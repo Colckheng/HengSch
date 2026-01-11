@@ -48,14 +48,17 @@ function getAutoStartWindows(): boolean {
   const keyPath = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
   const regQuery = `reg query "${keyPath}" /v "HengSch Todo"`;
   
-  exec(regQuery, (error) => {
-    if (error) {
-      return false;
-    }
-    return true;
+  return new Promise<boolean>((resolve) => {
+    exec(regQuery, (error, stdout, stderr) => {
+      if (error || stderr) {
+        resolve(false);
+      } else {
+        resolve(stdout.includes('HengSch Todo'));
+      }
+    });
+  }).catch(() => {
+    resolve(false);
   });
-  
-  return false;
 }
 
 function setAutoStartMac(enable: boolean): void {

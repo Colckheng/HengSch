@@ -55,6 +55,40 @@ function todoReducer(state: TodoState, action: TodoAction): TodoState {
             }
           : todo
       );
+      
+      const toggledTodo = updatedTodos.find((t) => t.id === action.payload);
+      if (toggledTodo && toggledTodo.type === 'recurring') {
+        const recurringTodo = toggledTodo as RecurringTodo;
+        if (toggledTodo.status === 'pending') {
+          const now = Date.now();
+          let nextDueDate: number | undefined;
+          
+          switch (recurringTodo.cycleType) {
+            case 'daily':
+              nextDueDate = now + 24 * 60 * 60 * 1000;
+              break;
+            case 'weekly':
+              nextDueDate = now + 7 * 24 * 60 * 60 * 1000;
+              break;
+            case 'monthly':
+              const nextMonth = new Date(now);
+              nextMonth.setMonth(nextMonth.getMonth() + 1);
+              nextDueDate = nextMonth.getTime();
+              break;
+            case 'custom':
+              if (recurringTodo.customCycleDays) {
+                nextDueDate = now + recurringTodo.customCycleDays * 24 * 60 * 60 * 1000;
+              }
+              break;
+          }
+          
+          const todoIndex = updatedTodos.findIndex(t => t.id === toggledTodo.id);
+          if (todoIndex !== -1) {
+            updatedTodos[todoIndex] = { ...updatedTodos[todoIndex], nextDueDate };
+          }
+        }
+      }
+      
       const sortedTodos = [
         ...updatedTodos.filter((todo) => todo.status === 'pending'),
         ...updatedTodos.filter((todo) => todo.status === 'completed')

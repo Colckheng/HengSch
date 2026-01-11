@@ -80,7 +80,7 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isCompactMode, toggleCompactMode]);
+  }, [isCompactMode]);
 
   const minimizeWindow = async () => {
     try {

@@ -22,13 +22,15 @@ function createWindow(): void {
       sandbox: false
     },
     frame: false,
-    transparent: true,
+    transparent: false,
+    backgroundColor: '#f0f0f0',
     resizable: true,
     alwaysOnTop: store.get('alwaysOnTop', false) as boolean
   });
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
   }

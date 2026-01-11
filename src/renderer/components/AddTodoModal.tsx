@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { TodoType, CycleType } from '../types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
@@ -18,19 +18,44 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
 
+  const handleClose = useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setType('once');
+    setCycleType('daily');
+    setCustomCycleDays('');
+    setSelectedGroupId('default');
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, handleClose]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) return;
 
     if (type === 'recurring') {
+      const parsedDays = parseInt(customCycleDays);
       addTodo({
         title: title.trim(),
         description: description.trim() || undefined,
         type: 'recurring',
         status: 'pending',
         cycleType,
-        customCycleDays: cycleType === 'custom' ? parseInt(customCycleDays) || undefined : undefined,
+        customCycleDays: cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined,
         nextDueDate: Date.now(),
         groupId: selectedGroupId
       });
@@ -45,16 +70,6 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
     }
 
     handleClose();
-  };
-
-  const handleClose = () => {
-    setTitle('');
-    setDescription('');
-    setType('once');
-    setCycleType('daily');
-    setCustomCycleDays('');
-    setSelectedGroupId('default');
-    onClose();
   };
 
   if (!isOpen) return <></>;

@@ -35,7 +35,9 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onDelete(todo.id);
+    if (confirm('确定要删除这个待办事项吗？')) {
+      onDelete(todo.id);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent) => {

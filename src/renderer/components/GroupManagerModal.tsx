@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGroups, DEFAULT_GROUP_COLORS } from '../context/GroupContext';
+import { useTodos } from '../context/TodoContext';
 import { ColorPicker } from './ColorPicker';
 import type { Group } from '../types';
 
@@ -14,6 +15,20 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedColor, setSelectedColor] = useState(DEFAULT_GROUP_COLORS[0]);
   const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   const handleAddGroup = () => {
     if (!newGroupName.trim()) return;
@@ -49,9 +64,14 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
 
   const handleDeleteGroup = (groupId: string) => {
     if (groupId === 'default') return;
-
     if (confirm('确定要删除这个分组吗？该分组下的所有待办事项将变为未分类。')) {
       deleteGroup(groupId);
+      const { updateTodo } = useTodos();
+      state.todos.forEach((todo) => {
+        if (todo.groupId === groupId) {
+          updateTodo(todo.id, { groupId: 'default' });
+        }
+      });
     }
   };
 

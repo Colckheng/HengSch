@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { Todo, RecurringTodo } from '../types';
 
 interface TodoDetailModalProps {
@@ -7,6 +8,20 @@ interface TodoDetailModalProps {
 }
 
 export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps): JSX.Element {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !todo) return <></>;
 
   const isCompleted = todo.status === 'completed';
