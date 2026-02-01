@@ -1,0 +1,20 @@
+{
+  "name": "hengsch-monorepo",
+  "version": "1.0.0",
+  "description": "HengSch Todo - Multi-platform todo management application",
+  "private": true,
+  "workspaces": [
+    "v1.0.0",
+    "v1.1.0-web",
+    "v1.1.0-an",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build --workspaces --if-present",
+    "build:web": "npm run build --workspace=v1.1.0-web",
+    "start:an": "npm run start --workspace=v1.1.0-an"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

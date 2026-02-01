@@ -1,0 +1,21 @@
+{
+  "name": "@hengsch/shared-logic",
+  "version": "1.0.0",
+  "description": "Shared business logic for HengSch",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hengsch/shared-types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}
