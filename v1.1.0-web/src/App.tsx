@@ -7,7 +7,6 @@ import { EditTodoModal } from './components/EditTodoModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GroupManagerModal } from './components/GroupManagerModal';
 import type { Todo } from '@hengsch/shared-types';
-import './styles/index.css';
 
 function AppContent() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

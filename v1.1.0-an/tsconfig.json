@@ -4,9 +4,9 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@hengsch/shared-types": ["../packages/shared-types/src/index.ts"],
-      "@hengsch/shared-logic": ["../packages/shared-logic/src/index.ts"],
-      "@hengsch/shared-storage": ["../packages/shared-storage/src/index.ts"]
+      "@hengsch/shared-types": ["./shared/shared-types/index.ts"],
+      "@hengsch/shared-logic": ["./shared/shared-logic/index.ts"],
+      "@hengsch/shared-storage": ["./shared/shared-storage/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

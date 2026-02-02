@@ -1,21 +1,25 @@
 ## HengSch 项目多端开发规划（v1.0.x / v1.1.x）
 
-本文档描述当前桌面端 v1.0.0 的后续演进规划，以及移动端 / Web 端的新版本规划。后期如果有调整，建议在本文档基础上更新版本记录，而不是另起新文档。
+本文档描述 HengSch 多端（桌面、Web、移动）的总体规划与实施状态。后期如有调整，建议在本文档基础上更新版本记录，而不是另起新文档。
 
 ---
 
-## 一、当前状态概览（v1.0.0 桌面端）
+## 一、当前状态概览
 
+### v1.0.0 桌面端（已完成）
 - **技术栈**：Electron + React + TypeScript + Vite  
-- **目录位置**：`v1.0.0/`（当前桌面端主工程）  
-- **主要特性**：
-  - 待办事项：一次性 + 循环任务、状态管理、拖拽排序
-  - 分组管理：颜色主题、筛选等
-  - 窗口特性：小窗模式、置顶、开机自启动、窗口位置和大小记忆
+- **目录位置**：`v1.0.0/`  
+- **主要特性**：待办（一次性 + 循环）、拖拽排序、分组管理、小窗模式、贴边缩入、置顶、开机自启动、窗口记忆
 
-本规划重点围绕：
-- 桌面端 v1.0.x 小窗模式增强
-- 新增 v1.1.0-web（网页端）与 v1.1.0-an（移动端）
+### v1.1.0-web 网页端（已完成）
+- **技术栈**：Vite + React + TypeScript  
+- **目录位置**：`v1.1.0-web/`  
+- **主要特性**：待办、分组管理、拖拽排序（原生 HTML5）、响应式布局、PWA（离线 + 安装到主屏）
+
+### v1.1.0-an 移动端（已完成）
+- **技术栈**：Expo + React Native + TypeScript  
+- **目录位置**：`v1.1.0-an/`  
+- **主要特性**：待办、分组管理、分组筛选、EAS Build 打包 APK
 
 ---
 
@@ -99,14 +103,14 @@ v1.1.0 计划新增两个子项目：
 
 - `v1.0.0/`：现有 Electron 桌面端。
 - `v1.1.0-web/`：Web 版本工程（Vite + React + TS）。
-- `v1.1.0-an/`：移动端工程（技术栈待定：React Native 或 Capacitor + React）。
+- `v1.1.0-an/`：移动端工程（Expo + React Native + TypeScript）。
 - `packages/`：存放可复用的共享代码：
   - `packages/shared-types/`：Todo、Group、窗口配置等 TypeScript 类型定义。
   - `packages/shared-logic/`：纯业务逻辑模块（如循环任务计算、排序、过滤、数据迁移等），输出 ESM 格式以兼容 Vite/Rollup。
   - `packages/shared-storage/`：存储接口定义与默认实现（桌面端、Web 端、移动端可有各自实现）。
   - （可选）`packages/shared-ui/`：跨 Web + Electron 共用的一些基础 UI 组件或样式工具。
 
-后续可以考虑引入 npm workspaces / pnpm / yarn workspace 来统一管理多工程依赖。
+根目录已配置 npm workspaces，统一管理 `v1.0.0`、`v1.1.0-web`、`packages/*`。`v1.1.0-an` 为独立工程，不在 workspaces 内，便于 EAS Build 自包含构建。
 
 ### 3.2 跨端共享策略
 
@@ -144,8 +148,8 @@ v1.1.0 计划新增两个子项目：
 - **目录位置**：`v1.1.0-web/`。
 - **核心依赖**：
   - `react` / `react-dom`
-  - `@dnd-kit/*`（当前使用原生 HTML5 拖拽）
   - 与桌面端共享的 `shared-*` 包。
+  - 拖拽排序使用原生 HTML5 DnD API，无需额外库。
 
 ### 4.2 功能目标
 
@@ -178,16 +182,14 @@ v1.1.0 计划新增两个子项目：
 
 ### 4.5 里程碑
 
-- **web v0.1**（已完成）
+- **web v0.1**（已完成）— **v1.1.0-web 开发完毕**
   - 项目基础骨架搭建完成。
   - 集成 `shared-types`、`shared-logic`、`shared-storage`。
   - 实现 Todo 列表、分组管理、添加/编辑/详情等核心功能。
   - 响应式布局（桌面端 + 移动端，添加/编辑全屏、分组侧边抽屉）。
   - PWA 支持（manifest + Service Worker + 安装到主屏）。
-  - **问题修复**（启动后白屏）：
-    - tsconfig 补充 `"jsx": "react-jsx"`，保证 TS 能正确解析 JSX。
-    - TodoContext、GroupContext 补全 `useState` 的导入。
-    - 增加 ErrorBoundary 用于捕获并展示运行时错误。
+  - 问题修复（启动后白屏）：tsconfig 补充 jsx、Context 补全 useState、增加 ErrorBoundary。
+  - 代码优化：移除 Vite 模板冗余文件（main.ts、counter.ts、style.css、typescript.svg），移除未使用的 @dnd-kit 依赖。
 
 ---
 
@@ -224,14 +226,13 @@ v1.1.0 计划新增两个子项目：
 
 ### 5.4 里程碑（粗粒度）
 
-- **an v0.1**（已完成）
+- **an v0.1**（已完成）— **v1.1.0-an 开发完毕**
   - 项目结构搭建完成，使用 Expo (React Native) + TypeScript，可在真机/模拟器运行。
   - 集成 `shared-types`、`shared-logic`、`shared-storage`。
   - 实现 Todo 与分组的基础功能：列表、详情、编辑、添加、删除、分组管理。
   - 存储使用 AsyncStorage 实现 `IStorage` 接口。
-  - Metro 配置支持 monorepo，workspace 包含 `v1.1.0-an`。
   - **EAS Build 打包 APK**：配置 `eas.json`，支持 `eas build --platform android --profile preview` 云构建 APK，无需本地 Android SDK。
-  - **启动前**需在根目录执行 `npm run build:packages` 以编译共享包。
+  - **自包含构建**：`v1.1.0-an/shared/` 内嵌 shared 包副本，EAS 构建不依赖 monorepo 父级；根目录 `npm run sync-shared` 或 `v1.1.0-an` 内 `npm run sync-shared` 可从 packages/ 同步更新。
 
 - **an v0.2**
   - 完善 UI 交互（滑动操作、手势交互等）。
@@ -240,32 +241,19 @@ v1.1.0 计划新增两个子项目：
 
 ---
 
-## 六、建议的实施顺序
+## 六、实施顺序与完成状态
 
-1. **第一阶段：桌面端 v1.0.x**
-   - 在现有 `v1.0.0` 基础上实现：
-     - 小窗模式四边吸附。
-     - 基础版闲置自动缩入 + 鼠标靠近弹出。
-   - 在此基础上迭代动画与配置选项。
+1. **第一阶段：桌面端 v1.0.x**（已完成）
+   - 小窗模式四边吸附、闲置自动缩入、鼠标靠近弹出、动效、吸附优先级等均已实现。
 
 2. **第二阶段：抽取共享代码（packages）与 Monorepo 搭建**（已完成）
-   - 创建 `packages/shared-types/`：抽取 Todo、Group 等 TypeScript 类型定义。
-   - 创建 `packages/shared-logic/`：抽取循环任务计算、排序、过滤等业务逻辑。
-   - 创建 `packages/shared-storage/`：定义存储接口抽象（IStorage）。
-   - 创建根目录 `package.json`，配置 npm workspaces 支持 Monorepo。
-   - 重构 `v1.0.0` 使用共享包，验证抽象是否合理：
-     - 更新类型引用：从 `@hengsch/shared-types` 导入类型。
-     - 更新业务逻辑：使用 `@hengsch/shared-logic` 中的工具函数（toggleTodoStatus、sortTodosByStatus、generateTodoId 等）。
-     - 配置 TypeScript 路径别名，支持直接引用 packages 源码。
+   - 创建 `packages/shared-types`、`shared-logic`、`shared-storage`，配置 npm workspaces，重构 `v1.0.0` 使用共享包。
 
-3. **第三阶段：v1.1.0-web 搭建**
-   - 创建 `v1.1.0-web` 工程。
-   - 接入共享类型与业务逻辑，实现核心功能。
+3. **第三阶段：v1.1.0-web 搭建**（已完成）
+   - 创建 `v1.1.0-web` 工程，接入共享包，实现核心功能、响应式布局、PWA 支持。
 
 4. **第四阶段：v1.1.0-an 搭建**（已完成）
-   - 采用 Expo (React Native) + TypeScript 作为移动端技术路线。
-   - 搭建 `v1.1.0-an` 工程，实现 Todo 列表、详情、编辑、分组管理、添加/删除等核心功能。
-   - 使用 AsyncStorage 持久化，Metro 配置支持 monorepo。
+   - 采用 Expo + React Native + TypeScript，搭建 `v1.1.0-an`，实现 Todo/分组功能，使用 AsyncStorage，支持 EAS Build 打包 APK。
 
 ---
 
@@ -282,6 +270,8 @@ v1.1.0 计划新增两个子项目：
 - 2026-01-31：v1.0.0 构建修复：auto-start.ts 改用 execSync 保持同步返回；GroupManagerModal 修复 state.todos 误用（改用 todoState.todos）及 useTodos 在回调内调用问题。
 - 2026-01-31：shared-logic 输出由 CommonJS 改为 ESM，解决 Vite/Rollup 命名导出解析问题。
 - 2026-01-31：v1.1.0-an 添加 EAS Build 配置，支持 `eas build --platform android` 云端打包 APK。
+- 2026-01-31：v1.1.0-an 改为自包含构建，内嵌 shared 包至 `shared/`，移除对 monorepo workspace 的构建依赖，修复 EAS Build Gradle 失败。
+- 2026-01-31：v1.1.0 系统性检查与代码优化。Web 端：移除 Vite 模板冗余文件（main.ts、counter.ts、style.css、typescript.svg），移除未使用的 @dnd-kit 依赖，移除 App.tsx 重复样式导入。根目录新增 `npm run sync-shared` 脚本。文档整体更新：补充 v1.1.0-web / v1.1.0-an 完成状态，更新技术栈描述与实施顺序。
 
 这样可以方便未来回顾每一阶段的决策背景。
 
