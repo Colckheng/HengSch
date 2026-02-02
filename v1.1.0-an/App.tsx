@@ -8,6 +8,7 @@ import { AddTodoModal } from './src/components/AddTodoModal';
 import { EditTodoModal } from './src/components/EditTodoModal';
 import { TodoDetailModal } from './src/components/TodoDetailModal';
 import { GroupManagerModal } from './src/components/GroupManagerModal';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import type { Todo } from '@hengsch/shared-types';
 
 function AppContent(): React.ReactElement {
@@ -73,11 +74,13 @@ function AppContent(): React.ReactElement {
 
 export default function App(): React.ReactElement {
   return (
-    <GroupProvider>
-      <TodoProvider>
-        <AppContent />
-      </TodoProvider>
-    </GroupProvider>
+    <ErrorBoundary>
+      <GroupProvider>
+        <TodoProvider>
+          <AppContent />
+        </TodoProvider>
+      </GroupProvider>
+    </ErrorBoundary>
   );
 }
 

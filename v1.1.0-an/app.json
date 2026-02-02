@@ -2,25 +2,41 @@
   "expo": {
     "name": "HengSch Todo",
     "slug": "hengsch-todo",
-    "version": "0.0.1",
+    "version": "1.1.0",
+    "description": "功能完整的待办事项管理软件（移动端）",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "primaryColor": "#e8eaed",
+    "backgroundColor": "#ffffff",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#e8eaed"
     },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#e8eaed"
+    },
     "ios": {
+      "bundleIdentifier": "com.hengsch.todo",
+      "buildNumber": "1",
       "supportsTablet": true,
-      "bundleIdentifier": "com.hengsch.todo"
+      "userInterfaceStyle": "light"
     },
     "android": {
+      "package": "com.hengsch.todo",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#e8eaed",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
-      "package": "com.hengsch.todo"
+      "userInterfaceStyle": "light"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "76e9118f-c706-49fd-8f98-c84c7426b053"
+      }
     }
   }
 }

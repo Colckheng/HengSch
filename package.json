@@ -6,15 +6,20 @@
   "workspaces": [
     "v1.0.0",
     "v1.1.0-web",
-    "v1.1.0-an",
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build:web",
     "build:packages": "npm run build --workspaces --if-present",
     "build:web": "npm run build --workspace=v1.1.0-web",
-    "start:an": "npm run start --workspace=v1.1.0-an"
+    "start:an": "npm run start --prefix v1.1.0-an",
+    "sync-shared": "npm run sync-shared --prefix v1.1.0-an"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
 }
