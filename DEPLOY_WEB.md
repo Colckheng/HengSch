@@ -10,7 +10,7 @@ Web 端为 Vite + React 静态站点，构建产物在 `v1.1.0-web/dist`。支�
 
 1. 打开 [vercel.com](https://vercel.com)，登录（支持 GitHub）。
 2. 点击 **Add New Project**，导入 HengSch 仓库。
-3. 保持 **Root Directory** 为仓库根目录（`.`）。
+3. **重要**：**Root Directory** 必须保持为**空**或填 **`.`**（仓库根目录）。若误选为 `v1.1.0-web`，会报错 `Missing script: "build:web"`，因为该脚本定义在根目录 `package.json`。
 4. 构建配置已写在根目录 `vercel.json`，一般无需修改。
 5. 点击 **Deploy** 完成部署。
 
