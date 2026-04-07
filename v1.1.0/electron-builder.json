@@ -1,21 +1,33 @@
 {
   "appId": "com.hengsch.todo",
   "productName": "HengSch Todo",
+  "electronVersion": "30.5.1",
   "directories": {
-    "output": "release"
+    "output": "release",
+    "buildResources": "build"
   },
   "files": [
     "dist/**/*",
     "package.json"
   ],
+  "extraResources": [
+    {
+      "from": "build/icon.png",
+      "to": "build/icon.png"
+    },
+    {
+      "from": "build/icon.ico",
+      "to": "build/icon.ico"
+    }
+  ],
   "win": {
+    "icon": "build/icon.ico",
     "target": [
       {
         "target": "nsis",
         "arch": ["x64"]
       }
-    ],
-    "icon": "public/assets/icon.ico"
+    ]
   },
   "nsis": {
     "oneClick": false,

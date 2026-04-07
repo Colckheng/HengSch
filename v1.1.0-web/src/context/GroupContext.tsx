@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
-import type { Group } from '@hengsch/shared-types';
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react';
 import { generateGroupId } from '@hengsch/shared-logic';
+import type { Group } from '@hengsch/shared-types';
 import { storage } from '../utils/localStorageAdapter';
 
 interface GroupState {
@@ -22,22 +22,29 @@ interface GroupContextType {
   getGroupById: (id: string) => Group | undefined;
 }
 
-const GroupContext = createContext<GroupContextType | undefined>(undefined);
+const FALLBACK_GROUP: Group = {
+  id: 'default',
+  name: '未分类',
+  color: '#f4f0e7',
+  createdAt: Date.now()
+};
 
-const DEFAULT_GROUP_COLORS = [
-  '#E3F2FD',
-  '#E8F5E9',
-  '#FFF3E0',
-  '#F3E5F5',
-  '#E0F2F1',
-  '#FFF9C4',
-  '#FCE4EC',
-  '#E8EAF6',
-  '#E0F7FA',
-  '#F5F5F5',
-  '#FFF8E1',
-  '#FBE9E7'
+export const DEFAULT_GROUP_COLORS = [
+  '#e8c56a',
+  '#b8d5f2',
+  '#efc3ae',
+  '#b9d8c0',
+  '#cdc2e9',
+  '#e7c7cf',
+  '#f0e3b5',
+  '#c9dfdd',
+  '#d7bca5',
+  '#c6d9cf',
+  '#ddd0bf',
+  '#efe2d3'
 ];
+
+const GroupContext = createContext<GroupContextType | undefined>(undefined);
 
 function groupReducer(state: GroupState, action: GroupAction): GroupState {
   switch (action.type) {
@@ -64,49 +71,41 @@ function groupReducer(state: GroupState, action: GroupAction): GroupState {
 
 export function GroupProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(groupReducer, { groups: [] });
-  const [isInitialized, setIsInitialized] = useState(false);
+  const isLoadedRef = useRef(false);
 
-  useEffect(() => {
-    loadGroups().then(() => setIsInitialized(true));
-  }, []);
-
-  useEffect(() => {
-    if (isInitialized) saveGroups();
-  }, [state.groups, isInitialized]);
-
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       const savedGroups = await storage.get<Group[]>('groups');
-      if (savedGroups && Array.isArray(savedGroups)) {
+      if (savedGroups && Array.isArray(savedGroups) && savedGroups.length > 0) {
         dispatch({ type: 'SET_GROUPS', payload: savedGroups });
       } else {
-        const defaultGroup: Group = {
-          id: 'default',
-          name: '未分类',
-          color: '#F5F5F5',
-          createdAt: Date.now()
-        };
-        dispatch({ type: 'SET_GROUPS', payload: [defaultGroup] });
+        dispatch({ type: 'SET_GROUPS', payload: [FALLBACK_GROUP] });
       }
     } catch (error) {
       console.error('Failed to load groups:', error);
-      const defaultGroup: Group = {
-        id: 'default',
-        name: '未分类',
-        color: '#F5F5F5',
-        createdAt: Date.now()
-      };
-      dispatch({ type: 'SET_GROUPS', payload: [defaultGroup] });
+      dispatch({ type: 'SET_GROUPS', payload: [FALLBACK_GROUP] });
+    } finally {
+      isLoadedRef.current = true;
     }
-  };
+  }, []);
 
-  const saveGroups = async () => {
+  const saveGroups = useCallback(async () => {
     try {
       await storage.set('groups', state.groups);
     } catch (error) {
       console.error('Failed to save groups:', error);
     }
-  };
+  }, [state.groups]);
+
+  useEffect(() => {
+    void loadGroups();
+  }, [loadGroups]);
+
+  useEffect(() => {
+    if (isLoadedRef.current) {
+      void saveGroups();
+    }
+  }, [saveGroups]);
 
   const addGroup = (groupData: Omit<Group, 'id' | 'createdAt'>) => {
     const newGroup: Group = {
@@ -123,9 +122,9 @@ export function GroupProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   const deleteGroup = (id: string) => {
     if (id === 'default') {
-      console.warn('Cannot delete default group');
       return;
     }
+
     dispatch({ type: 'DELETE_GROUP', payload: id });
   };
 
@@ -156,5 +155,3 @@ export function useGroups(): GroupContextType {
   }
   return context;
 }
-
-export { DEFAULT_GROUP_COLORS };

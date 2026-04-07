@@ -9,9 +9,9 @@ module.exports = function (api) {
         'module-resolver',
         {
           alias: {
-            '@hengsch/shared-types': path.resolve(__dirname, 'shared/shared-types'),
-            '@hengsch/shared-logic': path.resolve(__dirname, 'shared/shared-logic'),
-            '@hengsch/shared-storage': path.resolve(__dirname, 'shared/shared-storage'),
+            '@hengsch/shared-types': path.resolve(__dirname, 'shared/shared-types/index.ts'),
+            '@hengsch/shared-logic': path.resolve(__dirname, 'shared/shared-logic/index.ts'),
+            '@hengsch/shared-storage': path.resolve(__dirname, 'shared/shared-storage/index.ts'),
           },
         },
       ],

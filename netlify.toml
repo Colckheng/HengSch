@@ -1,9 +1,7 @@
-# Netlify 部署配置 - HengSch Todo Web 端
 [build]
   command = "npm run build:web"
-  publish = "v1.1.0-web/dist"
+  publish = "v2.0.0-web/dist"
 
-# SPA 路由回退
 [[redirects]]
   from = "/*"
   to = "/index.html"

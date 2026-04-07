@@ -45,7 +45,7 @@ export class AsyncStorageAdapter implements IStorage {
 
   async keys(): Promise<string[]> {
     try {
-      return await AsyncStorage.getAllKeys();
+      return Array.from(await AsyncStorage.getAllKeys());
     } catch (error) {
       console.error('[AsyncStorage] Failed to get keys:', error);
       return [];

@@ -17,6 +17,7 @@ export function ColorPicker({ selectedColor, onColorSelect }: ColorPickerProps):
             onClick={() => onColorSelect(color)}
             aria-label={`选择颜色 ${color}`}
             title={color}
+            type="button"
           >
             {selectedColor === color && <span className="color-check">✓</span>}
           </button>

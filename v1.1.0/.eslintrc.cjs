@@ -18,5 +18,13 @@ module.exports = {
       'error',
       { argsIgnorePattern: '^_' }
     ]
-  }
+  },
+  overrides: [
+    {
+      files: ['src/renderer/context/*.tsx'],
+      rules: {
+        'react-refresh/only-export-components': 'off'
+      }
+    }
+  ]
 };

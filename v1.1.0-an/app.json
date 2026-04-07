@@ -6,17 +6,17 @@
     "description": "功能完整的待办事项管理软件（移动端）",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "primaryColor": "#e8eaed",
-    "backgroundColor": "#ffffff",
+    "primaryColor": "#efe6d6",
+    "backgroundColor": "#f5efe2",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#e8eaed"
+      "backgroundColor": "#efe6d6"
     },
     "androidStatusBar": {
       "barStyle": "dark-content",
-      "backgroundColor": "#e8eaed"
+      "backgroundColor": "#efe6d6"
     },
     "ios": {
       "bundleIdentifier": "com.hengsch.todo",
@@ -28,7 +28,7 @@
       "package": "com.hengsch.todo",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#e8eaed",
+        "backgroundColor": "#efe6d6",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "userInterfaceStyle": "light"

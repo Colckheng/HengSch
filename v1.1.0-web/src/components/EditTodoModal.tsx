@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Todo, TodoType, CycleType, RecurringTodo } from '@hengsch/shared-types';
-import { useTodos } from '../context/TodoContext';
+import { useCallback, useEffect, useState } from 'react';
+import type { CycleType, RecurringTodo, Todo, TodoType } from '@hengsch/shared-types';
 import { useGroups } from '../context/GroupContext';
+import { useTodos } from '../context/TodoContext';
 
 interface EditTodoModalProps {
   isOpen: boolean;
@@ -9,8 +9,25 @@ interface EditTodoModalProps {
   todo: Todo | null;
 }
 
+const todoTypeOptions: Array<{ value: TodoType; label: string }> = [
+  { value: 'once', label: '一次性' },
+  { value: 'recurring', label: '循环事项' }
+];
+
+const statusOptions: Array<{ value: 'pending' | 'completed'; label: string }> = [
+  { value: 'pending', label: '待推进' },
+  { value: 'completed', label: '已完成' }
+];
+
+const cycleOptions: Array<{ value: CycleType; label: string }> = [
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+  { value: 'custom', label: '自定义' }
+];
+
 export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JSX.Element {
-  const { updateTodo } = useTodos();
+  const { updateTodo, deleteTodo } = useTodos();
   const { state: groupState } = useGroups();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -18,18 +35,26 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
   const [cycleType, setCycleType] = useState<CycleType>('daily');
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
+  const [status, setStatus] = useState<'pending' | 'completed'>('pending');
 
   useEffect(() => {
-    if (todo) {
-      setTitle(todo.title);
-      setDescription(todo.description || '');
-      setType(todo.type);
-      setSelectedGroupId(todo.groupId || 'default');
-      if (todo.type === 'recurring') {
-        const recurringTodo = todo as RecurringTodo;
-        setCycleType(recurringTodo.cycleType);
-        setCustomCycleDays(recurringTodo.customCycleDays?.toString() || '');
-      }
+    if (!todo) {
+      return;
+    }
+
+    setTitle(todo.title);
+    setDescription(todo.description || '');
+    setType(todo.type);
+    setSelectedGroupId(todo.groupId || 'default');
+    setStatus(todo.status);
+
+    if (todo.type === 'recurring') {
+      const recurringTodo = todo as RecurringTodo;
+      setCycleType(recurringTodo.cycleType);
+      setCustomCycleDays(recurringTodo.customCycleDays?.toString() || '');
+    } else {
+      setCycleType('daily');
+      setCustomCycleDays('');
     }
   }, [todo]);
 
@@ -40,143 +65,199 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
     setCycleType('daily');
     setCustomCycleDays('');
     setSelectedGroupId('default');
+    setStatus('pending');
     onClose();
   }, [onClose]);
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === 'Escape') {
         handleClose();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleClose, isOpen]);
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, handleClose]);
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    if (!todo || !title.trim()) {
+      return;
+    }
 
-    if (!todo || !title.trim()) return;
-
-    const updateData: Partial<Todo> = {
+    const updates: Partial<Todo> = {
       title: title.trim(),
       description: description.trim() || undefined,
       type,
+      status,
       groupId: selectedGroupId
     };
 
     if (type === 'recurring') {
-      const recurringUpdateData = updateData as Partial<RecurringTodo>;
-      recurringUpdateData.cycleType = cycleType;
-      const parsedDays = parseInt(customCycleDays);
-      recurringUpdateData.customCycleDays = cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined;
-      updateTodo(todo.id, recurringUpdateData);
-    } else {
-      updateTodo(todo.id, updateData);
+      const parsedDays = parseInt(customCycleDays, 10);
+      const recurringUpdate = updates as Partial<RecurringTodo>;
+      recurringUpdate.cycleType = cycleType;
+      recurringUpdate.customCycleDays =
+        cycleType === 'custom' && !Number.isNaN(parsedDays) && parsedDays > 0
+          ? parsedDays
+          : undefined;
     }
 
+    updateTodo(todo.id, updates);
     handleClose();
   };
 
-  if (!isOpen || !todo) return <></>;
+  const handleDelete = (): void => {
+    if (!todo) {
+      return;
+    }
+
+    if (confirm('确定要删除这条待办事项吗？')) {
+      deleteTodo(todo.id);
+      handleClose();
+    }
+  };
+
+  if (!isOpen || !todo) {
+    return <></>;
+  }
 
   return (
-    <div className="modal-overlay modal-add-edit" onClick={handleClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={handleClose}>
+      <div className="modal-card modal-card-form tone-blue" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
-          <h2>编辑待办事项</h2>
-          <button className="modal-close" onClick={handleClose} aria-label="关闭">
-            ✕
-          </button>
+          <div className="modal-header-copy">
+            <span className="modal-kicker">编辑待办</span>
+            <h2>{todo.title}</h2>
+            <p>调整标题、状态、分组或循环方式，让它继续留在正确的位置。</p>
+          </div>
+          <span className={`modal-status-chip ${status === 'completed' ? 'completed' : 'pending'}`}>
+            {status === 'completed' ? '已完成' : '待推进'}
+          </span>
+          <button className="modal-close" onClick={handleClose} aria-label="关闭" />
         </div>
-        <form onSubmit={handleSubmit} className="modal-body">
+
+        <form className="modal-body modal-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="edit-title">标题 *</label>
+            <label htmlFor="edit-title">任务标题</label>
             <input
               id="edit-title"
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="输入待办事项标题"
-              required
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="输入待办标题"
               autoFocus
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="edit-description">描述</label>
+            <label htmlFor="edit-description">描述说明</label>
             <textarea
               id="edit-description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="输入待办事项描述（可选）"
-              rows={3}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="补充任务背景、边界或完成标准"
+              rows={4}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="edit-type">类型</label>
-            <select id="edit-type" value={type} onChange={(e) => setType(e.target.value as TodoType)}>
-              <option value="once">一次性待办事项</option>
-              <option value="recurring">循环待办事项</option>
-            </select>
+          <div className="modal-grid">
+            <div className="form-group">
+              <label>任务状态</label>
+              <div className="choice-row">
+                {statusOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`choice-chip ${status === option.value ? 'active tone-green' : ''}`}
+                    onClick={() => setStatus(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>任务类型</label>
+              <div className="choice-row">
+                {todoTypeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`choice-chip ${type === option.value ? 'active tone-blue' : ''}`}
+                    onClick={() => setType(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="edit-group">分组</label>
-            <select id="edit-group" value={selectedGroupId} onChange={(e) => setSelectedGroupId(e.target.value)}>
+            <label>所属分组</label>
+            <div className="choice-row">
               {groupState.groups.map((group) => (
-                <option key={group.id} value={group.id}>
+                <button
+                  key={group.id}
+                  type="button"
+                  className={`choice-chip ${selectedGroupId === group.id ? 'active' : ''}`}
+                  onClick={() => setSelectedGroupId(group.id)}
+                >
                   {group.name}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           {type === 'recurring' && (
-            <>
-              <div className="form-group">
-                <label htmlFor="edit-cycleType">循环周期</label>
-                <select
-                  id="edit-cycleType"
-                  value={cycleType}
-                  onChange={(e) => setCycleType(e.target.value as CycleType)}
-                >
-                  <option value="daily">每天</option>
-                  <option value="weekly">每周</option>
-                  <option value="monthly">每月</option>
-                  <option value="custom">自定义</option>
-                </select>
+            <div className="form-group">
+              <label>循环频率</label>
+              <div className="choice-row">
+                {cycleOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`choice-chip ${cycleType === option.value ? 'active tone-coral' : ''}`}
+                    onClick={() => setCycleType(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
 
               {cycleType === 'custom' && (
-                <div className="form-group">
-                  <label htmlFor="edit-customCycleDays">自定义周期（天）</label>
-                  <input
-                    id="edit-customCycleDays"
-                    type="number"
-                    min={1}
-                    value={customCycleDays}
-                    onChange={(e) => setCustomCycleDays(e.target.value)}
-                    placeholder="输入天数"
-                    required
-                  />
-                </div>
+                <input
+                  className="inline-input"
+                  type="number"
+                  min="1"
+                  value={customCycleDays}
+                  onChange={(event) => setCustomCycleDays(event.target.value)}
+                  placeholder="输入循环天数"
+                />
               )}
-            </>
+            </div>
           )}
 
-          <div className="modal-footer">
-            <button type="button" className="button button-secondary" onClick={handleClose}>
-              取消
+          <div className="modal-footer modal-footer-split">
+            <button type="button" className="button button-danger" onClick={handleDelete}>
+              删除待办
             </button>
-            <button type="submit" className="button button-primary">
-              保存
-            </button>
+            <div className="modal-footer-actions">
+              <button type="button" className="button button-secondary" onClick={handleClose}>
+                取消
+              </button>
+              <button type="submit" className="button button-primary">
+                保存修改
+              </button>
+            </div>
           </div>
         </form>
       </div>

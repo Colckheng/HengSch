@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
-import type { Todo, RecurringTodo } from '@hengsch/shared-types';
-import { toggleTodoStatus, sortTodosByStatus, generateTodoId } from '@hengsch/shared-logic';
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react';
+import { generateTodoId, sortTodosByStatus, toggleTodoStatus as toggleTodoStatusLogic } from '@hengsch/shared-logic';
+import type { RecurringTodo, Todo } from '@hengsch/shared-types';
 import { storage } from '../utils/localStorageAdapter';
 
 interface TodoState {
@@ -18,7 +18,10 @@ type TodoAction =
 interface TodoContextType {
   state: TodoState;
   dispatch: React.Dispatch<TodoAction>;
-  addTodo: (todo: Omit<Todo, 'id' | 'createdAt' | 'order'> & Partial<Pick<RecurringTodo, 'cycleType' | 'customCycleDays' | 'nextDueDate'>>) => void;
+  addTodo: (
+    todo: Omit<Todo, 'id' | 'createdAt' | 'order'> &
+      Partial<Pick<RecurringTodo, 'cycleType' | 'customCycleDays' | 'nextDueDate'>>
+  ) => void;
   updateTodo: (id: string, updates: Partial<Todo>) => void;
   deleteTodo: (id: string) => void;
   toggleTodoStatus: (id: string) => void;
@@ -47,12 +50,12 @@ function todoReducer(state: TodoState, action: TodoAction): TodoState {
       };
     case 'REORDER_TODOS':
       return { ...state, todos: action.payload };
-    case 'TOGGLE_TODO_STATUS':
+    case 'TOGGLE_TODO_STATUS': {
       const updatedTodos = state.todos.map((todo) =>
-        todo.id === action.payload ? toggleTodoStatus(todo) : todo
+        todo.id === action.payload ? toggleTodoStatusLogic(todo) : todo
       );
-      const sortedTodos = sortTodosByStatus(updatedTodos);
-      return { ...state, todos: sortedTodos };
+      return { ...state, todos: sortTodosByStatus(updatedTodos) };
+    }
     default:
       return state;
   }
@@ -60,17 +63,9 @@ function todoReducer(state: TodoState, action: TodoAction): TodoState {
 
 export function TodoProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(todoReducer, { todos: [] });
-  const [isInitialized, setIsInitialized] = useState(false);
+  const isLoadedRef = useRef(false);
 
-  useEffect(() => {
-    loadTodos().then(() => setIsInitialized(true));
-  }, []);
-
-  useEffect(() => {
-    if (isInitialized) saveTodos();
-  }, [state.todos, isInitialized]);
-
-  const loadTodos = async () => {
+  const loadTodos = useCallback(async () => {
     try {
       const savedTodos = await storage.get<Todo[]>('todos');
       if (savedTodos && Array.isArray(savedTodos)) {
@@ -78,18 +73,33 @@ export function TodoProvider({ children }: { children: ReactNode }): JSX.Element
       }
     } catch (error) {
       console.error('Failed to load todos:', error);
+    } finally {
+      isLoadedRef.current = true;
     }
-  };
+  }, []);
 
-  const saveTodos = async () => {
+  const saveTodos = useCallback(async () => {
     try {
       await storage.set('todos', state.todos);
     } catch (error) {
       console.error('Failed to save todos:', error);
     }
-  };
+  }, [state.todos]);
 
-  const addTodo = (todoData: Omit<Todo, 'id' | 'createdAt' | 'order'>) => {
+  useEffect(() => {
+    void loadTodos();
+  }, [loadTodos]);
+
+  useEffect(() => {
+    if (isLoadedRef.current) {
+      void saveTodos();
+    }
+  }, [saveTodos]);
+
+  const addTodo = (
+    todoData: Omit<Todo, 'id' | 'createdAt' | 'order'> &
+      Partial<Pick<RecurringTodo, 'cycleType' | 'customCycleDays' | 'nextDueDate'>>
+  ) => {
     const newTodo: Todo = {
       ...todoData,
       id: generateTodoId(),

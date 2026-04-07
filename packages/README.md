@@ -60,7 +60,7 @@ npm run build
 
 ### 在项目中使用
 
-在 `v1.0.0`、`v1.1.0-web`、`v1.1.0-an` 中，通过 workspace 协议引用：
+在 `v1.1.0`、`v1.1.0-web`、`v1.1.0-an` 中，通过 workspace 协议引用：
 
 ```json
 {
