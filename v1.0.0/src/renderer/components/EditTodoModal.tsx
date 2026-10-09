@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Todo, TodoType, CycleType, RecurringTodo } from '../types';
+import type { Todo, TodoType, CycleType, RecurringTodo, MonitorConfig } from '../types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import { IconClose } from './Icons';
+import { MonitorSection } from './MonitorSection';
 
 interface EditTodoModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
   const [cycleType, setCycleType] = useState<CycleType>('daily');
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
+  const [monitor, setMonitor] = useState<MonitorConfig | undefined>(undefined);
   const [titleError, setTitleError] = useState(false);
 
   useEffect(() => {
@@ -32,6 +34,9 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
         const recurringTodo = todo as RecurringTodo;
         setCycleType(recurringTodo.cycleType);
         setCustomCycleDays(recurringTodo.customCycleDays?.toString() || '');
+        setMonitor(recurringTodo.monitor);
+      } else {
+        setMonitor(undefined);
       }
     }
   }, [todo]);
@@ -43,6 +48,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
     setCycleType('daily');
     setCustomCycleDays('');
     setSelectedGroupId('default');
+    setMonitor(undefined);
     setTitleError(false);
     onClose();
   }, [onClose]);
@@ -73,11 +79,13 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
     }
     setTitleError(false);
 
-    const updateData: Partial<Todo> = {
+    const updateData: Partial<Todo> & { monitor?: MonitorConfig } = {
       title: title.trim(),
       description: description.trim() || undefined,
       type,
-      groupId: selectedGroupId
+      groupId: selectedGroupId,
+      // 切换为一次性任务时清空监测配置
+      monitor: type === 'recurring' ? monitor : undefined
     };
 
     if (type === 'recurring') {
@@ -191,6 +199,8 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
                   />
                 </div>
               )}
+
+              <MonitorSection monitor={monitor} onChange={setMonitor} />
             </>
           )}
 

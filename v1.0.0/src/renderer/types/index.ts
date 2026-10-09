@@ -5,7 +5,9 @@ export type {
   Group,
   TodoItem,
   RecurringTodo,
-  Todo
+  Todo,
+  SyncedMeta,
+  MonitorConfig
 } from '@hengsch/shared-types';
 
 // 窗口状态类型（仅桌面端使用，不共享）

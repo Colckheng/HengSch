@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import type { Todo } from '../types';
+import type { Todo, RecurringTodo } from '../types';
 import { useGroups } from '../context/GroupContext';
+import { useTodos } from '../context/TodoContext';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconEdit, IconTrash } from './Icons';
 
@@ -26,7 +27,10 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { getGroupById } = useGroups();
+  const { monitorProgress } = useTodos();
   const group = todo.groupId ? getGroupById(todo.groupId) : undefined;
+  const monitor = todo.type === 'recurring' ? (todo as RecurringTodo).monitor : undefined;
+  const monitorMs = monitor ? monitorProgress[todo.id]?.ms ?? 0 : 0;
 
   const handleCardClick = () => {
     if (!isDragging) {
@@ -106,6 +110,11 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
       </div>
       <div className="todo-right">
         <span className="todo-meta">
+          {monitor && (
+            <span className="meta-monitor">
+              监测 {String(Math.floor(monitorMs / 60000)).padStart(2, '0')}/{monitor.thresholdMinutes} 分钟
+            </span>
+          )}
           {group && <span className="group-dot" style={{ backgroundColor: group.color }} />}
           {group && <span>{group.name}</span>}
           <span>{formatDate(todo.createdAt)}</span>

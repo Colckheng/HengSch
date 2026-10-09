@@ -1,7 +1,26 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import Store from 'electron-store';
 import { setAutoStart } from './auto-start';
+import {
+  initMonitorService,
+  configureMonitor,
+  listProcessDisplayNames,
+  getTodayProgress,
+  setJournalEnabled,
+  getJournalEnabled,
+  type MonitorEntry
+} from './monitor-service';
+import {
+  initSyncService,
+  runCycle,
+  testConnection,
+  configureSync,
+  getSyncConfig,
+  getSyncStatus
+} from './sync-service';
+import type { SyncConfig, SyncPayload } from '@hengsch/shared-types';
 
 const store = new Store();
 let mainWindow: BrowserWindow | null = null;
@@ -409,6 +428,13 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const pushToRenderer = (channel: string, payload: unknown) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(channel, payload);
+    }
+  };
+  initMonitorService(store, pushToRenderer);
+  initSyncService(store, pushToRenderer);
   createWindow();
 });
 
@@ -490,6 +516,37 @@ ipcMain.handle('store:set', (_, key: string, value: unknown) => {
 ipcMain.handle('store:delete', (_, key: string) => {
   store.delete(key);
 });
+
+ipcMain.handle('sync:deviceInfo', () => {
+  let deviceId = store.get('deviceId') as string | undefined;
+  if (!deviceId || typeof deviceId !== 'string') {
+    deviceId = randomUUID();
+    store.set('deviceId', deviceId);
+  }
+  return { deviceId };
+});
+
+ipcMain.handle('monitor:configure', (_, entries: MonitorEntry[]) => {
+  configureMonitor(Array.isArray(entries) ? entries : []);
+});
+
+ipcMain.handle('monitor:listProcesses', () => listProcessDisplayNames());
+
+ipcMain.handle('monitor:getProgress', () => getTodayProgress());
+
+ipcMain.handle('monitor:setJournalEnabled', (_, enabled: boolean) => setJournalEnabled(Boolean(enabled)));
+
+ipcMain.handle('monitor:getJournalEnabled', () => getJournalEnabled());
+
+ipcMain.handle('sync:getConfig', () => getSyncConfig());
+
+ipcMain.handle('sync:getStatus', () => getSyncStatus());
+
+ipcMain.handle('sync:configure', (_, cfg: SyncConfig) => configureSync(cfg));
+
+ipcMain.handle('sync:test', (_, cfg: SyncConfig) => testConnection(cfg));
+
+ipcMain.handle('sync:run', (_, local?: SyncPayload) => runCycle(local));
 
 ipcMain.handle('auto-start:set', (_, enable: boolean) => {
   setAutoStart(enable);

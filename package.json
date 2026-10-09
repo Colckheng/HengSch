@@ -12,6 +12,7 @@
     "build": "npm run build:web",
     "build:packages": "npm run build --workspaces --if-present",
     "build:web": "npm run build --workspace=v1.1.0-web",
+    "test": "npm test --workspaces --if-present",
     "start:an": "npm run start --prefix v1.1.0-an",
     "sync-shared": "npm run sync-shared --prefix v1.1.0-an"
   },

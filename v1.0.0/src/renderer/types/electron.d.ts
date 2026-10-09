@@ -1,3 +1,5 @@
+import type { SyncConfig, SyncStatus, SyncPayload } from '@hengsch/shared-types';
+
 export interface ElectronAPI {
   window: {
     minimize: () => Promise<void>;
@@ -19,6 +21,25 @@ export interface ElectronAPI {
   autoStart: {
     set: (enable: boolean) => Promise<void>;
     get: () => Promise<boolean>;
+  };
+  sync: {
+    deviceInfo: () => Promise<{ deviceId: string }>;
+    getConfig: () => Promise<{ config: SyncConfig | null; publicKey: string | null }>;
+    getStatus: () => Promise<SyncStatus>;
+    configure: (cfg: SyncConfig) => Promise<{ ok: boolean; error?: string }>;
+    test: (cfg: SyncConfig) => Promise<{ ok: boolean; error?: string }>;
+    run: (local?: SyncPayload) => Promise<{ status: SyncStatus; merged?: SyncPayload }>;
+    onStatus: (cb: (payload: SyncStatus) => void) => () => void;
+    onMerged: (cb: (payload: SyncPayload) => void) => () => void;
+  };
+  monitor: {
+    configure: (entries: { todoId: string; title: string; exeName: string; thresholdMinutes: number }[]) => Promise<void>;
+    listProcesses: () => Promise<string[]>;
+    getProgress: () => Promise<{ day: string; progress: Record<string, { ms: number; notified: boolean }> }>;
+    setJournalEnabled: (enabled: boolean) => Promise<boolean>;
+    getJournalEnabled: () => Promise<boolean>;
+    onProgress: (cb: (payload: { day: string; progress: Record<string, { ms: number; notified: boolean }> }) => void) => () => void;
+    onCompleted: (cb: (payload: { todoId: string }) => void) => () => void;
   };
 }
 

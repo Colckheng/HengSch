@@ -21,5 +21,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
   autoStart: {
     set: (enable: boolean) => ipcRenderer.invoke('auto-start:set', enable),
     get: () => ipcRenderer.invoke('auto-start:get')
+  },
+  sync: {
+    deviceInfo: () => ipcRenderer.invoke('sync:deviceInfo'),
+    getConfig: () => ipcRenderer.invoke('sync:getConfig'),
+    getStatus: () => ipcRenderer.invoke('sync:getStatus'),
+    configure: (cfg: unknown) => ipcRenderer.invoke('sync:configure', cfg),
+    test: (cfg: unknown) => ipcRenderer.invoke('sync:test', cfg),
+    run: (local?: unknown) => ipcRenderer.invoke('sync:run', local),
+    onStatus: (cb: (payload: unknown) => void) => {
+      const handler = (_: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on('sync:status', handler);
+      return () => ipcRenderer.removeListener('sync:status', handler);
+    },
+    onMerged: (cb: (payload: unknown) => void) => {
+      const handler = (_: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on('sync:merged', handler);
+      return () => ipcRenderer.removeListener('sync:merged', handler);
+    }
+  },
+  monitor: {
+    configure: (entries: unknown[]) => ipcRenderer.invoke('monitor:configure', entries),
+    listProcesses: () => ipcRenderer.invoke('monitor:listProcesses'),
+    getProgress: () => ipcRenderer.invoke('monitor:getProgress'),
+    setJournalEnabled: (enabled: boolean) => ipcRenderer.invoke('monitor:setJournalEnabled', enabled),
+    getJournalEnabled: () => ipcRenderer.invoke('monitor:getJournalEnabled'),
+    onProgress: (cb: (payload: unknown) => void) => {
+      const handler = (_: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on('monitor:progress', handler);
+      return () => ipcRenderer.removeListener('monitor:progress', handler);
+    },
+    onCompleted: (cb: (payload: unknown) => void) => {
+      const handler = (_: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on('monitor:completed', handler);
+      return () => ipcRenderer.removeListener('monitor:completed', handler);
+    }
   }
 });

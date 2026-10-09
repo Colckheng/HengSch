@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { TodoType, CycleType } from '../types';
+import type { TodoType, CycleType, MonitorConfig } from '../types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import { IconClose } from './Icons';
+import { MonitorSection } from './MonitorSection';
 
 interface AddTodoModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   const [cycleType, setCycleType] = useState<CycleType>('daily');
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
+  const [monitor, setMonitor] = useState<MonitorConfig | undefined>(undefined);
   const [titleError, setTitleError] = useState(false);
 
   const handleClose = useCallback(() => {
@@ -27,6 +29,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
     setCycleType('daily');
     setCustomCycleDays('');
     setSelectedGroupId('default');
+    setMonitor(undefined);
     setTitleError(false);
     onClose();
   }, [onClose]);
@@ -65,7 +68,8 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
         cycleType,
         customCycleDays: cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined,
         nextDueDate: Date.now(),
-        groupId: selectedGroupId
+        groupId: selectedGroupId,
+        monitor
       });
     } else {
       addTodo({
@@ -178,6 +182,8 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
                   />
                 </div>
               )}
+
+              <MonitorSection monitor={monitor} onChange={setMonitor} />
             </>
           )}
 

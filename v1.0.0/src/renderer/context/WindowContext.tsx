@@ -97,7 +97,7 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isCompactMode]);
+  }, [isCompactMode]); // eslint-disable-line react-hooks/exhaustive-deps -- toggleCompactMode 每次渲染重建，isCompactMode 已在依赖中
 
   useEffect(() => {
     // 小窗模式下：任何用户活动都通知主进程，重置闲置计时/触发弹出
@@ -185,7 +185,7 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
   );
 }
 
-export function useWindow(): WindowContextType {
+export function useWindow(): WindowContextType { // eslint-disable-line react-refresh/only-export-components -- Provider+Hook 同文件是 React 标准模式
   const context = useContext(WindowContext);
   if (context === undefined) {
     throw new Error('useWindow must be used within a WindowProvider');
