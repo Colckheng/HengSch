@@ -353,8 +353,8 @@ function createWindow(): void {
     alwaysOnTop: store.get('alwaysOnTop', false) as boolean
   });
 
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:5173');
+  if (!app.isPackaged) {
+    mainWindow.loadURL('http://localhost:5175');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
   }

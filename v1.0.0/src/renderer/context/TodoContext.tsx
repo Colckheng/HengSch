@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
 import type { Todo, RecurringTodo } from '../types';
 import { toggleTodoStatus, sortTodosByStatus, generateTodoId } from '@hengsch/shared-logic';
 
@@ -60,16 +60,15 @@ function todoReducer(state: TodoState, action: TodoAction): TodoState {
 
 export function TodoProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(todoReducer, { todos: [] });
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    loadTodos();
+    loadTodos().then(() => setIsInitialized(true));
   }, []);
 
   useEffect(() => {
-    if (state.todos.length > 0) {
-      saveTodos();
-    }
-  }, [state.todos]);
+    if (isInitialized) saveTodos();
+  }, [state.todos, isInitialized]);
 
   const loadTodos = async () => {
     try {

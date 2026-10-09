@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Todo, RecurringTodo } from '../types';
+import { IconClose } from './Icons';
 
 interface TodoDetailModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps)
         <div className="modal-header">
           <h2>待办事项详情</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
-            ✕
+            <IconClose />
           </button>
         </div>
         <div className="modal-body">

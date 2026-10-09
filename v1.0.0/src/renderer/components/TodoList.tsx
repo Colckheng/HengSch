@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Todo } from '../types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
@@ -15,6 +15,38 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
   const { state: groupState } = useGroups();
   const { isCompactMode } = useWindow();
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+  const listRef = useRef<HTMLDivElement>(null);
+  const positionsRef = useRef<Map<string, number>>(new Map());
+  const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const nodes = Array.from(list.querySelectorAll<HTMLElement>('[data-flip-id]'));
+    const next = new Map<string, number>();
+
+    nodes.forEach((node) => {
+      const id = node.dataset.flipId;
+      if (!id) return;
+      const lastTop = node.getBoundingClientRect().top;
+      next.set(id, lastTop);
+
+      if (!reduceMotionRef.current) {
+        const firstTop = positionsRef.current.get(id);
+        if (firstTop !== undefined && Math.abs(firstTop - lastTop) > 0.5) {
+          node.style.transition = 'none';
+          node.style.transform = `translateY(${firstTop - lastTop}px)`;
+          requestAnimationFrame(() => {
+            node.style.transition = 'transform 180ms ease-out';
+            node.style.transform = '';
+          });
+        }
+      }
+    });
+
+    positionsRef.current = next;
+  });
 
   const handleDragStart = (e: React.DragEvent, draggedId: string) => {
     e.dataTransfer.setData('text/plain', draggedId);
@@ -29,11 +61,11 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     const draggedId = e.dataTransfer.getData('text/plain');
-    
+
     if (draggedId && targetId && draggedId !== targetId) {
       const oldIndex = state.todos.findIndex((todo) => todo.id === draggedId);
       const newIndex = state.todos.findIndex((todo) => todo.id === targetId);
-      
+
       if (oldIndex !== -1 && newIndex !== -1) {
         const newTodos = [...state.todos];
         const [removed] = newTodos.splice(oldIndex, 1);
@@ -43,45 +75,70 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
     }
   };
 
+  const pendingCount = state.todos.filter((t) => t.status === 'pending').length;
+  const pendingByGroup = (groupId: string) =>
+    state.todos.filter((t) => t.status === 'pending' && t.groupId === groupId).length;
+
+  const filteredTodos =
+    selectedGroupId === 'all'
+      ? state.todos
+      : state.todos.filter((todo) => todo.groupId === selectedGroupId);
+
+  const showTabs = !isCompactMode;
+
   if (state.todos.length === 0) {
     return (
-      <div className="todo-list-empty">
-        <p>暂无待办事项</p>
-        <p>点击上方 + 按钮添加新的待办事项</p>
-      </div>
+      <>
+        {showTabs && (
+          <div className="group-filter">
+            <button className="group-filter-item active" onClick={() => setSelectedGroupId('all')}>
+              <span className="tab-no">00</span> All
+              <span className="tab-cn">全部</span>
+              <span className="tab-count">00</span>
+            </button>
+          </div>
+        )}
+        <div className="todo-list-empty">
+          <p>Nothing here yet</p>
+          <p>点击顶栏 + 或右下 ADD TASK 添加待办</p>
+        </div>
+      </>
     );
   }
 
-  const filteredTodos = selectedGroupId === 'all' 
-    ? state.todos 
-    : state.todos.filter((todo) => todo.groupId === selectedGroupId);
-
   return (
     <>
-      {!isCompactMode && (
+      {showTabs && (
         <div className="group-filter">
           <button
             className={`group-filter-item ${selectedGroupId === 'all' ? 'active' : ''}`}
             onClick={() => setSelectedGroupId('all')}
           >
-            全部
+            <span className="tab-no">00</span> All
+            <span className="tab-cn">全部</span>
+            <span className="tab-count">{String(pendingCount).padStart(2, '0')}</span>
           </button>
-          {groupState.groups.map((group) => (
+          {groupState.groups.map((group, index) => (
             <button
               key={group.id}
               className={`group-filter-item ${selectedGroupId === group.id ? 'active' : ''}`}
               onClick={() => setSelectedGroupId(group.id)}
-              style={{ backgroundColor: selectedGroupId === group.id ? group.color : 'transparent' }}
             >
+              <span className="tab-no">{String(index + 1).padStart(2, '0')}</span>
               {group.name}
+              <span className="tab-dot" style={{ backgroundColor: group.color }} />
+              <span className="tab-count">
+                {String(pendingByGroup(group.id)).padStart(2, '0')}
+              </span>
             </button>
           ))}
         </div>
       )}
-      <div className="todo-list">
+      <div className="todo-list" ref={listRef}>
         {(isCompactMode ? filteredTodos.slice(0, 6) : filteredTodos).map((todo) => (
           <div
             key={todo.id}
+            data-flip-id={todo.id}
             onDragStart={(e) => handleDragStart(e, todo.id)}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, todo.id)}

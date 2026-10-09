@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 · Bento Playful — HengSch Todo UI Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,900;1,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#FFF8EE; --coral:#FF8A7A; --sky:#7AB8FF; --mint:#A8D8A0; --sun:#FFD166;
+  --ink:#3A342C; --ink-dim:#8A8175; --page:#E9E4DC;
+  --shadow:0 8px 20px rgba(58,52,44,.08);
+  --clay:inset 0 2px 0 rgba(255,255,255,.8);
+  --pop:cubic-bezier(.34,1.56,.64,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:'Nunito','Quicksand',system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:var(--page);
+  background-image:radial-gradient(circle at 30% 20%,rgba(255,255,255,.5),transparent 60%),
+                   radial-gradient(circle at 80% 90%,rgba(255,209,102,.25),transparent 50%);
+  color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;overflow:hidden;
+}
+.stage{transform-origin:center}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px;border-radius:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- 窗口 ---------- */
+.window{
+  width:800px;height:600px;background:var(--cream);
+  border-radius:20px;overflow:hidden;position:relative;
+  box-shadow:0 30px 70px rgba(58,52,44,.28),0 4px 14px rgba(58,52,44,.12);
+  display:flex;flex-direction:column;
+}
+.titlebar{
+  height:46px;flex:0 0 46px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;background:var(--cream);
+  box-shadow:inset 0 -1px 0 rgba(58,52,44,.08);
+  -webkit-app-region:drag;
+}
+.t-title{font-weight:900;font-size:13px;letter-spacing:.04em}
+.t-title span{color:var(--coral)}
+.t-dots{display:flex;gap:8px;-webkit-app-region:no-drag}
+.t-dots .dot{width:13px;height:13px;border-radius:50%;box-shadow:var(--clay);transition:transform .2s var(--pop)}
+.t-dots .dot:hover{transform:scale(1.25)}
+.t-dots .dot:active{transform:scale(.9)}
+.dot.d1{background:var(--coral)}.dot.d2{background:var(--sun)}.dot.d3{background:var(--mint)}
+
+/* ---------- 便当格 ---------- */
+.grid{
+  flex:1;display:grid;gap:14px;padding:18px;
+  grid-template-columns:repeat(4,1fr);
+  grid-template-rows:150px 150px 98px 78px;
+}
+.tile{
+  background:var(--cream);border-radius:26px;box-shadow:var(--shadow),var(--clay);
+  position:relative;overflow:hidden;
+}
+button.tile{transition:transform .2s var(--pop),box-shadow .2s ease}
+button.tile:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(58,52,44,.13),var(--clay)}
+button.tile:active{transform:scale(.97);box-shadow:0 4px 10px rgba(58,52,44,.1),var(--clay)}
+
+/* 进度大格 */
+.progress{grid-column:1/3;grid-row:1/3;background:var(--coral);display:flex;align-items:center;gap:14px;padding:20px 22px}
+.progress::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 78% 18%,rgba(255,255,255,.35),transparent 55%);pointer-events:none}
+.ring-wrap{position:relative;width:150px;height:150px;flex:0 0 150px}
+.ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(58,52,44,.16);stroke-width:16}
+.ring-fg{fill:none;stroke:var(--ink);stroke-width:16;stroke-linecap:round;
+  stroke-dasharray:402.12;stroke-dashoffset:402.12;
+  transition:stroke-dashoffset .85s cubic-bezier(.22,1,.36,1)}
+.ring-num{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:40px;color:var(--ink);font-variant-numeric:tabular-nums;
+}
+.ring-num.roll{animation:rollNum .45s var(--pop)}
+@keyframes rollNum{0%{transform:translateY(14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+.p-info{position:relative;z-index:1}
+.p-label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(58,52,44,.72)}
+.p-title{font-size:23px;font-weight:900;line-height:1.25;margin:6px 0 10px;max-width:160px}
+.p-sub{display:inline-flex;align-items:center;gap:6px;background:rgba(255,248,238,.85);border-radius:999px;
+  padding:6px 13px;font-size:13px;font-weight:700;box-shadow:var(--clay)}
+
+/* 任务清单格 */
+.list{grid-column:3/5;grid-row:1/3;display:flex;flex-direction:column;padding:16px 6px 6px 18px}
+.list-head{display:flex;align-items:center;justify-content:space-between;padding-right:12px;flex:0 0 auto}
+.list-head h2{font-size:15px;font-weight:900;letter-spacing:.02em}
+.list-head .count{font-size:12px;font-weight:700;color:var(--ink-dim)}
+.add-mini{
+  width:34px;height:34px;border-radius:50%;background:var(--sun);box-shadow:var(--clay),0 4px 10px rgba(58,52,44,.12);
+  font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;
+  transition:transform .2s var(--pop);flex:0 0 auto;
+}
+.add-mini:hover{transform:scale(1.1) rotate(90deg)}
+.add-mini:active{transform:scale(.92)}
+.tasks{flex:1;overflow-y:auto;margin-top:8px;padding-right:8px;padding-bottom:8px}
+.tasks::-webkit-scrollbar{width:6px}
+.tasks::-webkit-scrollbar-thumb{background:rgba(58,52,44,.16);border-radius:3px}
+.tasks::-webkit-scrollbar-track{background:transparent}
+.task{
+  display:flex;align-items:center;gap:11px;padding:9px 8px;border-radius:16px;
+  min-height:48px;transition:background .2s ease;
+}
+.task:hover{background:rgba(255,209,102,.22)}
+.task + .task{margin-top:2px}
+.check{
+  flex:0 0 24px;width:24px;height:24px;border-radius:50%;border:2.5px solid rgba(58,52,44,.35);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .25s ease,border-color .25s ease,transform .2s var(--pop);
+  background:transparent;
+}
+.check:hover{border-color:var(--ink);transform:scale(1.12)}
+.check svg{width:13px;height:13px;opacity:0;transform:scale(.4);transition:opacity .2s ease,transform .3s var(--pop)}
+.task.done .check{background:var(--mint);border-color:var(--mint)}
+.task.done .check svg{opacity:1;transform:scale(1)}
+.t-body{flex:1;min-width:0}
+.t-title{display:block;font-size:14.5px;font-weight:700;line-height:1.35;transition:color .3s ease}
+.task.done .t-title{color:var(--ink-dim);text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:rgba(58,52,44,.4)}
+.t-meta{display:flex;gap:6px;margin-top:3px;flex-wrap:wrap}
+.chip{
+  font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;
+  background:rgba(58,52,44,.07);color:rgba(58,52,44,.75);
+  display:inline-flex;align-items:center;gap:4px;
+}
+.chip.due-today{background:rgba(255,138,122,.28);color:#9C4A3C}
+.chip .swatch{width:8px;height:8px;border-radius:3px;display:inline-block}
+.chip.prio{background:var(--coral);color:#5C241B}
+.task.pop{animation:taskPop .4s var(--pop)}
+@keyframes taskPop{0%{transform:scale(1)}45%{transform:scale(1.045)}100%{transform:scale(1)}}
+.empty{
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  color:var(--ink-dim);text-align:center;padding:10px;
+}
+.empty .face{
+  width:58px;height:58px;border-radius:50%;background:rgba(255,209,102,.4);position:relative;
+}
+.empty .face::before{content:"";position:absolute;left:15px;top:22px;width:6px;height:6px;border-radius:50%;background:var(--ink);
+  box-shadow:22px 0 0 var(--ink)}
+.empty .face::after{content:"";position:absolute;left:50%;bottom:15px;width:20px;height:10px;
+  border-bottom:3px solid var(--ink);border-radius:0 0 20px 20px;transform:translateX(-50%)}
+
+/* streak 格 */
+.streak{grid-column:1;grid-row:3;background:var(--sun);display:flex;align-items:center;gap:12px;padding:0 18px;text-align:left}
+.flame{position:relative;width:30px;height:38px;flex:0 0 30px}
+.flame::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(160deg,#FF9F45,#FF5A36);
+  border-radius:50% 50% 50% 6px;transform:rotate(-45deg);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.45);
+}
+.flame::after{
+  content:"";position:absolute;left:50%;top:56%;width:11px;height:15px;
+  background:#FFF3C4;border-radius:50% 50% 46% 46%/62% 62% 38% 38%;
+  transform:translate(-50%,-50%);
+}
+.streak .num{font-size:30px;font-weight:900;line-height:1}
+.streak .lbl{font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(58,52,44,.72);margin-top:3px}
+
+/* 分组格 */
+.gtile{grid-row:3;display:flex;flex-direction:column;justify-content:space-between;padding:14px 16px;text-align:left}
+.gtile.g-work{grid-column:2}.gtile.g-life{grid-column:3}.gtile.g-study{grid-column:4}
+.g-swatch{width:34px;height:34px;border-radius:12px;box-shadow:var(--clay),0 4px 8px rgba(58,52,44,.1)}
+.g-name{font-size:14px;font-weight:900}
+.g-stat{font-size:11.5px;font-weight:700;color:var(--ink-dim);margin-top:1px}
+.g-check{position:absolute;right:12px;top:12px;font-size:13px;font-weight:900;opacity:0;transition:opacity .2s ease}
+.gtile[aria-pressed="true"] .g-check{opacity:1}
+.gtile[aria-pressed="true"]{outline:3px solid var(--ink);outline-offset:-3px}
+.g-work[aria-pressed="true"]{background:var(--coral)}
+.g-life[aria-pressed="true"]{background:var(--mint)}
+.g-study[aria-pressed="true"]{background:var(--sky)}
+.gtile[aria-pressed="true"] .g-stat{color:rgba(58,52,44,.8)}
+
+/* 格言格 */
+.quote{grid-column:1/3;grid-row:4;background:var(--sky);display:flex;align-items:center;padding:0 22px;gap:14px}
+.quote .qmark{font-size:52px;font-weight:900;line-height:.6;color:rgba(255,255,255,.75);font-family:Georgia,serif}
+.quote p{font-size:16.5px;font-weight:600;font-style:italic;line-height:1.35;color:#1F3A54}
+
+/* 本周完成格 */
+.done-tile{grid-column:3;grid-row:4;background:var(--mint);display:flex;flex-direction:column;justify-content:center;padding:0 18px}
+.done-tile .num{font-size:34px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.done-tile .lbl{font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(58,52,44,.72);margin-top:4px}
+
+/* 添加格 */
+.add-tile{grid-column:4;grid-row:4;display:flex;align-items:center;justify-content:center;background:var(--cream)}
+.add-tile .knob{
+  width:52px;height:52px;border-radius:50%;background:var(--coral);color:#fff;
+  font-size:30px;font-weight:900;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--clay),0 6px 14px rgba(255,138,122,.5);
+}
+.add-tile:hover .knob{transform:scale(1.06)}
+.add-tile:active .knob{transform:scale(.94)}
+
+/* ---------- 彩纸 ---------- */
+.confetti{position:absolute;width:9px;height:9px;pointer-events:none;z-index:60;opacity:0}
+@keyframes confettiFly{
+  0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.5)}
+}
+
+/* ---------- 添加浮层 ---------- */
+.scrim{
+  position:absolute;inset:0;background:rgba(58,52,44,.45);backdrop-filter:blur(3px);
+  opacity:0;transition:opacity .25s ease;z-index:40;
+}
+.scrim.open{opacity:1}
+.popover{
+  position:absolute;left:50%;top:50%;z-index:50;width:380px;
+  transform:translate(-50%,-46%) scale(.94);opacity:0;
+  transition:opacity .25s ease,transform .3s var(--pop);
+  background:var(--cream);border-radius:28px;padding:26px;
+  box-shadow:0 24px 60px rgba(58,52,44,.35),var(--clay);
+}
+.popover.open{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.popover h2{font-size:20px;font-weight:900;margin-bottom:4px}
+.popover .hint{font-size:12.5px;color:var(--ink-dim);font-weight:600;margin-bottom:16px}
+.popover input{
+  width:100%;font-family:inherit;font-size:15px;font-weight:700;color:var(--ink);
+  padding:14px 16px;border-radius:16px;border:2.5px solid rgba(58,52,44,.15);
+  background:#fff;outline:none;transition:border-color .2s ease;
+}
+.popover input:focus{border-color:var(--coral)}
+.g-chips{display:flex;gap:8px;margin:14px 0 20px}
+.g-chip{
+  flex:1;padding:10px 0;border-radius:14px;font-size:13px;font-weight:800;text-align:center;
+  background:rgba(58,52,44,.06);transition:transform .15s var(--pop),background .2s ease;
+  border:2.5px solid transparent;
+}
+.g-chip:hover{transform:scale(1.04)}
+.g-chip[aria-pressed="true"]{border-color:var(--ink);background:#fff}
+.g-chip[data-g="work"][aria-pressed="true"]{background:var(--coral)}
+.g-chip[data-g="life"][aria-pressed="true"]{background:var(--mint)}
+.g-chip[data-g="study"][aria-pressed="true"]{background:var(--sky)}
+.pop-actions{display:flex;gap:10px}
+.pop-actions button{
+  flex:1;padding:13px 0;border-radius:16px;font-size:14.5px;font-weight:900;
+  transition:transform .15s var(--pop);
+}
+.pop-actions button:hover{transform:scale(1.03)}
+.pop-actions button:active{transform:scale(.97)}
+.btn-cancel{background:rgba(58,52,44,.08)}
+.btn-ok{background:var(--ink);color:var(--cream)}
+
+[hidden]{display:none!important}
+
+/* ---------- 响应 ---------- */
+@media (max-width:840px),(max-height:640px){
+  body{overflow:auto;padding:20px}
+  .stage{transform:scale(var(--fit,1))}
+}
+/* ---------- 减少动效 ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <header class="titlebar">
+      <div class="t-title">HengSch <span>·</span> BENTO</div>
+      <div class="t-dots">
+        <button class="dot d1" aria-label="关闭（演示）" title="演示窗口"></button>
+        <button class="dot d2" aria-label="最小化（演示）" title="演示窗口"></button>
+        <button class="dot d3" aria-label="最大化（演示）" title="演示窗口"></button>
+      </div>
+    </header>
+
+    <main class="grid" id="grid">
+      <!-- 进度大格 -->
+      <section class="tile progress" aria-label="今日进度">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 160 160" aria-hidden="true">
+            <circle class="ring-bg" cx="80" cy="80" r="64"></circle>
+            <circle class="ring-fg" id="ring" cx="80" cy="80" r="64"></circle>
+          </svg>
+          <div class="ring-num" id="pctNum">38%</div>
+        </div>
+        <div class="p-info">
+          <div class="p-label">Today</div>
+          <div class="p-title">今天也要<br>一点点完成</div>
+          <div class="p-sub" id="pSub">☀️ 今日 3/8 完成</div>
+        </div>
+      </section>
+
+      <!-- 任务清单格 -->
+      <section class="tile list" aria-label="任务清单">
+        <div class="list-head">
+          <div>
+            <h2 id="listTitle">Today's list</h2>
+            <div class="count" id="listCount">4 项待办</div>
+          </div>
+          <button class="add-mini" id="addBtn" aria-haspopup="dialog" aria-expanded="false" aria-label="添加任务">＋</button>
+        </div>
+        <div class="tasks" id="tasks"></div>
+      </section>
+
+      <!-- streak -->
+      <button class="tile streak" type="button" aria-label="连续打卡 3 天">
+        <span class="flame" aria-hidden="true"></span>
+        <span>
+          <span class="num">3</span><span style="font-size:15px;font-weight:900"> 天</span>
+          <span class="lbl" style="display:block">连续打卡</span>
+        </span>
+      </button>
+
+      <!-- 分组格 -->
+      <button class="tile gtile g-work" type="button" data-g="work" aria-pressed="false">
+        <span class="g-swatch" style="background:var(--coral)"></span>
+        <span>
+          <span class="g-name">工作</span>
+          <span class="g-stat" id="stat-work">4/5 待办</span>
+        </span>
+        <span class="g-check" aria-hidden="true">✓</span>
+      </button>
+      <button class="tile gtile g-life" type="button" data-g="life" aria-pressed="false">
+        <span class="g-swatch" style="background:var(--mint)"></span>
+        <span>
+          <span class="g-name">生活</span>
+          <span class="g-stat" id="stat-life">3/4 待办</span>
+        </span>
+        <span class="g-check" aria-hidden="true">✓</span>
+      </button>
+      <button class="tile gtile g-study" type="button" data-g="study" aria-pressed="false">
+        <span class="g-swatch" style="background:var(--sky)"></span>
+        <span>
+          <span class="g-name">学习</span>
+          <span class="g-stat" id="stat-study">2/3 待办</span>
+        </span>
+        <span class="g-check" aria-hidden="true">✓</span>
+      </button>
+
+      <!-- 格言 -->
+      <div class="tile quote" aria-hidden="true">
+        <span class="qmark">“</span>
+        <p>Small steps every day.<br>每天走一小步。</p>
+      </div>
+
+      <!-- 本周完成 -->
+      <div class="tile done-tile">
+        <span class="num" id="weekNum">12</span>
+        <span class="lbl">本周完成</span>
+      </div>
+
+      <!-- 添加 -->
+      <button class="tile add-tile" type="button" id="addTile" aria-label="添加任务">
+        <span class="knob">＋</span>
+      </button>
+    </main>
+
+    <!-- 浮层 -->
+    <div class="scrim" id="scrim" hidden></div>
+    <div class="popover" id="popover" role="dialog" aria-modal="true" aria-labelledby="popTitle" hidden>
+      <h2 id="popTitle">添加任务</h2>
+      <p class="hint">回车快速添加 · Esc 关闭</p>
+      <input id="fTitle" type="text" maxlength="60" placeholder="要做什么？" autocomplete="off">
+      <div class="g-chips" role="group" aria-label="选择分组">
+        <button type="button" class="g-chip" data-g="work" aria-pressed="true">工作</button>
+        <button type="button" class="g-chip" data-g="life" aria-pressed="false">生活</button>
+        <button type="button" class="g-chip" data-g="study" aria-pressed="false">学习</button>
+      </div>
+      <div class="pop-actions">
+        <button type="button" class="btn-cancel" id="popCancel">取消</button>
+        <button type="button" class="btn-ok" id="popOk">添加</button>
+      </div>
+    </div>
+
+    <div class="sr" id="live" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+var REDUCED=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ================= 数据 ================= */
+var GROUPS={
+  work:{name:"工作",color:"#FF8A7A"},
+  life:{name:"生活",color:"#A8D8A0"},
+  study:{name:"学习",color:"#7AB8FF"}
+};
+var todos=[
+  {id:1,title:"完成 Q4 产品路线图初稿",group:"work",done:false,today:true,due:"今天",prio:true},
+  {id:2,title:"Review PR #42 · 认证模块重构",group:"work",done:false,today:true,due:"今天"},
+  {id:3,title:"准备周五用户访谈提纲",group:"work",done:false,today:false,due:"明天"},
+  {id:4,title:"回复设计团队组件库反馈",group:"work",done:false,today:false,due:"本周五"},
+  {id:5,title:"发布 v1.2.0 release notes",group:"work",done:true,today:true},
+  {id:6,title:"买牛奶和鸡蛋",group:"life",done:false,today:true,due:"今天"},
+  {id:7,title:"预约周六洗牙",group:"life",done:false,today:false,due:"周六"},
+  {id:8,title:"每日晚间拉伸 15 分钟",group:"life",done:false,today:true,due:"今天",repeat:"daily"},
+  {id:9,title:"给绿萝浇水",group:"life",done:true,today:true},
+  {id:10,title:"读完《设计中的设计》第 3 章",group:"study",done:false,today:true,due:"今天"},
+  {id:11,title:"每周整理学习笔记",group:"study",done:false,today:false,due:"周日",repeat:"weekly"},
+  {id:12,title:"TypeScript 泛型练习",group:"study",done:true,today:true}
+];
+var nextId=100;
+var filter=null;
+var confettiFired=false;
+
+/* ================= 渲染 ================= */
+function esc(s){var d=document.createElement("span");d.textContent=s;return d.innerHTML}
+
+function visibleTodos(){
+  return todos.filter(function(t){return !filter||t.group===filter});
+}
+
+function renderTasks(){
+  var box=$("#tasks");
+  var list=visibleTodos();
+  /* 待办在前、已完成在后 */
+  list=list.filter(function(t){return !t.done}).concat(list.filter(function(t){return t.done}));
+  if(!list.length){
+    box.innerHTML='<div class="empty"><div class="face"></div><div>这里空空的，很清爽</div></div>';
+  }else{
+    box.innerHTML=list.map(function(t){
+      var g=GROUPS[t.group];
+      var meta="";
+      if(t.prio)meta+='<span class="chip prio">高优先</span>';
+      if(t.due)meta+='<span class="chip'+(t.due==="今天"?" due-today":"")+'">'+esc(t.due)+'</span>';
+      if(t.repeat)meta+='<span class="chip">♻ '+t.repeat+'</span>';
+      meta+='<span class="chip"><span class="swatch" style="background:'+g.color+'"></span>'+g.name+'</span>';
+      return '<div class="task'+(t.done?" done":"")+'" data-id="'+t.id+'">'+
+        '<button class="check" role="checkbox" aria-checked="'+t.done+'" aria-label="'+(t.done?"取消完成：":"标记完成：")+esc(t.title)+'">'+
+          '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="#3A342C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+        '</button>'+
+        '<span class="t-body"><span class="t-title">'+esc(t.title)+'</span><span class="t-meta">'+meta+'</span></span>'+
+      '</div>';
+    }).join("");
+  }
+  var pend=list.filter(function(t){return !t.done}).length;
+  $("#listCount").textContent=pend+" 项待办";
+  $("#listTitle").textContent=filter?(GROUPS[filter].name+" · 共 "+list.length):"Today's list";
+}
+
+function renderStats(){
+  var todayList=todos.filter(function(t){return t.today});
+  var doneToday=todayList.filter(function(t){return t.done}).length;
+  var total=todayList.length;
+  var pct=total?Math.round(doneToday/total*100):0;
+  var ring=$("#ring");
+  ring.style.strokeDashoffset=String(402.12*(1-pct/100));
+  var num=$("#pctNum");
+  if(num.textContent!==pct+"%"){
+    num.textContent=pct+"%";
+    if(!REDUCED){num.classList.remove("roll");void num.offsetWidth;num.classList.add("roll")}
+  }
+  $("#pSub").textContent="☀️ 今日 "+doneToday+"/"+total+" 完成";
+
+  Object.keys(GROUPS).forEach(function(g){
+    var all=todos.filter(function(t){return t.group===g});
+    var pend=all.filter(function(t){return !t.done}).length;
+    $("#stat-"+g).textContent=pend+"/"+all.length+" 待办";
+  });
+  $("#weekNum").textContent=String(9+todos.filter(function(t){return t.done}).length);
+
+  /* 彩纸：今日完成到 5/8 时触发一次 */
+  if(!confettiFired&&total>0&&doneToday>=5){
+    confettiFired=true;
+    if(!REDUCED)burstConfetti();
+  }
+}
+
+function render(){renderTasks();renderStats()}
+
+/* ================= Signature: 完成 ================= */
+function toggle(id){
+  var t=todos.filter(function(x){return x.id===id})[0];
+  if(!t)return;
+  t.done=!t.done;
+  render();
+  if(t.done){
+    var row=document.querySelector('.task[data-id="'+id+'"]');
+    if(row&&!REDUCED){row.classList.add("pop");setTimeout(function(){row.classList.remove("pop")},450)}
+    announce("已完成："+t.title+"，今日进度更新",false);
+  }else{
+    announce("已恢复待办："+t.title,true);
+  }
+}
+
+function burstConfetti(){
+  var win=document.querySelector(".window");
+  var colors=["#FF8A7A","#7AB8FF","#A8D8A0","#FFD166","#7B2FFF","#FFFFFF"];
+  for(var i=0;i<7;i++){
+    (function(i){
+      var c=document.createElement("span");
+      c.className="confetti";
+      c.style.background=colors[i%colors.length];
+      c.style.left="62%";c.style.top="46%";
+      c.style.setProperty("--dx",(Math.random()*260-130)+"px");
+      c.style.setProperty("--dy",(-60-Math.random()*160)+"px");
+      c.style.setProperty("--rot",(Math.random()*720-360)+"deg");
+      c.style.borderRadius=i%2?"50%":"2px";
+      c.style.animation="confettiFly "+(850+Math.random()*350)+"ms cubic-bezier(.2,.7,.4,1) forwards";
+      win.appendChild(c);
+      setTimeout(function(){c.remove()},1400);
+    })(i);
+  }
+  announce("太棒了，今日完成 5 项！",false);
+}
+
+function announce(msg,isAssertive){
+  var live=$("#live");
+  live.setAttribute("aria-live",isAssertive?"assertive":"polite");
+  live.textContent=msg;
+}
+
+/* ================= 筛选 ================= */
+function setFilter(g){
+  filter=(filter===g)?null:g;
+  document.querySelectorAll(".gtile").forEach(function(b){
+    b.setAttribute("aria-pressed",String(b.dataset.g===filter));
+  });
+  renderTasks();
+}
+
+/* ================= 浮层 ================= */
+var popGen=0,lastFocused=null,popGroup="work";
+function openPopover(){
+  lastFocused=document.activeElement;
+  var gen=++popGen;
+  $("#scrim").hidden=false;$("#popover").hidden=false;
+  requestAnimationFrame(function(){
+    if(gen!==popGen)return;
+    $("#scrim").classList.add("open");$("#popover").classList.add("open");
+  });
+  $("#addBtn").setAttribute("aria-expanded","true");
+  setTimeout(function(){if(gen===popGen)$("#fTitle").focus()},80);
+  document.addEventListener("keydown",trap,true);
+}
+function closePopover(){
+  var gen=++popGen;
+  $("#scrim").classList.remove("open");$("#popover").classList.remove("open");
+  $("#addBtn").setAttribute("aria-expanded","false");
+  document.removeEventListener("keydown",trap,true);
+  setTimeout(function(){
+    if(gen!==popGen)return;
+    $("#scrim").hidden=true;$("#popover").hidden=true;
+    $("#fTitle").value="";
+  },260);
+  if(lastFocused&&lastFocused.focus)lastFocused.focus();
+}
+function popoverOpen(){return $("#popover").classList.contains("open")}
+function trap(e){
+  if(e.key==="Escape"){e.preventDefault();closePopover();return}
+  if(e.key!=="Tab"||!popoverOpen())return;
+  var nodes=$("#popover").querySelectorAll("button, input, [tabindex]:not([tabindex='-1'])");
+  if(!nodes.length)return;
+  var first=nodes[0],last=nodes[nodes.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function addTodo(){
+  var v=$("#fTitle").value.trim();
+  if(!v){$("#fTitle").focus();return}
+  todos.unshift({id:nextId++,title:v,group:popGroup,done:false,today:true,due:"今天"});
+  closePopover();
+  render();
+  announce("已添加："+v,false);
+}
+
+/* ================= 视口适配 ================= */
+function fit(){
+  var s=Math.min(1,(window.innerWidth-40)/800,(window.innerHeight-40)/600);
+  document.documentElement.style.setProperty("--fit",String(s));
+}
+
+/* ================= 事件 ================= */
+$("#tasks").addEventListener("click",function(e){
+  var chk=e.target.closest(".check");
+  var row=e.target.closest(".task");
+  if(!row)return;
+  toggle(Number(row.dataset.id));
+  if(chk)e.stopPropagation();
+});
+document.querySelectorAll(".gtile").forEach(function(b){
+  b.addEventListener("click",function(){setFilter(b.dataset.g)});
+});
+$("#addBtn").addEventListener("click",openPopover);
+$("#addTile").addEventListener("click",openPopover);
+$("#popCancel").addEventListener("click",closePopover);
+$("#scrim").addEventListener("click",closePopover);
+$("#popOk").addEventListener("click",addTodo);
+$("#fTitle").addEventListener("keydown",function(e){if(e.key==="Enter")addTodo()});
+document.querySelectorAll(".g-chip").forEach(function(c){
+  c.addEventListener("click",function(){
+    popGroup=c.dataset.g;
+    document.querySelectorAll(".g-chip").forEach(function(x){
+      x.setAttribute("aria-pressed",String(x===c));
+    });
+    $("#fTitle").focus();
+  });
+});
+window.addEventListener("resize",fit);
+
+/* ================= 启动 ================= */
+fit();
+render();
+})();
+</script>
+</body>
+</html>

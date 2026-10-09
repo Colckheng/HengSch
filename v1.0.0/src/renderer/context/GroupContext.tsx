@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
 import type { Group } from '../types';
 import { generateGroupId } from '@hengsch/shared-logic';
 
@@ -63,16 +63,15 @@ function groupReducer(state: GroupState, action: GroupAction): GroupState {
 
 export function GroupProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(groupReducer, { groups: [] });
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    loadGroups();
+    loadGroups().then(() => setIsInitialized(true));
   }, []);
 
   useEffect(() => {
-    if (state.groups.length > 0) {
-      saveGroups();
-    }
-  }, [state.groups]);
+    if (isInitialized) saveGroups();
+  }, [state.groups, isInitialized]);
 
   const loadGroups = async () => {
     try {

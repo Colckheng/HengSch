@@ -39,10 +39,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
+      '@': path.resolve(__dirname, './src'),
+      '@hengsch/shared-types': path.resolve(__dirname, '../packages/shared-types/src/index.ts'),
+      '@hengsch/shared-logic': path.resolve(__dirname, '../packages/shared-logic/src/index.ts'),
+      '@hengsch/shared-storage': path.resolve(__dirname, '../packages/shared-storage/src/index.ts')
     }
   },
   server: {
-    port: 5173
+    port: 5175
   }
 });

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HengSch · 04 Terminal HUD — process monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0C0F0E;
+  --green:#33FF66;
+  --amber:#FFB000;
+  --cyan:#5EE0E0;
+  --dim:#5A6B60;
+  --fg:#D8E6DC;
+  --line:rgba(51,255,64,.14);
+  --glow:0 0 8px rgba(51,255,64,.30);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:#191B1A;
+  color:var(--fg);
+  font-family:'JetBrains Mono','Cascadia Code',Consolas,'Courier New',monospace;
+  font-variant-numeric:tabular-nums;
+  display:grid;
+  place-items:center;
+  padding:16px;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit}
+
+/* ---------- window chrome ---------- */
+.window{
+  position:relative;
+  width:min(800px,100%);
+  height:min(600px,100%);
+  background:var(--bg);
+  border-radius:8px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(51,255,64,.12),0 0 46px rgba(51,255,64,.05);
+}
+.window::after{
+  content:"";position:absolute;inset:0;z-index:4;pointer-events:none;
+  box-shadow:inset 0 0 90px rgba(0,0,0,.55);
+}
+.scanlines{
+  position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.7) 0 1px,rgba(0,0,0,0) 1px 3px);
+  opacity:.045;
+  animation:crt 6s ease-in-out infinite alternate;
+}
+@keyframes crt{from{opacity:.04}to{opacity:.055}}
+@keyframes blink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+
+.titlebar{
+  flex:none;height:34px;display:flex;align-items:center;gap:12px;
+  padding:0 8px 0 12px;
+  background:linear-gradient(180deg,#121816,#0D1110);
+  border-bottom:1px solid var(--line);
+}
+.dots{display:flex;gap:6px}
+.dots i{width:8px;height:8px;background:#3A4A42;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.dots i:nth-child(1){background:var(--dim)}
+.dots i:nth-child(2){background:var(--amber);opacity:.7}
+.dots i:nth-child(3){background:var(--green);opacity:.75}
+.title{font-size:11.5px;letter-spacing:.1em;color:#9FB4A6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.winctl{margin-left:auto;display:flex;gap:2px}
+.wbtn{
+  width:26px;height:22px;background:transparent;border:1px solid transparent;color:#7C9186;
+  font-size:12px;line-height:1;cursor:pointer;border-radius:3px;padding:0;
+}
+.wbtn:hover{color:var(--green);border-color:rgba(51,255,64,.35);background:rgba(51,255,64,.08)}
+.wbtn.close:hover{color:#FF6B62;border-color:rgba(255,107,98,.5);background:rgba(255,107,98,.12)}
+.wbtn:focus-visible,.vol:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+/* ---------- status bar ---------- */
+.statusbar{
+  flex:none;height:54px;display:flex;align-items:center;gap:14px;padding:0 14px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(51,255,64,.045),rgba(51,255,64,0));
+}
+.sb-group{display:flex;align-items:center;gap:9px}
+.lbl{font-size:9.5px;letter-spacing:.2em;color:var(--dim)}
+.val{font-size:12.5px;color:var(--green);text-shadow:var(--glow)}
+.sb-sep{width:1px;height:22px;background:var(--line)}
+.spark{display:flex;align-items:flex-end;gap:2px;height:16px}
+.spark i{width:7px;background:rgba(51,255,64,.35);transition:height .3s ease}
+.spark i.today{background:var(--green);box-shadow:0 0 6px rgba(51,255,64,.5)}
+.segbar{display:flex;gap:2px}
+.segbar i{width:5px;height:12px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(51,255,64,.16);transition:background .2s ease}
+.segbar i.on{background:var(--green);box-shadow:inset 0 0 0 1px var(--green),0 0 6px rgba(51,255,64,.45)}
+.sb-right{margin-left:auto;font-size:11px;letter-spacing:.06em;color:var(--dim);white-space:nowrap}
+.sb-right b{color:var(--cyan);font-weight:400;opacity:.75}
+/* ---------- workspace ---------- */
+.workspace{flex:1;min-height:0;display:flex}
+.vols{
+  width:148px;flex:none;display:flex;flex-direction:column;padding:8px 0 10px;
+  border-right:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(51,255,64,.035),rgba(51,255,64,0) 45%);
+}
+.rail-h{font-size:9px;letter-spacing:.22em;color:var(--dim);padding:8px 12px 6px}
+.vol{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;
+  padding:6px 10px 6px 12px;background:transparent;border:0;color:var(--fg);
+  font-size:12px;text-align:left;cursor:pointer;transition:background .1s linear,color .1s linear;
+}
+.vol .vc{color:var(--cyan);font-size:11px}
+.vol:hover{background:rgba(51,255,64,.1)}
+.vol.on{background:var(--green);color:#05120A;font-weight:700}
+.vol.on .vc{color:#05120A}
+.minis{display:flex;justify-content:space-between;padding:3px 12px;font-size:11px;color:var(--dim)}
+.minis b{color:var(--green);font-weight:500;text-shadow:var(--glow)}
+.rail-foot{margin-top:auto;padding:8px 12px 0;font-size:9px;letter-spacing:.06em;color:#3E4B45;border-top:1px dashed rgba(51,255,64,.12);white-space:nowrap;overflow:hidden}
+
+/* ---------- process table ---------- */
+.procwrap{flex:1;min-width:0;display:flex;flex-direction:column}
+.thead,.row{
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr) 82px 56px 46px;
+  gap:8px;align-items:center;padding:0 12px;position:relative;
+}
+.thead{
+  flex:none;height:26px;font-size:10px;letter-spacing:.18em;color:var(--green);
+  text-shadow:var(--glow);border-bottom:1px solid var(--line);
+  background:rgba(51,255,64,.035);
+}
+.rows{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
+.rows::-webkit-scrollbar{width:8px}
+.rows::-webkit-scrollbar-thumb{background:rgba(51,255,64,.22)}
+.rows::-webkit-scrollbar-track{background:transparent}
+.row{
+  height:28px;font-size:12px;cursor:pointer;outline:none;
+  border-bottom:1px solid rgba(51,255,64,.07);
+  transition:background .1s linear,color .1s linear;
+}
+.row .c{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.c-pid{color:var(--dim);font-size:11.5px}
+.c-task{color:var(--fg);display:flex;align-items:center}
+.c-task .nm{display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pri,.rec{flex:none}
+.lead{
+  flex:1;min-width:14px;height:3px;margin-left:9px;align-self:center;opacity:.3;
+  background-image:radial-gradient(circle at 1.5px 50%,currentColor 1px,transparent 1.7px);
+  background-size:6px 100%;
+}
+.c-state{color:var(--green);letter-spacing:.04em}
+.c-due{color:var(--cyan);letter-spacing:.06em}
+.c-due.hot{color:var(--amber);text-shadow:0 0 7px rgba(255,176,0,.35)}
+.c-grp{color:rgba(94,224,224,.72)}
+.pri{color:var(--amber);font-weight:700}
+.pri:empty{display:none}
+.pri:not(:empty){margin-right:6px}
+.rec{color:var(--cyan)}
+.rec:empty{display:none}
+.rec:not(:empty){margin-left:6px}
+.row.exited .c-pid,.row.exited .c-task,.row.exited .c-state,.row.exited .c-due,.row.exited .c-grp{color:var(--dim);text-shadow:none}
+.row.exited .pri,.row.exited .rec{color:var(--dim)}
+.row:hover{background:var(--green)}
+.row:hover .c,.row:hover .pri,.row:hover .rec{color:#05120A !important;text-shadow:none}
+.row:hover .exitmsg{background:var(--green);color:#05120A;border-left-color:rgba(5,18,10,.45)}
+.row:focus{outline:2px solid var(--green);outline-offset:-2px}
+.row.empty{cursor:default;color:var(--dim);font-size:11.5px;letter-spacing:.08em;grid-template-columns:1fr;text-align:center}
+.exitmsg{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  padding:2px 6px;background:var(--bg);color:var(--green);
+  font-size:10.5px;letter-spacing:.03em;text-shadow:var(--glow);white-space:nowrap;
+  border-left:1px solid rgba(51,255,64,.4);
+  opacity:0;transition:opacity .45s ease;pointer-events:none;
+}
+.exitmsg.on{opacity:1}
+.exitmsg.nomotion{transition:none}
+
+/* ---------- console ---------- */
+.console{flex:none;padding:8px 12px 10px;border-top:1px solid var(--line);background:#0A0D0C}
+.log{
+  height:56px;overflow-y:auto;overflow-x:hidden;font-size:11.5px;line-height:1.55;
+  padding-right:6px;cursor:text;
+}
+.log::-webkit-scrollbar{width:6px}
+.log::-webkit-scrollbar-thumb{background:rgba(51,255,64,.2)}
+.ln{color:var(--dim);white-space:pre-wrap;word-break:break-all}
+.ln.ok{color:var(--green);text-shadow:0 0 7px rgba(51,255,64,.25)}
+.ln.cmd{color:var(--cyan)}
+.ln.warn{color:var(--amber)}
+.hint{margin:6px 0;font-size:10.5px;letter-spacing:.03em;color:var(--dim);cursor:text}
+.cmdline{
+  display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;
+  background:#0E1312;border:1px solid rgba(51,255,64,.2);border-radius:4px;
+  transition:border-color .12s linear,box-shadow .12s linear;
+}
+.cmdline:focus-within{
+  border-color:var(--green);
+  box-shadow:0 0 0 1px rgba(51,255,64,.65),0 0 16px rgba(51,255,64,.18);
+}
+.prompt{font-size:12.5px;font-weight:700;color:var(--green);text-shadow:var(--glow);white-space:nowrap}
+.caret{width:1ch;color:var(--green);visibility:hidden;text-shadow:var(--glow)}
+.caret.show{visibility:visible;animation:blink 1s steps(1) infinite}
+#cmd{
+  flex:1;min-width:0;background:transparent;border:0;outline:none;padding:0;
+  color:var(--fg);font-family:inherit;font-size:12.5px;caret-color:var(--green);
+}
+#cmd::placeholder{color:#46564D}
+
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+@media (prefers-reduced-motion:reduce){
+  .scanlines{display:none}
+  .caret.show{animation:none;visibility:visible}
+  *,*::before,*::after{
+    animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important;
+  }
+}
+</style>
+</head>
+<body>
+<section class="window" aria-label="hengsch process monitor 演示窗口">
+  <header class="titlebar">
+    <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">hengsch — process monitor</div>
+    <div class="winctl">
+      <button class="wbtn" type="button" aria-label="最小化" title="最小化">–</button>
+      <button class="wbtn" type="button" aria-label="最大化" title="最大化">▢</button>
+      <button class="wbtn close" type="button" aria-label="关闭" title="关闭">✕</button>
+    </div>
+  </header>
+
+  <div class="statusbar">
+    <div class="sb-group"><span class="lbl">UPTIME</span><span class="val" id="uptime">14:32:00</span></div>
+    <div class="sb-sep" aria-hidden="true"></div>
+    <div class="sb-group">
+      <span class="lbl">THROUGHPUT</span>
+      <span class="spark" id="spark" role="img" aria-label="近 5 日完成量">
+        <i></i><i></i><i></i><i></i><i class="today"></i>
+      </span>
+    </div>
+    <div class="sb-sep" aria-hidden="true"></div>
+    <div class="sb-group">
+      <span class="lbl">LOAD</span>
+      <span class="segbar" id="segbar" role="img" aria-label="完成率">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </span>
+      <span class="val" id="loadpct">25%</span>
+    </div>
+    <div class="sb-right"><b>{ }</b> hengsch v1.0.0</div>
+  </div>
+
+  <div class="workspace">
+    <nav class="vols" aria-label="挂载卷 · 分组筛选">
+      <div class="rail-h">VOLUMES</div>
+      <button class="vol" type="button" data-g="work" aria-pressed="false"><span class="vn">/work</span><span class="vc">4/5</span></button>
+      <button class="vol" type="button" data-g="life" aria-pressed="false"><span class="vn">/life</span><span class="vc">3/4</span></button>
+      <button class="vol" type="button" data-g="study" aria-pressed="false"><span class="vn">/study</span><span class="vc">2/3</span></button>
+      <button class="vol on" type="button" data-g="all" aria-pressed="true"><span class="vn">~/all</span><span class="vc">9/12</span></button>
+      <div class="rail-h">PROC</div>
+      <div class="minis"><span>RUN</span><b id="mRun">9</b></div>
+      <div class="minis"><span>EXIT</span><b id="mExit">3</b></div>
+      <div class="minis"><span>TOTAL</span><b id="mTotal">12</b></div>
+      <div class="rail-foot">tty1 · utf-8 · 80×24</div>
+    </nav>
+
+    <p class="sr-only">进程表：按 Enter 或空格切换选中任务的完成状态，使用左侧挂载卷按钮筛选分组。</p>
+
+    <main class="procwrap" role="table" aria-label="进程表">
+      <div class="thead" role="row">
+        <span role="columnheader">PID</span>
+        <span role="columnheader">TASK</span>
+        <span role="columnheader">STATE</span>
+        <span role="columnheader">DUE</span>
+        <span role="columnheader">GRP</span>
+      </div>
+      <div class="rows" id="rows" role="rowgroup"></div>
+    </main>
+  </div>
+
+  <footer class="console">
+    <div class="log" id="log" aria-live="polite" aria-label="控制台输出"></div>
+    <p class="hint" id="hint"># 点击行切换状态 · 输入任务名回车入队</p>
+    <form class="cmdline" id="cmdform" autocomplete="off">
+      <label class="prompt" for="cmd">hengsch@local:~$</label>
+      <span class="caret" id="caret" aria-hidden="true">▋</span>
+      <input id="cmd" type="text" placeholder="add 任务名…" aria-label="命令行，输入任务名或 add 任务名后回车添加">
+    </form>
+  </footer>
+
+  <div class="scanlines" aria-hidden="true"></div>
+</section>
+<script>
+(function(){
+  "use strict";
+  var RM = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  var tasks = [
+    {pid:1004,name:"完成 Q4 产品路线图初稿",group:"work",state:"run",due:"TODAY",prio:true,recur:false},
+    {pid:1011,name:"Review PR #42 · 认证模块重构",group:"work",state:"run",due:"TODAY",prio:false,recur:false},
+    {pid:1002,name:"准备周五用户访谈提纲",group:"work",state:"run",due:"TMR",prio:false,recur:false},
+    {pid:1009,name:"回复设计团队组件库反馈",group:"work",state:"run",due:"FRI",prio:false,recur:false},
+    {pid:1001,name:"发布 v1.2.0 release notes",group:"work",state:"exit",due:"—",prio:false,recur:false},
+    {pid:1007,name:"买牛奶和鸡蛋",group:"life",state:"run",due:"TODAY",prio:false,recur:false},
+    {pid:1012,name:"预约周六洗牙",group:"life",state:"run",due:"SAT",prio:false,recur:false},
+    {pid:1003,name:"每日晚间拉伸 15 分钟",group:"life",state:"run",due:"TODAY",prio:false,recur:true},
+    {pid:1010,name:"给绿萝浇水",group:"life",state:"exit",due:"—",prio:false,recur:false},
+    {pid:1005,name:"读完《设计中的设计》第 3 章",group:"study",state:"run",due:"TODAY",prio:false,recur:false},
+    {pid:1008,name:"每周整理学习笔记",group:"study",state:"run",due:"SUN",prio:false,recur:true},
+    {pid:1006,name:"TypeScript 泛型练习",group:"study",state:"exit",due:"—",prio:false,recur:false}
+  ];
+
+  var DUE_TXT = {TODAY:"今天",TMR:"明天",FRI:"本周五",SAT:"周六",SUN:"周日","—":"无截止"};
+  var GRP_TXT = {work:"工作",life:"生活",study:"学习"};
+
+  var filter = "all";
+  var nextPid = 1013;
+
+  var rowsEl   = document.getElementById("rows");
+  var logEl    = document.getElementById("log");
+  var form     = document.getElementById("cmdform");
+  var input    = document.getElementById("cmd");
+  var caret    = document.getElementById("caret");
+  var segbar   = document.getElementById("segbar");
+  var spark    = document.getElementById("spark");
+  var loadpct  = document.getElementById("loadpct");
+  var uptimeEl = document.getElementById("uptime");
+  var mRun = document.getElementById("mRun");
+  var mExit = document.getElementById("mExit");
+  var mTotal = document.getElementById("mTotal");
+
+  /* ---------- helpers ---------- */
+  function ariaOf(t){
+    var s = "PID " + t.pid + "，" + (t.name || "新任务") + "，" +
+      (t.state === "exit" ? "已完成" : "待办") +
+      "，截止" + (DUE_TXT[t.due] || t.due) +
+      "，分组" + GRP_TXT[t.group];
+    if (t.prio) s += "，高优先";
+    if (t.recur) s += "，循环任务";
+    return s;
+  }
+  function stateText(t){ return t.state === "exit" ? "[✓] EXIT" : "[ ] RUN"; }
+  function log(text, cls){
+    var d = document.createElement("div");
+    d.className = "ln" + (cls ? " " + cls : "");
+    d.textContent = text;
+    logEl.appendChild(d);
+    while (logEl.children.length > 40) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function visible(){
+    return filter === "all" ? tasks : tasks.filter(function(t){ return t.group === filter; });
+  }
+  function byPid(pid){
+    for (var i = 0; i < tasks.length; i++) if (tasks[i].pid === pid) return tasks[i];
+    return null;
+  }
+
+  /* ---------- render ---------- */
+  function buildRow(t){
+    var r = document.createElement("div");
+    r.className = "row" + (t.state === "exit" ? " exited" : "");
+    r.setAttribute("role", "row");
+    r.tabIndex = 0;
+    r.dataset.pid = String(t.pid);
+    r.title = t.name;
+    r.setAttribute("aria-label", ariaOf(t));
+    r.innerHTML =
+      '<span class="c c-pid" role="cell">' + t.pid + '</span>' +
+      '<span class="c c-task" role="cell"><span class="pri">' + (t.prio ? "!" : "") + '</span><span class="nm"></span><span class="rec">' + (t.recur ? "↻" : "") + '</span><span class="lead" aria-hidden="true"></span></span>' +
+      '<span class="c c-state" role="cell">' + stateText(t) + '</span>' +
+      '<span class="c c-due' + (t.due === "TODAY" ? " hot" : "") + '" role="cell">' + t.due + '</span>' +
+      '<span class="c c-grp" role="cell">' + t.group + '</span>';
+    r.querySelector(".nm").textContent = t.name;
+    if (t.state === "exit") r.appendChild(makeExitMsg(true));
+    return r;
+  }
+  function makeExitMsg(instant){
+    var m = document.createElement("span");
+    m.className = "exitmsg" + (instant ? " nomotion on" : "");
+    m.textContent = "process exited 0";
+    if (!instant) requestAnimationFrame(function(){ m.classList.add("on"); });
+    return m;
+  }
+  function render(){
+    rowsEl.textContent = "";
+    var list = visible();
+    if (!list.length){
+      var e = document.createElement("div");
+      e.className = "row empty";
+      e.textContent = "// no process on this volume";
+      rowsEl.appendChild(e);
+    } else {
+      list.forEach(function(t){ rowsEl.appendChild(buildRow(t)); });
+    }
+    stats();
+  }
+
+  /* ---------- stats / meters ---------- */
+  function stats(){
+    var total = tasks.length;
+    var done = tasks.filter(function(t){ return t.state === "exit"; }).length;
+    var pct = Math.round(done / total * 100);
+    loadpct.textContent = pct + "%";
+    var filled = Math.min(done, segbar.children.length);
+    var segs = segbar.children;
+    for (var i = 0; i < segs.length; i++) segs[i].classList.toggle("on", i < filled);
+    segbar.setAttribute("aria-label", "完成率 " + pct + "%");
+
+    var vols = document.querySelectorAll(".vol");
+    for (var v = 0; v < vols.length; v++){
+      var g = vols[v].dataset.g;
+      var list = g === "all" ? tasks : tasks.filter(function(t){ return t.group === g; });
+      var pending = list.filter(function(t){ return t.state === "run"; }).length;
+      vols[v].querySelector(".vc").textContent = pending + "/" + list.length;
+    }
+    mRun.textContent = total - done;
+    mExit.textContent = done;
+    mTotal.textContent = total;
+
+    var vals = [2, 4, 3, 5, done];
+    var max = Math.max.apply(null, vals.concat([1]));
+    var bars = spark.children;
+    for (var b = 0; b < bars.length; b++) bars[b].style.height = (vals[b] / max * 100) + "%";
+    spark.setAttribute("aria-label", "近 5 日完成量 " + vals.join("、"));
+  }
+    /* ---------- toggle (signature: process exited 0) ---------- */
+  function toggleRow(row){
+    var t = byPid(Number(row.dataset.pid));
+    if (!t) return;
+    t.state = t.state === "exit" ? "run" : "exit";
+    row.classList.toggle("exited", t.state === "exit");
+    row.querySelector(".c-state").textContent = stateText(t);
+    row.setAttribute("aria-label", ariaOf(t));
+
+    var msg = row.querySelector(".exitmsg");
+    if (t.state === "exit"){
+      if (!msg){
+        msg = makeExitMsg(RM.matches);
+        if (!RM.matches){
+          msg.style.transition = "none";
+          msg.style.opacity = "0";
+          requestAnimationFrame(function(){
+            msg.style.transition = "";
+            msg.style.opacity = "";
+            msg.classList.add("on");
+          });
+        }
+        row.appendChild(msg);
+      }
+      log("> process " + t.pid + " exited 0", "ok");
+    } else {
+      if (msg){
+        msg.classList.remove("on");
+        (function(m){ setTimeout(function(){ if (m.parentNode) m.parentNode.removeChild(m); }, 450); })(msg);
+      }
+      log("> process " + t.pid + " restarted", "cmd");
+    }
+    stats();
+  }
+
+  rowsEl.addEventListener("click", function(e){
+    var row = e.target.closest(".row");
+    if (row && !row.classList.contains("empty")) toggleRow(row);
+  });
+  rowsEl.addEventListener("keydown", function(e){
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var row = e.target.closest(".row");
+    if (row && !row.classList.contains("empty")){
+      e.preventDefault();
+      toggleRow(row);
+    }
+  });
+
+  /* ---------- volume filter ---------- */
+  function setFilter(g){
+    filter = g;
+    var vols = document.querySelectorAll(".vol");
+    for (var i = 0; i < vols.length; i++){
+      var on = vols[i].dataset.g === g;
+      vols[i].classList.toggle("on", on);
+      vols[i].setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    render();
+    var n = visible().length;
+    log("> volume mounted " + (g === "all" ? "~/all" : "/" + g) + " · " + n + " proc", "cmd");
+  }
+  document.querySelectorAll(".vol").forEach(function(b){
+    b.addEventListener("click", function(){ setFilter(b.dataset.g); });
+  });
+
+  /* ---------- typewriter spawn ---------- */
+  function typeTask(t, text){
+    if (RM.matches){ t.name = text; render(); return; }
+    var i = 0;
+    var iv = setInterval(function(){
+      i++;
+      t.name = text.slice(0, i);
+      var cell = rowsEl.querySelector('.row[data-pid="' + t.pid + '"] .nm');
+      if (cell) cell.textContent = t.name;
+      if (i >= text.length) clearInterval(iv);
+    }, 30);
+  }
+
+  function spawn(raw){
+    var original = (raw || "").trim();
+    if (!original){ log("> nothing to spawn — type a task name", "warn"); return; }
+    var name = original.replace(/^(?:add|new|\+)\s+/i, "").trim();
+    if (!name){ log("> missing task name after `add`", "warn"); return; }
+
+    var t = {
+      pid: nextPid++,
+      name: "",
+      group: filter === "all" ? "work" : filter,
+      state: "run",
+      due: "TODAY",
+      prio: false,
+      recur: false
+    };
+    tasks.unshift(t);
+    log("$ " + original, "cmd");
+    log("> spawning process " + t.pid + "... OK", "ok");
+    render();
+
+    var row = rowsEl.querySelector('.row[data-pid="' + t.pid + '"]');
+    if (row) row.scrollIntoView({ block: "nearest" });
+    typeTask(t, name);
+  }
+
+  /* ---------- command line ---------- */
+  function syncCaret(){
+    caret.classList.toggle("show", document.activeElement !== input && input.value === "");
+  }
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var v = input.value;
+    input.value = "";
+    spawn(v);
+    syncCaret();
+  });
+  input.addEventListener("input", syncCaret);
+  input.addEventListener("focus", syncCaret);
+  input.addEventListener("blur", syncCaret);
+  syncCaret();
+
+  function focusCmd(){
+    if (window.getSelection().toString()) return;
+    input.focus();
+  }
+  logEl.addEventListener("click", focusCmd);
+  document.getElementById("hint").addEventListener("click", focusCmd);
+
+  /* ---------- uptime ---------- */
+  var up = 14 * 3600 + 32 * 60;
+  function pad(n){ return n < 10 ? "0" + n : String(n); }
+  setInterval(function(){
+    up++;
+    uptimeEl.textContent = pad(Math.floor(up / 3600)) + ":" + pad(Math.floor(up / 60) % 60) + ":" + pad(up % 60);
+  }, 1000);
+
+  /* ---------- boot ---------- */
+  render();
+  log("hengsch v1.0.0 · tty1 · utf-8", "cmd");
+  log("12 proc attached · 3 volumes mounted", "");
+})();
+</script>
+</body>
+</html>
