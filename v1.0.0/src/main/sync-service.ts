@@ -135,7 +135,9 @@ async function readRemoteFile(sftp: SFTPWrapper, path: string): Promise<string |
     const buf = await call<Buffer>((cb) => sftp.readFile(path, cb));
     return buf.toString('utf8');
   } catch (error) {
-    if ((error as { code?: string }).code === 'ENOENT') return null;
+    // ssh2 SFTP 状态错误用数字码：2 = NO_SUCH_FILE（不是 Node 风格的 'ENOENT' 字符串）
+    const code = (error as { code?: number | string }).code;
+    if (code === 2 || code === 'ENOENT') return null;
     throw error;
   }
 }

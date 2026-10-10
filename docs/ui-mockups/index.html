@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HengSch 手机端 · 6 个 UI 方向总览</title>
+<style>
+  @import url('https://fonts.loli.net/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+  :root{--ink:#1B1B1F;--dim:#6B6B74;--line:#E4E4EA;--accent:#E1352B}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#F5F5F7;color:var(--ink);font-family:'Noto Sans SC','PingFang SC',sans-serif;padding:48px 40px 80px}
+  header{max-width:1500px;margin:0 auto 40px;border-bottom:2px solid var(--ink);padding-bottom:20px}
+  header .no{font-family:'Space Grotesk',monospace;font-size:13px;letter-spacing:.2em;color:var(--accent)}
+  header h1{font-size:34px;font-weight:700;margin-top:8px;letter-spacing:-.02em}
+  header p{color:var(--dim);font-size:14.5px;line-height:1.8;margin-top:10px;max-width:860px}
+  header .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:16px}
+  header .legend span{font-family:'Space Grotesk',monospace;font-size:11.5px;letter-spacing:.08em;color:var(--dim);background:#fff;border:1px solid var(--line);padding:6px 12px;border-radius:99px}
+  .grid{max-width:1500px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:36px}
+  .item{background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden;transition:transform .25s,box-shadow .25s;display:flex;flex-direction:column}
+  .item:hover{transform:translateY(-6px);box-shadow:0 24px 60px -24px #00000055}
+  .item .frame{height:520px;overflow:hidden;position:relative;background:#EEE}
+  .item iframe{width:390px;height:844px;border:0;transform:scale(.86);transform-origin:top left;position:absolute;top:14px;left:50%;margin-left:-195px;pointer-events:none}
+  .item .cap{padding:20px 22px 24px;border-top:1px solid var(--line)}
+  .item .cap .n{font-family:'Space Grotesk',monospace;font-size:12px;letter-spacing:.16em;color:var(--accent);font-weight:700}
+  .item .cap h2{font-size:19px;font-weight:700;margin-top:6px}
+  .item .cap h2 small{color:var(--dim);font-weight:500;font-size:13px;margin-left:8px}
+  .item .cap p{font-size:13px;color:var(--dim);line-height:1.75;margin-top:8px}
+  .item .cap .kw{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .item .cap .kw i{font-style:normal;font-family:'Space Grotesk',monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink);border:1px solid var(--line);padding:4px 9px;border-radius:6px;background:#FAFAFC}
+  .item .cap a{display:inline-block;margin-top:16px;font-family:'Space Grotesk',monospace;font-size:12px;font-weight:700;letter-spacing:.1em;color:#fff;background:var(--ink);text-decoration:none;padding:10px 18px;border-radius:99px;transition:background .2s}
+  .item .cap a:hover{background:var(--accent)}
+  footer{max-width:1500px;margin:56px auto 0;color:var(--dim);font-size:12.5px;line-height:2;border-top:1px solid var(--line);padding-top:20px}
+</style>
+</head>
+<body>
+<header>
+  <div class="no">HENG SCH · MOBILE v1.1.0-an · UI EXPLORATION</div>
+  <h1>手机端 6 个 UI 方向 · 交互原型</h1>
+  <p>同一份任务数据（8 待办 + 3 完成，含「刷抖音 ≤ 30 分钟」监测任务），6 种完全不同的设计语言。每个原型都可点击：勾选完成、切换分组/筛选、FAB 打开新增面板并真的能添加任务。挑一个方向（或拼装元素）后进入设计定稿。</p>
+  <div class="legend">
+    <span>① Swiss 极简编辑</span><span>② Handwerk 手作纸感</span><span>③ Brutalist 粗野主义</span>
+    <span>④ Instrument 暗色仪表</span><span>⑤ Tactile 软触感</span><span>⑥ Fluid 极光流体</span>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="item">
+    <div class="frame"><iframe src="01-swiss.html" loading="lazy"></iframe></div>
+    <div class="cap">
+      <div class="n">01 / 06</div>
+      <h2>Swiss Precision <small>瑞士极简 · 编辑体系</small></h2>
+      <p>纸白 + 墨黑 + 信号红，硬线网格与 mono 编号，像一份印刷精良的清单杂志。克制、专业、耐看。</p>
+      <div class="kw"><i>MONO GRID</i><i>SIGNAL RED</i><i>HAIRLINE</i></div>
+      <a href="01-swiss.html" target="_blank">全屏体验 →</a>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="frame"><iframe src="02-handwerk.html" loading="lazy"></iframe></div>
+    <div class="cap">
+      <div class="n">02 / 06</div>
+      <h2>Handwerk <small>手作纸感 · 温暖工艺</small></h2>
+      <p>暖纸底、苔绿与铜色，衬线大标题与罗马编号。完成任务 = 盖章动画，监测 = 环形表盘，工匠气质。</p>
+      <div class="kw"><i>PAPER TEXTURE</i><i>SERIF</i><i>STAMP FX</i></div>
+      <a href="02-handwerk.html" target="_blank">全屏体验 →</a>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="frame"><iframe src="03-brutalist.html" loading="lazy"></iframe></div>
+    <div class="cap">
+      <div class="n">03 / 06</div>
+      <h2>Brutalist <small>粗野主义 · 网页朋克</small></h2>
+      <p>粗黑边 + 硬阴影 + 高饱和黄蓝粉，贴纸式 DONE! 弹入，波点底纹。个性最强，最抓眼球。</p>
+      <div class="kw"><i>THICK BORDER</i><i>HARD SHADOW</i><i>STICKER</i></div>
+      <a href="03-brutalist.html" target="_blank">全屏体验 →</a>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="frame"><iframe src="04-instrument.html" loading="lazy"></iframe></div>
+    <div class="cap">
+      <div class="n">04 / 06</div>
+      <h2>Precision Instrument <small>暗色仪表 · HUD 精密</small></h2>
+      <p>深底 + 荧光绿 + 等宽读数，顶部任务仪表盘与扫描线监测环。与「监测使用时长」特性气质最搭。</p>
+      <div class="kw"><i>DARK HUD</i><i>GLOW</i><i>READOUT</i></div>
+      <a href="04-instrument.html" target="_blank">全屏体验 →</a>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="frame"><iframe src="05-tactile.html" loading="lazy"></iframe></div>
+    <div class="cap">
+      <div class="n">05 / 06</div>
+      <h2>Soft Tactile <small>软触感 · 果冻动效</small></h2>
+      <p>奶油底 + 大圆角 + 黏土软阴影，果冻 spring 动效与彩纸 confetti，监测是会起泡的水位胶囊。亲和日常。</p>
+      <div class="kw"><i>JELLY</i><i>CLAY SHADOW</i><i>CONFETTI</i></div>
+      <a href="05-tactile.html" target="_blank">全屏体验 →</a>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="frame"><iframe src="06-fluid.html" loading="lazy"></iframe></div>
+    <div class="cap">
+      <div class="n">06 / 06</div>
+      <h2>Fluid Aurora <small>极光流体 · 玻璃拟态</small></h2>
+      <p>深夜底上流动的紫青橙极光 + 玻璃卡片 + 磁吸旋涡 FAB，完成时波纹扩散。最具未来氛围的实验方向。</p>
+      <div class="kw"><i>AURORA</i><i>GLASS</i><i>SPRING</i></div>
+      <a href="06-fluid.html" target="_blank">全屏体验 →</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  HengSch Todo · Android v1.1.0-an · UI 方案评估用静态原型（数据与动效为演示，未接真实状态）<br>
+  选择方向后：进入设计文档定稿（组件/色板/动效规范）→ writing-plans 实施计划 → M1 同步桥开发。
+</footer>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 · Deutsche Handwerk — HengSch 方案</title>
+<style>
+  @import url('https://fonts.loli.net/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap');
+  :root{
+    --paper:#F4F1E9; --card:#FCFAF4; --ink:#1E1C17; --moss:#4E6E58; --copper:#B96A32;
+    --faint:#8B867A; --line:#1E1C1722; --serif:'Fraunces','Songti SC','SimSun',Georgia,serif;
+    --sans:'Avenir Next','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    --mono:'Courier New',monospace; --ease:cubic-bezier(.3,.9,.3,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:#D9D4C7;font-family:var(--sans);color:var(--ink);min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;gap:28px;padding:40px 20px 80px}
+  .brief{width:min(860px,100%);display:flex;align-items:baseline;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:14px}
+  .brief .no{font-family:var(--mono);font-size:13px;letter-spacing:.1em}
+  .brief h1{font-family:var(--serif);font-size:22px;font-weight:600}
+  .brief .kw{margin-left:auto;font-family:var(--mono);font-size:11px;color:#555;letter-spacing:.06em;text-align:right}
+  .device{position:relative;width:390px;height:844px;background:var(--paper);border-radius:44px;
+    box-shadow:0 0 0 11px #201E19,0 0 0 13px #4a463c,0 34px 80px -20px #00000055;overflow:hidden;flex-shrink:0}
+  .device::after{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#201E19;border-radius:16px;z-index:60}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:
+    radial-gradient(circle at 20% 0%,#ffffff88 0%,transparent 50%),var(--paper)}
+  /* 纸质噪点 */
+  .screen::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:multiply;z-index:1;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.48 0 0 0 0 0.44 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:16px 26px 4px;font-family:var(--mono);font-size:12px;font-weight:700;position:relative;z-index:5}
+  .head{padding:20px 26px 0;position:relative;z-index:5}
+  .head .issue{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--faint);border-bottom:1px solid var(--line);padding-bottom:10px}
+  .head h2{font-family:var(--serif);font-size:42px;font-weight:600;line-height:1.06;letter-spacing:-.01em;margin-top:16px}
+  .head h2 em{font-style:italic;color:var(--moss)}
+  .head .sub{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--faint);margin-top:8px}
+  .head .stats{display:flex;gap:22px;margin-top:16px}
+  .stat{text-align:left}
+  .stat b{font-family:var(--serif);font-size:26px;font-weight:700;display:block;line-height:1}
+  .stat span{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--faint)}
+  .stat.moss b{color:var(--moss)}
+  /* 分组：书签式 */
+  .chips{display:flex;gap:6px;padding:18px 26px 6px;position:relative;z-index:5}
+  .chip{font-family:var(--mono);font-size:10px;letter-spacing:.1em;padding:7px 13px;border:1px solid var(--ink);border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;transition:all .2s var(--ease)}
+  .chip.on{background:var(--moss);border-color:var(--moss);color:#fff}
+  .list{flex:1;overflow-y:auto;padding:10px 26px 130px;position:relative;z-index:5;scrollbar-width:none}
+  .list::-webkit-scrollbar{display:none}
+  .daymark{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint);display:flex;align-items:center;gap:10px;margin:18px 0 4px}
+  .daymark::after{content:'';flex:1;height:1px;background:var(--line)}
+  .row{display:grid;grid-template-columns:34px 1fr;gap:14px;padding:17px 14px 17px 10px;margin:0 -14px 0 -10px;border-radius:14px;cursor:pointer;position:relative;transition:background .25s var(--ease),transform .3s var(--ease);align-items:start}
+  .row:active{transform:scale(.985)}
+  .row:hover{background:#ffffffaa}
+  .num{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--faint);padding-top:2px;text-align:center;position:relative}
+  .title{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:-.01em;line-height:1.4;display:block;transition:all .3s var(--ease)}
+  .meta{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;align-items:center}
+  .tag{font-family:var(--mono);font-size:9px;letter-spacing:.1em;padding:4px 9px;border-radius:999px;background:#1E1C170d;color:#5c584e}
+  .tag.work{background:#4E6E5818;color:var(--moss)}
+  .tag.life{background:#B96A3218;color:var(--copper)}
+  .tag.study{background:#1E1C170d}
+  .tag.cycle{border:1px dashed #1E1C1744;background:transparent}
+  .tag.mon{background:var(--ink);color:#F4F1E9;letter-spacing:.14em}
+  /* 监测：墨水进度 */
+  .mon{margin-top:12px;display:flex;align-items:center;gap:12px}
+  .mon .dial{position:relative;width:38px;height:38px;flex-shrink:0}
+  .mon .dial svg{transform:rotate(-90deg)}
+  .mon .dial .pct{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:8px;font-weight:700;color:var(--moss)}
+  .mon .bar{flex:1;height:8px;background:#1E1C1710;border-radius:99px;overflow:hidden;position:relative}
+  .mon .bar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--moss),#7ba085);border-radius:99px;transition:width .6s var(--ease)}
+  .mon .t{font-family:var(--mono);font-size:11px;color:var(--ink);letter-spacing:.04em}
+  .mon .t b{color:var(--moss)}
+  /* 完成印章 */
+  .stamp{position:absolute;right:8px;top:50%;width:74px;height:74px;margin-top:-37px;pointer-events:none;opacity:0;transform:scale(2.2) rotate(-24deg)}
+  .stamp svg{width:100%;height:100%}
+  @keyframes stampdown{
+    0%{opacity:0;transform:scale(2.2) rotate(-24deg)}
+    55%{opacity:.95;transform:scale(.94) rotate(-8deg)}
+    70%{transform:scale(1.04) rotate(-8deg)}
+    100%{opacity:.88;transform:scale(1) rotate(-8deg)}
+  }
+  .row.done .stamp{animation:stampdown .5s var(--ease) forwards}
+  .row.done .title{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#B96A3288}
+  .row.done .num{opacity:.5}
+  .row.done{background:transparent}
+  /* FAB：黄铜圆钮 */
+  .fab{position:absolute;right:24px;bottom:100px;width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#6f9179,#3E5A47);border:1px solid #ffffff44;cursor:pointer;display:grid;place-items:center;z-index:40;
+    box-shadow:0 10px 24px -6px #1E1C1766,inset 0 2px 3px #ffffff55,inset 0 -3px 6px #00000044;transition:transform .2s var(--ease)}
+  .fab:active{transform:scale(.9)}
+  .fab svg{width:22px;height:22px;stroke:#EDE8DC;stroke-width:2}
+  /* 底部 */
+  .tabs{position:absolute;left:0;right:0;bottom:0;display:flex;background:#F4F1E9ee;backdrop-filter:blur(8px);border-top:1px solid var(--line);z-index:30;padding-bottom:18px}
+  .tab{flex:1;padding:15px 0 10px;background:none;border:none;color:var(--faint);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.14em;position:relative;transition:color .2s}
+  .tab.on{color:var(--moss)}
+  .tab.on::before{content:'';position:absolute;top:-1px;left:28%;right:28%;height:2px;background:var(--moss)}
+  /* Sheet */
+  .mask{position:absolute;inset:0;background:#1E1C1766;opacity:0;pointer-events:none;transition:opacity .3s;z-index:70}
+  .mask.open{opacity:1;pointer-events:auto}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:26px 26px 0 0;padding:30px 26px 40px;transform:translateY(110%);transition:transform .38s var(--ease);z-index:80;box-shadow:0 -20px 60px #1E1C1733}
+  .sheet.open{transform:translateY(0)}
+  .sheet .grip{width:44px;height:5px;border-radius:99px;background:#1E1C1722;margin:-14px auto 20px}
+  .sheet h3{font-family:var(--serif);font-style:italic;font-size:24px;font-weight:600;margin-bottom:4px}
+  .sheet .hint{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--faint);margin-bottom:20px}
+  .sheet input{width:100%;font-family:var(--serif);font-size:19px;padding:10px 0 12px;border:none;border-bottom:2px solid var(--ink);background:transparent;outline:none}
+  .sheet input::placeholder{color:#B5AF9F;font-style:italic}
+  .sheet .chips{padding:20px 0 26px}
+  .sheet .add{width:100%;padding:17px;background:var(--moss);color:#fff;border:none;border-radius:14px;font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:transform .15s var(--ease);box-shadow:0 8px 20px -6px #4E6E5888}
+  .sheet .add:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<div class="brief">
+  <span class="no">02 / 06</span>
+  <h1>Deutsche Handwerk — 德系工艺</h1>
+  <span class="kw">SERIF EDITORIAL · STAMP · PAPER GRAIN<br>适合：iF / Red Dot 产品气质 · 编辑式叙事</span>
+</div>
+
+<div class="device">
+  <div class="screen">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span style="display:flex;gap:6px;align-items:center">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4"/><rect x="4.5" y="5" width="3" height="6"/><rect x="9" y="2.5" width="3" height="8.5"/><rect x="13.5" y="0" width="3" height="11"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3" fill="none" stroke="currentColor"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="currentColor"/><path d="M23 4v4a2.5 2.5 0 0 0 0-4z" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="head">
+      <div class="issue"><span>AUSGABE №.42 — 第四十二期</span><span>FREITAG · 周五</span></div>
+      <h2>今日<em>工单</em></h2>
+      <div class="sub">Was heute zu tun ist — 一件一件，认真完成</div>
+      <div class="stats">
+        <div class="stat"><b id="s-act">8</b><span>AKTIV 待办</span></div>
+        <div class="stat moss"><b id="s-done">3</b><span>FERTIG 完成</span></div>
+        <div class="stat"><b>2</b><span>WÖCHENTLICH 循环</span></div>
+      </div>
+    </div>
+
+    <div class="chips" id="chips">
+      <button class="chip on" data-g="all">全部</button>
+      <button class="chip" data-g="work">工作</button>
+      <button class="chip" data-g="life">生活</button>
+      <button class="chip" data-g="study">学习</button>
+    </div>
+
+    <div class="list" id="list">
+      <div class="daymark">HEUTE — 今日工单</div>
+
+      <div class="row" data-g="work">
+        <span class="num">I</span>
+        <div>
+          <span class="title">完成 Swiss Precision 界面移植收尾</span>
+          <div class="meta"><span class="tag work">工作</span><span class="tag">截止 18:00</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="work">
+        <span class="num">II</span>
+        <div>
+          <span class="title">Review PR #42</span>
+          <div class="meta"><span class="tag work">工作</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="life">
+        <span class="num">III</span>
+        <div>
+          <span class="title">刷抖音 ≤ 30 分钟</span>
+          <div class="meta"><span class="tag mon">监测中</span><span class="tag life">生活</span></div>
+          <div class="mon">
+            <div class="dial">
+              <svg width="38" height="38" viewBox="0 0 38 38">
+                <circle cx="19" cy="19" r="16" fill="none" stroke="#1E1C1718" stroke-width="4"/>
+                <circle id="ring" cx="19" cy="19" r="16" fill="none" stroke="#4E6E58" stroke-width="4" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="60.3"/>
+              </svg>
+              <span class="pct" id="ring-pct">40%</span>
+            </div>
+            <div class="bar"><i id="monbar" style="width:40%"></i></div>
+            <span class="t"><b id="mont">12:00</b>/30:00</span>
+          </div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="work">
+        <span class="num">IV</span>
+        <div>
+          <span class="title">每日站会同步进度</span>
+          <div class="meta"><span class="tag work">工作</span><span class="tag cycle">每日 ⟳</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="work">
+        <span class="num">V</span>
+        <div>
+          <span class="title">备份数据库到云端</span>
+          <div class="meta"><span class="tag work">工作</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="study">
+        <span class="num">VI</span>
+        <div>
+          <span class="title">读《设计中的设计》第三章</span>
+          <div class="meta"><span class="tag study">学习</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="life">
+        <span class="num">VII</span>
+        <div>
+          <span class="title">买菜和做晚饭</span>
+          <div class="meta"><span class="tag life">生活</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="row" data-g="work">
+        <span class="num">VIII</span>
+        <div>
+          <span class="title">整理周报</span>
+          <div class="meta"><span class="tag work">工作</span><span class="tag mon" style="background:#B96A32">今日截止</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+
+      <div class="daymark">ERLEDIGT — 已完成</div>
+
+      <div class="row done" data-g="life">
+        <span class="num">IX</span>
+        <div>
+          <span class="title">健身 45 分钟</span>
+          <div class="meta"><span class="tag life">生活</span><span class="tag cycle">每两日 ⟳</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+      <div class="row done" data-g="life">
+        <span class="num">X</span>
+        <div>
+          <span class="title">给绿萝浇水</span>
+          <div class="meta"><span class="tag life">生活</span><span class="tag cycle">每周 ⟳</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+      <div class="row done" data-g="study">
+        <span class="num">XI</span>
+        <div>
+          <span class="title">TypeScript 类型体操练习</span>
+          <div class="meta"><span class="tag study">学习</span></div>
+        </div>
+        <div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>
+      </div>
+    </div>
+
+    <button class="fab" id="fab" aria-label="新增"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+
+    <div class="tabs">
+      <button class="tab on" data-f="all">ALLE 全部</button>
+      <button class="tab" data-f="active">OFFEN 待办</button>
+      <button class="tab" data-f="done">FERTIG 完成</button>
+    </div>
+
+    <div class="mask" id="mask" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet">
+      <div class="grip"></div>
+      <h3>新工单</h3>
+      <div class="hint">NEUE ARBEITSAUFGABE</div>
+      <input id="ni" placeholder="写下要做的事…" autocomplete="off">
+      <div class="chips" id="nchips">
+        <button class="chip on" data-g="all">未分类</button>
+        <button class="chip" data-g="work">工作</button>
+        <button class="chip" data-g="life">生活</button>
+        <button class="chip" data-g="study">学习</button>
+      </div>
+      <button class="add" onclick="add()">盖章开工 · HINZUFÜGEN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $=(s,p=document)=>p.querySelector(s),$$=(s,p=document)=>[...p.querySelectorAll(s)];
+  let filter='all',group='all',ni=12;
+  const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV'];
+  const STAMP=`<div class="stamp"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#B96A32" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="#B96A32" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-size="15" fill="#B96A32" font-family="Georgia,serif" font-weight="bold">DONE</text><text x="50" y="64" text-anchor="middle" font-size="13" fill="#B96A32" font-family="serif">已完成</text></svg></div>`;
+  function counts(){
+    const rows=$$('.row');
+    const d=rows.filter(r=>r.classList.contains('done')).length;
+    $('#s-act').textContent=rows.length-d;$('#s-done').textContent=d;
+  }
+  function apply(){
+    $$('.row').forEach(r=>{
+      const okG=group==='all'||r.dataset.g===group;
+      const okF=filter==='all'||(filter==='active'&&!r.classList.contains('done'))||(filter==='done'&&r.classList.contains('done'));
+      r.style.display=(okG&&okF)?'':'none';
+    });
+  }
+  $$('.row').forEach(r=>r.onclick=()=>{r.classList.toggle('done');counts();apply();});
+  $$('#chips .chip').forEach(c=>c.onclick=()=>{$$('#chips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');group=c.dataset.g;apply();});
+  $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');filter=t.dataset.f;apply();});
+  $('#fab').onclick=()=>{$('#sheet').classList.add('open');$('#mask').classList.add('open');setTimeout(()=>$('#ni').focus(),320);};
+  function closeSheet(){$('#sheet').classList.remove('open');$('#mask').classList.remove('open');}
+  $$('#nchips .chip').forEach(c=>c.onclick=()=>{$$('#nchips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');});
+  function add(){
+    const v=$('#ni').value.trim();if(!v)return;
+    const g=$('#nchips .chip.on').dataset.g;
+    const gName={all:'待归类',work:'工作',life:'生活',study:'学习'}[g];
+    const gCls=g==='all'?'':` ${g}`;
+    const row=document.createElement('div');
+    row.className='row';row.dataset.g=g==='all'?'work':g;
+    row.innerHTML=`<span class="num">${ROMAN[ni-1]||ni}</span><div><span class="title"></span><div class="meta"><span class="tag${gCls}">${gName}</span></div></div>${STAMP}`;
+    row.querySelector('.title').textContent=v;
+    row.onclick=()=>{row.classList.toggle('done');counts();apply();};
+    const first=$$('.row')[0];$('#list').insertBefore(row,first);
+    ni++;$('#ni').value='';closeSheet();counts();apply();
+  }
+  $('#ni').addEventListener('keydown',e=>{if(e.key==='Enter')add();});
+  // 监测环
+  let sec=720;const C=100.5;
+  setInterval(()=>{sec=Math.min(sec+3,1800);const p=sec/1800;
+    const ring=$('#ring');if(ring)ring.setAttribute('stroke-dashoffset',(C*(1-p)).toFixed(1));
+    const pct=$('#ring-pct');if(pct)pct.textContent=Math.round(p*100)+'%';
+    const bar=$('#monbar');if(bar)bar.style.width=(p*100).toFixed(1)+'%';
+    const t=$('#mont');if(t)t.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+  },1000);
+  counts();
+</script>
+</body>
+</html>

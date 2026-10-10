@@ -9,5 +9,6 @@
       "@hengsch/shared-storage": ["./shared/shared-storage/index.ts"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "shared/**/*.test.ts"]
 }

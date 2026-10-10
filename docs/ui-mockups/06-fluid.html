@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>06 · Fluid Aurora — HengSch 方案</title>
+<style>
+  @import url('https://fonts.loli.net/css2?family=Syne:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap');
+  :root{
+    --bg:#0D0B1A; --glass:rgba(255,255,255,.055); --stroke:rgba(255,255,255,.1);
+    --violet:#8B6CFF; --cyan:#4FE0E0; --coral:#FF8E6B; --text:#F2EEFF; --dim:#8E88AB;
+    --disp:'Syne','PingFang SC','Microsoft YaHei',sans-serif;
+    --sans:'Manrope','PingFang SC','Microsoft YaHei',sans-serif;
+    --spring:cubic-bezier(.3,1.6,.4,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:#070614;font-family:var(--sans);color:var(--text);min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;gap:28px;padding:40px 20px 80px}
+  .brief{width:min(860px,100%);display:flex;align-items:baseline;gap:20px;border-bottom:2px solid #8B6CFF;padding-bottom:14px}
+  .brief .no{font-family:var(--disp);font-size:14px;font-weight:800;color:#8B6CFF}
+  .brief h1{font-family:var(--disp);font-size:22px;font-weight:700}
+  .brief .kw{margin-left:auto;font-family:var(--sans);font-size:11px;color:#8E88AB;text-align:right;line-height:1.6}
+  .device{position:relative;width:390px;height:844px;background:var(--bg);border-radius:48px;
+    box-shadow:0 0 0 11px #151226,0 0 0 13px #2B2547,0 34px 90px -20px #000;overflow:hidden;flex-shrink:0}
+  .device::after{content:'';position:absolute;top:13px;left:50%;transform:translateX(-50%);width:108px;height:30px;background:#050410;border-radius:16px;z-index:60}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
+  /* 流动极光背景 */
+  .aurora{position:absolute;inset:-30%;z-index:0;filter:blur(70px);opacity:.85;pointer-events:none}
+  .aurora i{position:absolute;border-radius:50%;mix-blend-mode:screen;animation:drift 16s ease-in-out infinite alternate}
+  .aurora i:nth-child(1){width:340px;height:340px;background:#8B6CFF;top:4%;left:-8%;opacity:.55}
+  .aurora i:nth-child(2){width:300px;height:300px;background:#4FE0E0;top:38%;right:-14%;opacity:.4;animation-delay:-5s;animation-duration:19s}
+  .aurora i:nth-child(3){width:260px;height:260px;background:#FF8E6B;bottom:4%;left:12%;opacity:.38;animation-delay:-9s;animation-duration:23s}
+  .aurora i:nth-child(4){width:200px;height:200px;background:#FF6BD6;top:20%;left:38%;opacity:.28;animation-delay:-13s;animation-duration:21s}
+  @keyframes drift{
+    0%{transform:translate(0,0) scale(1)}
+    50%{transform:translate(46px,-38px) scale(1.18)}
+    100%{transform:translate(-40px,44px) scale(.92)}
+  }
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:17px 30px 4px;font-family:var(--sans);font-weight:600;font-size:13px;position:relative;z-index:5}
+  .head{padding:26px 26px 0;position:relative;z-index:5}
+  .head .ava{display:flex;align-items:center;gap:12px}
+  .head .ava .av{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--violet),var(--cyan));display:grid;place-items:center;font-family:var(--disp);font-weight:800;font-size:17px;color:#0D0B1A}
+  .head .ava .who b{font-family:var(--disp);font-size:16px;font-weight:700;display:block}
+  .head .ava .who span{font-size:12px;color:var(--dim)}
+  .head h2{font-family:var(--disp);font-size:34px;font-weight:800;line-height:1.15;margin-top:20px;letter-spacing:-.02em}
+  .head h2 .g{background:linear-gradient(90deg,var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  /* 统计玻璃条 */
+  .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:18px}
+  .stat{background:var(--glass);border:1px solid var(--stroke);backdrop-filter:blur(14px);border-radius:20px;padding:14px 12px;position:relative;overflow:hidden}
+  .stat::before{content:'';position:absolute;inset:0;background:linear-gradient(160deg,#ffffff0c,transparent 60%)}
+  .stat b{font-family:var(--disp);font-size:24px;font-weight:800;display:block;line-height:1;position:relative}
+  .stat:nth-child(1) b{color:var(--cyan)}
+  .stat:nth-child(3) b{color:var(--coral)}
+  .stat span{font-size:10.5px;color:var(--dim);display:block;margin-top:7px;letter-spacing:.04em;position:relative}
+  .chips{display:flex;gap:9px;padding:20px 26px 8px;position:relative;z-index:5;overflow-x:auto;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{font-family:var(--sans);font-weight:600;font-size:13px;padding:9px 18px;border-radius:999px;background:var(--glass);border:1px solid var(--stroke);backdrop-filter:blur(10px);color:var(--dim);cursor:pointer;white-space:nowrap;transition:all .3s var(--spring)}
+  .chip:active{transform:scale(.93)}
+  .chip.on{background:linear-gradient(120deg,var(--violet),#6E56FF);border-color:transparent;color:#fff;box-shadow:0 8px 24px -6px #8B6CFFaa;transform:scale(1.05)}
+  .list{flex:1;overflow-y:auto;padding:12px 26px 130px;position:relative;z-index:5;scrollbar-width:none}
+  .list::-webkit-scrollbar{display:none}
+  .sec{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.24em;color:var(--dim);margin:14px 4px 12px;text-transform:uppercase}
+  /* 玻璃任务卡 */
+  .card{background:var(--glass);border:1px solid var(--stroke);backdrop-filter:blur(16px);border-radius:22px;padding:16px;margin-bottom:11px;display:grid;grid-template-columns:30px 1fr;gap:13px;cursor:pointer;position:relative;overflow:hidden;transition:transform .35s var(--spring),border-color .3s,background .3s;user-select:none}
+  .card::after{content:'';position:absolute;top:0;left:-60%;width:50%;height:100%;background:linear-gradient(100deg,transparent,#ffffff14,transparent);transform:skewX(-18deg);pointer-events:none}
+  .card:active{transform:scale(.975)}
+  .cb{width:28px;height:28px;border-radius:10px;border:2px solid rgba(255,255,255,.28);display:grid;place-items:center;margin-top:1px;transition:all .35s var(--spring)}
+  .cb svg{width:15px;height:15px;stroke:#0D0B1A;stroke-width:3.4;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;transition:stroke-dashoffset .25s .1s}
+  .title{font-family:var(--sans);font-size:16px;font-weight:600;letter-spacing:-.005em;line-height:1.45;display:block;transition:color .3s}
+  .meta{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+  .tag{font-family:var(--sans);font-weight:600;font-size:10.5px;padding:4px 11px;border-radius:999px;background:#ffffff0e;color:var(--dim);border:1px solid #ffffff12}
+  .tag.work{color:#4FE0E0;border-color:#4FE0E044;background:#4FE0E012}
+  .tag.life{color:#FF8E6B;border-color:#FF8E6B44;background:#FF8E6B12}
+  .tag.study{color:#D6A6FF;border-color:#D6A6FF44;background:#D6A6FF12}
+  .tag.cycle{border-style:dashed}
+  .tag.mon{color:#0D0B1A;background:linear-gradient(120deg,var(--cyan),#7CF2D8);border:none;box-shadow:0 4px 14px -4px #4FE0E088}
+  .tag.due{color:#FF7A9A;border-color:#FF7A9A44;background:#FF7A9A12}
+  /* 监测：流动进度条 */
+  .mon{margin-top:12px;background:#0D0B1A66;border:1px solid #ffffff10;border-radius:16px;padding:13px 14px}
+  .mon .row{display:flex;justify-content:space-between;align-items:center;font-family:var(--sans)}
+  .mon .row .lab{font-size:11px;color:var(--dim);letter-spacing:.08em;display:flex;align-items:center;gap:7px}
+  .mon .row .lab i{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.6);opacity:.5}}
+  .mon .row .val{font-family:var(--disp);font-weight:800;font-size:17px;color:var(--cyan);text-shadow:0 0 16px #4FE0E066}
+  .mon .track{height:10px;border-radius:99px;background:#ffffff10;margin-top:11px;overflow:hidden;position:relative}
+  .mon .fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,var(--violet),var(--cyan),#7CF2D8);background-size:220% 100%;animation:flow 2.6s linear infinite;transition:width .7s var(--spring);box-shadow:0 0 14px #4FE0E077}
+  @keyframes flow{from{background-position:0 0}to{background-position:220% 0}}
+  .mon .legend{display:flex;justify-content:space-between;font-family:var(--sans);font-size:10px;color:var(--dim);margin-top:7px}
+  /* 完成态：波纹溶解 */
+  .ripple{position:absolute;left:26px;top:26px;width:14px;height:14px;border-radius:50%;border:2px solid var(--cyan);transform:translate(-50%,-50%) scale(0);opacity:.9;pointer-events:none;z-index:40}
+  .ripple.go{animation:rip .7s cubic-bezier(.2,.8,.3,1) forwards}
+  @keyframes rip{to{transform:translate(-50%,-50%) scale(16);opacity:0}}
+  .card.done{background:#ffffff08}
+  .card.done::after{animation:sheen .8s cubic-bezier(.4,0,.2,1)}
+  @keyframes sheen{from{left:-60%}to{left:130%}}
+  .card.done .cb{background:linear-gradient(135deg,var(--cyan),#7CF2D8);border-color:transparent;box-shadow:0 0 18px #4FE0E077;transform:rotate(360deg) scale(1.05)}
+  .card.done .cb svg{stroke-dashoffset:0}
+  .card.done .title{color:var(--dim);text-decoration:line-through;text-decoration-color:#4FE0E088}
+  /* FAB 磁吸 */
+  .fab{position:absolute;right:24px;bottom:104px;width:62px;height:62px;border-radius:50%;border:none;cursor:pointer;z-index:40;
+    background:conic-gradient(from 210deg,var(--violet),#6E56FF,var(--cyan),var(--violet));
+    display:grid;place-items:center;box-shadow:0 14px 40px -8px #8B6CFFcc;transition:transform .3s var(--spring)}
+  .fab::before{content:'';position:absolute;inset:3px;border-radius:50%;background:#0D0B1Aee}
+  .fab svg{width:24px;height:24px;stroke:#fff;stroke-width:2.6;position:relative;transition:transform .3s var(--spring)}
+  .fab:active{transform:scale(.88) rotate(90deg)}
+  /* tabs */
+  .tabs{position:absolute;left:20px;right:20px;bottom:18px;background:#16122Bcc;backdrop-filter:blur(18px);border:1px solid var(--stroke);border-radius:999px;display:flex;z-index:30;padding:7px;box-shadow:0 18px 44px -14px #000}
+  .tab{flex:1;padding:13px 0;background:none;border:none;color:var(--dim);font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;border-radius:999px;transition:all .3s var(--spring)}
+  .tab.on{background:linear-gradient(120deg,var(--violet),#6E56FF);color:#fff;box-shadow:0 8px 22px -6px #8B6CFFaa}
+  /* sheet */
+  .mask{position:absolute;inset:0;background:#050410aa;backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .3s;z-index:70}
+  .mask.open{opacity:1;pointer-events:auto}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:#171330f2;backdrop-filter:blur(24px);border:1px solid var(--stroke);border-bottom:none;border-radius:34px 34px 0 0;padding:34px 28px 42px;transform:translateY(110%);transition:transform .45s var(--spring);z-index:80;box-shadow:0 -30px 80px #000c}
+  .sheet.open{transform:translateY(0)}
+  .sheet .grip{width:48px;height:6px;border-radius:99px;background:#ffffff22;margin:-16px auto 22px}
+  .sheet h3{font-family:var(--disp);font-size:27px;font-weight:800;margin-bottom:20px;letter-spacing:-.01em}
+  .sheet input{width:100%;font-family:var(--sans);font-weight:600;font-size:17px;padding:17px 20px;border:none;border-radius:18px;background:#ffffff10;outline:none;color:var(--text);transition:box-shadow .25s,background .25s}
+  .sheet input:focus{background:#ffffff16;box-shadow:0 0 0 3px #8B6CFF55}
+  .sheet input::placeholder{color:#6E6793}
+  .sheet .chips{padding:20px 0 26px}
+  .sheet .add{width:100%;padding:18px;background:linear-gradient(120deg,var(--violet),var(--cyan));color:#0D0B1A;border:none;border-radius:20px;font-family:var(--disp);font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 14px 34px -8px #8B6CFFaa;transition:transform .2s var(--spring)}
+  .sheet .add:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+<div class="brief">
+  <span class="no">06 / 06</span>
+  <h1>Fluid Aurora — 流体实验</h1>
+  <span class="kw">AURORA · GLASSMORPHISM · SPRING<br>适合：Awwwards SOTD · 极光氛围 · 大胆创新</span>
+</div>
+
+<div class="device">
+  <div class="screen">
+    <div class="aurora"><i></i><i></i><i></i><i></i></div>
+
+    <div class="statusbar">
+      <span>9:41</span>
+      <span style="display:flex;gap:6px;align-items:center">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4"/><rect x="4.5" y="5" width="3" height="6"/><rect x="9" y="2.5" width="3" height="8.5"/><rect x="13.5" y="0" width="3" height="11"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3" fill="none" stroke="currentColor"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="currentColor"/><path d="M23 4v4a2.5 2.5 0 0 0 0-4z" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="head">
+      <div class="ava">
+        <div class="av">H</div>
+        <div class="who"><b>Hey, Heng</b><span>星期五 · 10月9日 · 状态在线</span></div>
+      </div>
+      <h2>把今天<br><span class="g">流动起来</span></h2>
+      <div class="stats">
+        <div class="stat"><b id="s-a">08</b><span>ACTIVE 待办</span></div>
+        <div class="stat"><b id="s-d">03</b><span>DONE 完成</span></div>
+        <div class="stat"><b id="s-p">27%</b><span>PROGRESS</span></div>
+      </div>
+    </div>
+
+    <div class="chips" id="chips">
+      <button class="chip on" data-g="all">全部</button>
+      <button class="chip" data-g="work">工作</button>
+      <button class="chip" data-g="life">生活</button>
+      <button class="chip" data-g="study">学习</button>
+    </div>
+
+    <div class="list" id="list">
+      <div class="sec">// 待办 · Active</div>
+
+      <div class="card" data-g="work">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">完成 Swiss Precision 界面移植收尾</span>
+          <div class="meta"><span class="tag work">工作</span><span class="tag due">18:00 截止</span></div></div>
+      </div>
+
+      <div class="card" data-g="work">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">Review PR #42</span>
+          <div class="meta"><span class="tag work">工作</span></div></div>
+      </div>
+
+      <div class="card" data-g="life">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">刷抖音 ≤ 30 分钟</span>
+          <div class="meta"><span class="tag mon">MONITORING</span><span class="tag life">生活</span></div>
+          <div class="mon">
+            <div class="row">
+              <span class="lab"><i></i>APP USAGE · 抖音</span>
+              <span class="val"><span id="mont">12:00</span> / 30:00</span>
+            </div>
+            <div class="track"><div class="fill" id="fill" style="width:40%"></div></div>
+            <div class="legend"><span>00:00</span><span id="remain">剩余 18:00</span><span>30:00</span></div>
+          </div></div>
+      </div>
+
+      <div class="card" data-g="work">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">每日站会同步进度</span>
+          <div class="meta"><span class="tag work">工作</span><span class="tag cycle">DAILY ⟳</span></div></div>
+      </div>
+
+      <div class="card" data-g="work">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">备份数据库到云端</span>
+          <div class="meta"><span class="tag work">工作</span></div></div>
+      </div>
+
+      <div class="card" data-g="study">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">读《设计中的设计》第三章</span>
+          <div class="meta"><span class="tag study">学习</span></div></div>
+      </div>
+
+      <div class="card" data-g="life">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">买菜和做晚饭</span>
+          <div class="meta"><span class="tag life">生活</span></div></div>
+      </div>
+
+      <div class="card" data-g="work">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">整理周报</span>
+          <div class="meta"><span class="tag work">工作</span><span class="tag due">今天截止</span></div></div>
+      </div>
+
+      <div class="sec" style="margin-top:18px">// 归档 · Logged</div>
+
+      <div class="card done" data-g="life">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">健身 45 分钟</span>
+          <div class="meta"><span class="tag life">生活</span><span class="tag cycle">每两天 ⟳</span></div></div>
+      </div>
+      <div class="card done" data-g="life">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">给绿萝浇水</span>
+          <div class="meta"><span class="tag life">生活</span><span class="tag cycle">每周 ⟳</span></div></div>
+      </div>
+      <div class="card done" data-g="study">
+        <span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span>
+        <div><span class="title">TypeScript 类型体操练习</span>
+          <div class="meta"><span class="tag study">学习</span></div></div>
+      </div>
+    </div>
+
+    <button class="fab" id="fab" aria-label="新增"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+
+    <div class="tabs">
+      <button class="tab on" data-f="all">全部</button>
+      <button class="tab" data-f="active">进行中</button>
+      <button class="tab" data-f="done">已完成</button>
+    </div>
+
+    <div class="mask" id="mask" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet">
+      <div class="grip"></div>
+      <h3>新任务</h3>
+      <input id="ni" placeholder="接下来想做什么？" autocomplete="off">
+      <div class="chips" id="nchips">
+        <button class="chip on" data-g="all">未分类</button>
+        <button class="chip" data-g="work">工作</button>
+        <button class="chip" data-g="life">生活</button>
+        <button class="chip" data-g="study">学习</button>
+      </div>
+      <button class="add" onclick="add()">创建任务</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $=(s,p=document)=>p.querySelector(s),$$=(s,p=document)=>[...p.querySelectorAll(s)];
+  let filter='all',group='all';
+  function counts(){
+    const rows=$$('.card');const d=rows.filter(r=>r.classList.contains('done')).length;const a=rows.length-d;
+    $('#s-a').textContent=String(a).padStart(2,'0');
+    $('#s-d').textContent=String(d).padStart(2,'0');
+    $('#s-p').textContent=rows.length?Math.round(d/rows.length*100)+'%':'0%';
+  }
+  function apply(){
+    $$('.card').forEach(r=>{
+      const okG=group==='all'||r.dataset.g===group;
+      const okF=filter==='all'||(filter==='active'&&!r.classList.contains('done'))||(filter==='done'&&r.classList.contains('done'));
+      r.style.display=(okG&&okF)?'':'none';
+    });
+  }
+  $$('.card').forEach(c=>c.onclick=()=>{
+    const was=c.classList.contains('done');
+    c.classList.toggle('done');
+    if(!was){
+      const r=document.createElement('span');r.className='ripple';c.appendChild(r);
+      requestAnimationFrame(()=>r.classList.add('go'));
+      setTimeout(()=>r.remove(),750);
+    }
+    counts();apply();
+  });
+  $$('#chips .chip').forEach(c=>c.onclick=()=>{$$('#chips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');group=c.dataset.g;apply();});
+  $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');filter=t.dataset.f;apply();});
+  $('#fab').onclick=()=>{$('#sheet').classList.add('open');$('#mask').classList.add('open');setTimeout(()=>$('#ni').focus(),330);};
+  function closeSheet(){$('#sheet').classList.remove('open');$('#mask').classList.remove('open');}
+  $$('#nchips .chip').forEach(c=>c.onclick=()=>{$$('#nchips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');});
+  function add(){
+    const v=$('#ni').value.trim();if(!v)return;
+    const g=$('#nchips .chip.on').dataset.g;
+    const gName={all:'未分类',work:'工作',life:'生活',study:'学习'}[g];
+    const gCls=g==='all'?'':` ${g}`;
+    const c=document.createElement('div');
+    c.className='card';c.dataset.g=g==='all'?'work':g;
+    c.innerHTML=`<span class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></span><div><span class="title"></span><div class="meta"><span class="tag${gCls}">${gName}</span></div></div>`;
+    c.querySelector('.title').textContent=v;
+    c.onclick=()=>{const was=c.classList.contains('done');c.classList.toggle('done');if(!was){const r=document.createElement('span');r.className='ripple';c.appendChild(r);requestAnimationFrame(()=>r.classList.add('go'));setTimeout(()=>r.remove(),750);}counts();apply();};
+    const first=$$('.card')[0];$('#list').insertBefore(c,first);
+    $('#ni').value='';closeSheet();counts();apply();
+  }
+  $('#ni').addEventListener('keydown',e=>{if(e.key==='Enter')add();});
+  // 监测流光进度
+  let sec=720;
+  setInterval(()=>{
+    sec=Math.min(sec+3,1800);const p=sec/1800;
+    const f=$('#fill');if(f)f.style.width=(p*100).toFixed(1)+'%';
+    const t=$('#mont');if(t)t.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+    const rm=$('#remain');if(rm)rm.textContent='剩余 '+String(Math.floor((1800-sec)/60)).padStart(2,'0')+':'+String((1800-sec)%60).padStart(2,'0');
+  },1000);
+  counts();
+</script>
+</body>
+</html>

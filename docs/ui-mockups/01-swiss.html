@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 · Swiss Precision — HengSch 方案</title>
+<style>
+  :root{
+    --paper:#FAFAF7; --ink:#111111; --red:#E1352B; --grey:#E5E5E0; --mid:#8A8A85;
+    --line:#1111111a; --mono:'SF Mono','Cascadia Mono','Consolas',monospace;
+    --sans:'Helvetica Neue',Helvetica,Arial,'PingFang SC','Microsoft YaHei',sans-serif;
+    --ease:cubic-bezier(.2,0,0,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:#DEDED8;font-family:var(--sans);color:var(--ink);min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;gap:28px;padding:40px 20px 80px}
+  /* ─── 壳外说明 ─── */
+  .brief{width:min(860px,100%);display:flex;align-items:baseline;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:14px}
+  .brief .no{font-family:var(--mono);font-size:13px;letter-spacing:.1em}
+  .brief h1{font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .brief .kw{margin-left:auto;font-family:var(--mono);font-size:11px;color:#555;letter-spacing:.06em;text-align:right}
+  /* ─── 手机壳 ─── */
+  .device{position:relative;width:390px;height:844px;background:var(--paper);border-radius:44px;
+    box-shadow:0 0 0 11px #17171a,0 0 0 13px #3a3a3e,0 34px 80px -20px #00000055;overflow:hidden;flex-shrink:0}
+  .device::after{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#17171a;border-radius:16px;z-index:60}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;
+    background:
+      linear-gradient(90deg,transparent 0 31px,var(--line) 31px 32px,transparent 32px) 0 0/32px 100%,
+      linear-gradient(90deg,transparent 0 63px,var(--line) 63px 64px,transparent 64px) 0 0/64px 100%,
+      var(--paper);
+    background-blend-mode:normal}
+  .grid-off{background:var(--paper)}
+  /* 状态栏 */
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:16px 26px 4px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;position:relative;z-index:5}
+  .statusbar svg{display:block}
+  /* 头部 */
+  .head{padding:18px 24px 0;position:relative;z-index:5}
+  .head .kicker{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--mid);margin-bottom:6px}
+  .head h2{font-size:44px;font-weight:700;letter-spacing:-.035em;line-height:1}
+  .head h2 .slash{color:var(--red)}
+  .head .count{font-family:var(--mono);font-size:11px;letter-spacing:.1em;margin-top:8px;color:#444}
+  .head .count b{color:var(--red)}
+  /* 分组 chips */
+  .chips{display:flex;gap:8px;padding:16px 24px 14px;position:relative;z-index:5}
+  .chip{font-family:var(--mono);font-size:10px;letter-spacing:.12em;padding:7px 12px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
+  .chip.on{background:var(--ink);color:var(--paper)}
+  .chip .dot{display:inline-block;width:7px;height:7px;margin-right:6px;vertical-align:1px}
+  .chip[data-g=work] .dot{background:#2563EB}.chip[data-g=life] .dot{background:#16A34A}.chip[data-g=study] .dot{background:#9333EA}
+  .chip[data-g=all] .dot{background:var(--red)}
+  /* 列表 */
+  .list{flex:1;overflow-y:auto;padding:0 24px 130px;position:relative;z-index:5;scrollbar-width:none}
+  .list::-webkit-scrollbar{display:none}
+  .sec{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--mid);display:flex;justify-content:space-between;padding:14px 0 8px;border-bottom:1.5px solid var(--ink);margin-bottom:2px}
+  .row{display:grid;grid-template-columns:30px 24px 1fr;gap:12px;align-items:start;padding:15px 0;border-bottom:1px solid var(--line);cursor:pointer;transition:opacity .3s var(--ease),transform .3s var(--ease);position:relative}
+  .row:active{transform:translateX(2px)}
+  .idx{font-family:var(--mono);font-size:11px;color:var(--mid);padding-top:3px;transition:all .12s var(--ease);position:relative}
+  .cb{width:20px;height:20px;border:1.8px solid var(--ink);margin-top:2px;background:transparent;cursor:pointer;display:grid;place-items:center;transition:background .12s var(--ease);flex-shrink:0}
+  .cb svg{width:13px;height:13px;stroke:var(--paper);stroke-width:3;fill:none;stroke-dasharray:22;stroke-dashoffset:22;transition:stroke-dashoffset .22s var(--ease) .05s}
+  .row.done .cb{background:var(--ink)}
+  .row.done .cb svg{stroke-dashoffset:0}
+  .row.done .title{color:var(--mid);text-decoration:line-through;text-decoration-thickness:1.5px}
+  .row.done{opacity:.55}
+  .title{font-size:16px;font-weight:500;letter-spacing:-.01em;line-height:1.35;display:block}
+  .meta{display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap}
+  .tag{font-family:var(--mono);font-size:9px;letter-spacing:.14em;padding:3px 6px;border:1px solid var(--line);color:#555}
+  .tag.g-work{border-color:#2563EB55;color:#2563EB}.tag.g-life{border-color:#16A34A55;color:#16A34A}.tag.g-study{border-color:#9333EA55;color:#9333EA}
+  .tag.hot{background:var(--red);border-color:var(--red);color:#fff}
+  .tag.cycle{border-style:dashed}
+  /* 监测进度 */
+  .mon{margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+  .mon .track{height:4px;background:var(--grey);position:relative;overflow:hidden}
+  .mon .fill{position:absolute;inset:0;right:auto;width:40%;background:var(--red);transition:width .5s var(--ease)}
+  .mon .val{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink)}
+  .mon .val b{color:var(--red)}
+  /* 完成动效：编号反白闪 */
+  @keyframes idxflash{0%{background:var(--red);color:#fff}100%{background:transparent;color:var(--mid)}}
+  .row.flash .idx{animation:idxflash .5s var(--ease)}
+  /* FAB */
+  .fab{position:absolute;right:22px;bottom:96px;width:54px;height:54px;background:var(--red);border:none;cursor:pointer;display:grid;place-items:center;z-index:40;transition:transform .18s var(--ease);box-shadow:6px 6px 0 var(--ink)}
+  .fab:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink)}
+  .fab svg{width:22px;height:22px;stroke:#fff;stroke-width:2.4}
+  /* 底部 */
+  .tabs{position:absolute;left:0;right:0;bottom:0;display:flex;background:var(--paper);border-top:1.5px solid var(--ink);z-index:30;padding-bottom:18px}
+  .tab{flex:1;padding:14px 0 10px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;background:none;border:none;color:var(--mid);cursor:pointer;position:relative;transition:color .15s}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;top:0;left:20%;right:20%;height:3px;background:var(--red)}
+  /* Sheet */
+  .sheet-mask{position:absolute;inset:0;background:#11111188;opacity:0;pointer-events:none;transition:opacity .25s var(--ease);z-index:70}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-top:2px solid var(--ink);padding:26px 24px 40px;transform:translateY(110%);transition:transform .32s var(--ease);z-index:80}
+  .sheet.open{transform:translateY(0)}
+  .sheet-mask.open{opacity:1;pointer-events:auto}
+  .sheet h3{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--mid);margin-bottom:18px;display:flex;justify-content:space-between}
+  .sheet input{width:100%;font-family:var(--sans);font-size:19px;font-weight:500;padding:8px 0 12px;border:none;border-bottom:2px solid var(--ink);background:transparent;outline:none;letter-spacing:-.01em}
+  .sheet input::placeholder{color:#bbb}
+  .sheet .chips{padding:20px 0 26px}
+  .sheet button.add{width:100%;padding:16px;background:var(--ink);color:var(--paper);border:none;font-family:var(--mono);font-size:12px;letter-spacing:.22em;cursor:pointer;transition:background .15s}
+  .sheet button.add:active{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="brief">
+  <span class="no">01 / 06</span>
+  <h1>Swiss Precision — 瑞士精密</h1>
+  <span class="kw">GRID · HAIRLINE · MONO INDEX<br>适合：跨端品牌一致性 · CSS Design Awards</span>
+</div>
+
+<div class="device">
+  <div class="screen" id="screen">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span style="display:flex;gap:6px;align-items:center">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4"/><rect x="4.5" y="5" width="3" height="6"/><rect x="9" y="2.5" width="3" height="8.5"/><rect x="13.5" y="0" width="3" height="11"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3" fill="none" stroke="currentColor"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="currentColor"/><path d="M23 4v4a2.5 2.5 0 0 0 0-4z" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="head">
+      <div class="kicker"><span>HENG/SCH — ENTRY LIST</span><span>2026/10/09 FRI</span></div>
+      <h2>待办<span class="slash">/</span>清单</h2>
+      <div class="count">ACTIVE <b id="c-active">08</b> · DONE <b id="c-done" style="color:#111">03</b> · TOTAL <b id="c-all" style="color:#111">11</b></div>
+    </div>
+
+    <div class="chips" id="chips">
+      <button class="chip on" data-g="all"><span class="dot"></span>全部</button>
+      <button class="chip" data-g="work"><span class="dot"></span>工作</button>
+      <button class="chip" data-g="life"><span class="dot"></span>生活</button>
+      <button class="chip" data-g="study"><span class="dot"></span>学习</button>
+    </div>
+
+    <div class="list" id="list">
+      <div class="sec"><span>ACTIVE — 待进行</span><span id="sec-n">08</span></div>
+
+      <div class="row" data-g="work" onclick="flip(this,event)">
+        <span class="idx">01</span><button class="cb" aria-label="完成"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">完成 Swiss Precision 界面移植收尾</span>
+          <div class="meta"><span class="tag g-work">WORK</span><span class="tag">DUE 18:00</span></div></div>
+      </div>
+
+      <div class="row" data-g="work" onclick="flip(this,event)">
+        <span class="idx">02</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">Review PR #42</span>
+          <div class="meta"><span class="tag g-work">WORK</span></div></div>
+      </div>
+
+      <div class="row" data-g="life" onclick="flip(this,event)">
+        <span class="idx">03</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">刷抖音 ≤ 30 分钟</span>
+          <div class="meta"><span class="tag hot">MONITOR</span><span class="tag g-life">LIFE</span></div>
+          <div class="mon"><div class="track"><div class="fill" id="monfill" style="width:40%"></div></div><span class="val"><b id="monval">12:00</b> / 30:00</span></div></div>
+      </div>
+
+      <div class="row" data-g="work" onclick="flip(this,event)">
+        <span class="idx">04</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">每日站会同步进度</span>
+          <div class="meta"><span class="tag g-work">WORK</span><span class="tag cycle">DAILY ⟳</span></div></div>
+      </div>
+
+      <div class="row" data-g="work" onclick="flip(this,event)">
+        <span class="idx">05</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">备份数据库到云端</span>
+          <div class="meta"><span class="tag g-work">WORK</span></div></div>
+      </div>
+
+      <div class="row" data-g="study" onclick="flip(this,event)">
+        <span class="idx">06</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">读《设计中的设计》第三章</span>
+          <div class="meta"><span class="tag g-study">STUDY</span></div></div>
+      </div>
+
+      <div class="row" data-g="life" onclick="flip(this,event)">
+        <span class="idx">07</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">买菜和做晚饭</span>
+          <div class="meta"><span class="tag g-life">LIFE</span></div></div>
+      </div>
+
+      <div class="row" data-g="work" onclick="flip(this,event)">
+        <span class="idx">08</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">整理周报</span>
+          <div class="meta"><span class="tag g-work">WORK</span><span class="tag hot">DUE TODAY</span></div></div>
+      </div>
+
+      <div class="sec" style="margin-top:26px"><span>COMPLETED — 已完成</span><span id="sec-d">03</span></div>
+
+      <div class="row done" data-g="life" onclick="flip(this,event)">
+        <span class="idx">09</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">健身 45 分钟</span>
+          <div class="meta"><span class="tag g-life">LIFE</span><span class="tag cycle">BI-WEEKLY ⟳</span></div></div>
+      </div>
+      <div class="row done" data-g="life" onclick="flip(this,event)">
+        <span class="idx">10</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">给绿萝浇水</span>
+          <div class="meta"><span class="tag g-life">LIFE</span><span class="tag cycle">WEEKLY ⟳</span></div></div>
+      </div>
+      <div class="row done" data-g="study" onclick="flip(this,event)">
+        <span class="idx">11</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button>
+        <div><span class="title">TypeScript 类型体操练习</span>
+          <div class="meta"><span class="tag g-study">STUDY</span></div></div>
+      </div>
+    </div>
+
+    <button class="fab" id="fab" aria-label="新增"><svg viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="20"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
+
+    <div class="tabs">
+      <button class="tab on" data-f="all">ALL — 全部</button>
+      <button class="tab" data-f="active">ACTIVE — 进行</button>
+      <button class="tab" data-f="done">DONE — 完成</button>
+    </div>
+
+    <div class="sheet-mask" id="mask" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet">
+      <h3><span>NEW ENTRY — 新条目</span><span id="next-idx">№ 12</span></h3>
+      <input id="new-title" placeholder="输入任务…" autocomplete="off">
+      <div class="chips" id="new-chips">
+        <button class="chip on" data-g="all"><span class="dot"></span>未分类</button>
+        <button class="chip" data-g="work"><span class="dot"></span>工作</button>
+        <button class="chip" data-g="life"><span class="dot"></span>生活</button>
+        <button class="chip" data-g="study"><span class="dot"></span>学习</button>
+      </div>
+      <button class="add" onclick="addEntry()">+ ADD TO LIST</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>[...p.querySelectorAll(s)];
+  let filter='all', group='all', ni=12;
+  function counts(){
+    const rows=$$('.row');
+    const act=rows.filter(r=>!r.classList.contains('done')).length;
+    const dn=rows.length-act;
+    $('#c-active').textContent=String(act).padStart(2,'0');
+    $('#c-done').textContent=String(dn).padStart(2,'0');
+    $('#c-all').textContent=String(rows.length).padStart(2,'0');
+    $('#sec-n').textContent=String($$('.row:not(.done)').length).padStart(2,'0');
+    $('#sec-d').textContent=String($$('.row.done').length).padStart(2,'0');
+  }
+  function apply(){
+    $$('.row').forEach(r=>{
+      const okG=group==='all'||r.dataset.g===group;
+      const okF=filter==='all'||(filter==='active'&&!r.classList.contains('done'))||(filter==='done'&&r.classList.contains('done'));
+      r.style.display=(okG&&okF)?'':'none';
+    });
+  }
+  function flip(row,e){
+    if(e.target.closest('.sheet'))return;
+    row.classList.toggle('done');
+    if(row.classList.contains('done')){row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),520);}
+    counts();apply();
+  }
+  $$('#chips .chip').forEach(c=>c.onclick=()=>{$$('#chips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');group=c.dataset.g;apply();});
+  $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');filter=t.dataset.f;apply();});
+  $('#fab').onclick=()=>{$('#sheet').classList.add('open');$('#mask').classList.add('open');setTimeout(()=>$('#new-title').focus(),300);};
+  function closeSheet(){$('#sheet').classList.remove('open');$('#mask').classList.remove('open');}
+  $$('#new-chips .chip').forEach(c=>c.onclick=()=>{$$('#new-chips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');});
+  function addEntry(){
+    const v=$('#new-title').value.trim();if(!v)return;
+    const g=$('#new-chips .chip.on').dataset.g;
+    const gName={all:'INBOX',work:'WORK',life:'LIFE',study:'STUDY'}[g];
+    const gCls=g==='all'?'':` g-${g}`;
+    const row=document.createElement('div');
+    row.className='row flash';row.dataset.g=g==='all'?'work':g;
+    row.innerHTML=`<span class="idx">${String(ni).padStart(2,'0')}</span><button class="cb"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></button><div><span class="title"></span><div class="meta"><span class="tag${gCls}">${gName}</span></div></div>`;
+    row.querySelector('.title').textContent=v;
+    row.onclick=ev=>flip(row,ev);
+    const first=$$('.row')[0];$('#list').insertBefore(row,first);
+    ni++;$('#next-idx').textContent='№ '+ni;
+    $('#new-title').value='';closeSheet();counts();apply();
+    setTimeout(()=>row.classList.remove('flash'),520);
+  }
+  $('#new-title').addEventListener('keydown',e=>{if(e.key==='Enter')addEntry();});
+  // 监测进度模拟：12:00 / 30:00 缓慢推进
+  let sec=720;
+  setInterval(()=>{sec=Math.min(sec+3,1800);const f=$('#monfill');if(f)f.style.width=(sec/1800*100).toFixed(1)+'%';
+    const v=document.querySelector('#monfill')?.closest('.mon')?.querySelector('.val');
+    if(v)v.innerHTML=`<b>${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}</b> / 30:00`;},1000);
+  counts();
+</script>
+</body>
+</html>

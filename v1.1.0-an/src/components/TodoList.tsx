@@ -24,9 +24,10 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): React.ReactElemen
     deleteTodo(todo.id);
   };
 
-  const renderItem = ({ item }: { item: Todo }) => (
+  const renderItem = ({ item, index }: { item: Todo; index: number }) => (
     <TodoCard
       todo={item}
+      index={index}
       onToggle={toggleTodoStatus}
       onPress={onDetail}
       onEdit={onEdit}
@@ -37,8 +38,8 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): React.ReactElemen
   if (state.todos.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>暂无待办事项</Text>
-        <Text style={styles.emptySub}>点击上方 + 按钮添加</Text>
+        <Text style={styles.emptyText}>NO TASKS</Text>
+        <Text style={styles.emptySub}>点击左上角 ＋ 添加第一条待办</Text>
       </View>
     );
   }
@@ -50,20 +51,15 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): React.ReactElemen
           style={[styles.filterItem, selectedGroupId === 'all' && styles.filterItemActive]}
           onPress={() => setSelectedGroupId('all')}
         >
-          <Text style={[styles.filterText, selectedGroupId === 'all' && styles.filterTextActive]}>
-            全部
-          </Text>
+          <Text style={[styles.filterText, selectedGroupId === 'all' && styles.filterTextActive]}>ALL</Text>
         </TouchableOpacity>
         {groupState.groups.map((group) => (
           <TouchableOpacity
             key={group.id}
-            style={[
-              styles.filterItem,
-              selectedGroupId === group.id && styles.filterItemActive,
-              selectedGroupId === group.id && { backgroundColor: group.color },
-            ]}
+            style={[styles.filterItem, selectedGroupId === group.id && styles.filterItemActive]}
             onPress={() => setSelectedGroupId(group.id)}
           >
+            <View style={[styles.filterDot, { backgroundColor: group.color }]} />
             <Text style={[styles.filterText, selectedGroupId === group.id && styles.filterTextActive]}>
               {group.name}
             </Text>
@@ -82,29 +78,42 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): React.ReactElemen
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#FAFAF7' },
   filter: {
     flexDirection: 'row',
-    padding: 12,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 12,
     gap: 8,
     flexWrap: 'wrap',
   },
   filterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    paddingVertical: 7,
+    borderRadius: 0,
+    borderWidth: 1.5,
+    borderColor: '#111111',
+    backgroundColor: '#FAFAF7',
   },
   filterItemActive: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#111111',
+  },
+  filterDot: {
+    width: 7,
+    height: 7,
+    marginRight: 6,
   },
   filterText: {
-    fontSize: 14,
-    color: '#666',
+    fontFamily: 'monospace',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: '#111111',
+    fontWeight: '700',
   },
   filterTextActive: {
-    color: '#333',
-    fontWeight: '600',
+    color: '#FAFAF7',
   },
   list: {
     paddingBottom: 24,
@@ -114,14 +123,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
+    backgroundColor: '#FAFAF7',
   },
   emptyText: {
-    fontSize: 18,
-    color: '#999',
-    marginBottom: 8,
+    fontFamily: 'monospace',
+    fontSize: 16,
+    letterSpacing: 3,
+    color: '#111111',
+    marginBottom: 10,
   },
   emptySub: {
-    fontSize: 14,
-    color: '#bbb',
+    fontSize: 12,
+    color: '#8A8A85',
   },
 });

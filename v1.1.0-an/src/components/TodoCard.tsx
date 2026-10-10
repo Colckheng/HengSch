@@ -5,34 +5,33 @@ import { useGroups } from '../context/GroupContext';
 
 interface TodoCardProps {
   todo: Todo;
+  index: number;
   onToggle: (id: string) => void;
   onPress: (todo: Todo) => void;
   onEdit: (todo: Todo) => void;
   onDelete: (todo: Todo) => void;
 }
 
-export function TodoCard({ todo, onToggle, onPress, onEdit, onDelete }: TodoCardProps): React.ReactElement {
+export function TodoCard({ todo, index, onToggle, onPress, onEdit, onDelete }: TodoCardProps): React.ReactElement {
   const isCompleted = todo.status === 'completed';
   const { getGroupById } = useGroups();
   const group = todo.groupId ? getGroupById(todo.groupId) : undefined;
 
   return (
-    <TouchableOpacity
-      style={[styles.card, group && { backgroundColor: group.color }]}
-      onPress={() => onPress(todo)}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={styles.row} onPress={() => onPress(todo)} activeOpacity={0.6}>
+      <Text style={[styles.index, isCompleted && styles.indexDone]}>{String(index + 1).padStart(2, '0')}</Text>
       <TouchableOpacity
         style={[styles.checkbox, isCompleted && styles.checkboxChecked]}
         onPress={() => onToggle(todo.id)}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         {isCompleted && <Text style={styles.checkmark}>✓</Text>}
       </TouchableOpacity>
       <View style={styles.content}>
         {group && (
-          <View style={[styles.badge, { backgroundColor: group.color }]}>
-            <Text style={styles.badgeText}>{group.name}</Text>
+          <View style={styles.chip}>
+            <View style={[styles.chipDot, { backgroundColor: group.color }]} />
+            <Text style={styles.chipText}>{group.name}</Text>
           </View>
         )}
         <Text style={[styles.title, isCompleted && styles.titleCompleted]} numberOfLines={2}>
@@ -41,13 +40,11 @@ export function TodoCard({ todo, onToggle, onPress, onEdit, onDelete }: TodoCard
         {todo.description ? (
           <Text style={styles.description} numberOfLines={1}>{todo.description}</Text>
         ) : null}
-        {todo.type === 'recurring' && (
-          <Text style={styles.recurringBadge}>循环</Text>
-        )}
+        {todo.type === 'recurring' && <Text style={styles.recurring}>↻ RECURRING</Text>}
       </View>
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => onEdit(todo)} style={styles.actionBtn}>
-          <Text>✏️</Text>
+          <Text style={styles.actionText}>EDIT</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
@@ -58,7 +55,7 @@ export function TodoCard({ todo, onToggle, onPress, onEdit, onDelete }: TodoCard
           }}
           style={styles.actionBtn}
         >
-          <Text>🗑️</Text>
+          <Text style={[styles.actionText, styles.actionDel]}>DEL</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -66,77 +63,105 @@ export function TodoCard({ todo, onToggle, onPress, onEdit, onDelete }: TodoCard
 }
 
 const styles = StyleSheet.create({
-  card: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(17,17,27,0.10)',
+    backgroundColor: '#FAFAF7',
+  },
+  index: {
+    width: 30,
+    fontFamily: 'monospace',
+    fontSize: 13,
+    color: '#8A8A85',
+    marginTop: 3,
+    letterSpacing: 0.5,
+  },
+  indexDone: {
+    color: '#E1352B',
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#bbb',
+    width: 20,
+    height: 20,
+    borderRadius: 0,
+    borderWidth: 1.5,
+    borderColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
+    marginTop: 1,
   },
   checkboxChecked: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+    backgroundColor: '#111111',
   },
   checkmark: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: '#FAFAF7',
+    fontSize: 12,
+    fontWeight: '700',
   },
   content: {
     flex: 1,
+    marginRight: 10,
   },
-  badge: {
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
     marginBottom: 4,
   },
-  badgeText: {
+  chipDot: {
+    width: 7,
+    height: 7,
+    marginRight: 6,
+  },
+  chipText: {
+    fontFamily: 'monospace',
     fontSize: 10,
-    color: '#666',
+    letterSpacing: 1,
+    color: '#8A8A85',
   },
   title: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: '#111111',
+    letterSpacing: -0.35,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
-    color: '#999',
+    color: '#8A8A85',
+    opacity: 0.55,
   },
   description: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    color: '#8A8A85',
+    marginTop: 3,
+    letterSpacing: -0.1,
   },
-  recurringBadge: {
+  recurring: {
+    fontFamily: 'monospace',
     fontSize: 10,
-    color: '#2196F3',
+    color: '#E1352B',
+    letterSpacing: 1,
     marginTop: 4,
   },
   actions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 14,
+    paddingTop: 3,
   },
   actionBtn: {
-    padding: 8,
+    paddingVertical: 2,
+  },
+  actionText: {
+    fontFamily: 'monospace',
+    fontSize: 10,
+    letterSpacing: 1,
+    color: '#8A8A85',
+  },
+  actionDel: {
+    color: '#E1352B',
   },
 });

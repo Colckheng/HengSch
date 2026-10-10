@@ -1,0 +1,14 @@
+{
+  "name": "@hengsch/sync-bridge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "HTTP sync bridge: authenticated read-merge-write gateway to the shared sync.json file",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -23,6 +23,7 @@ function syncLabel(status: SyncStatus): string {
     return `SYNCED ${hh}:${mm}`;
   }
   if (status.state === 'SYNCING') return 'SYNCING…';
+  if (status.state === 'OFF') return '同步 OFF';
   return status.state;
 }
 
@@ -201,7 +202,7 @@ function AppContent(): JSX.Element {
             <b>{pad(pendingCount)}</b> Pending · <b>{pad(completedCount)}</b> Completed ·{' '}
             <b>{pad(state.todos.length)}</b> Total
           </span>
-          {syncStatus && syncStatus.state !== 'OFF' && (
+          {syncStatus && (
             <button
               className={`foot-sync ${syncStatus.state === 'AUTH ERROR' || syncStatus.state === 'REMOTE ERROR' ? 'error' : ''} ${syncStatus.state === 'SYNCING' ? 'busy' : ''}`}
               onClick={() => setIsSyncModalOpen(true)}

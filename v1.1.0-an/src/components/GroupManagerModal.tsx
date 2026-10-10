@@ -123,15 +123,18 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
                   </View>
                 </View>
               ) : (
-                <View style={[styles.groupInfo, { backgroundColor: group.color }]}>
-                  <Text style={styles.groupName}>{group.name}</Text>
+                <View style={styles.groupInfo}>
+                  <View style={styles.groupNameRow}>
+                    <View style={[styles.groupDot, { backgroundColor: group.color }]} />
+                    <Text style={styles.groupName}>{group.name}</Text>
+                  </View>
                   {group.id !== 'default' && (
                     <View style={styles.groupActions}>
                       <TouchableOpacity onPress={() => handleEditGroup(group)} style={styles.actionBtn}>
-                        <Text>✏️</Text>
+                        <Text style={styles.actionText}>EDIT</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDeleteGroup(group.id)} style={styles.actionBtn}>
-                        <Text>🗑️</Text>
+                        <Text style={[styles.actionText, styles.actionTextDel]}>DEL</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -176,64 +179,91 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#FAFAF7' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: '#111111',
   },
-  headerBtn: { padding: 8, minWidth: 60 },
-  headerBtnText: { fontSize: 16, color: '#666' },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
-  body: { flex: 1, padding: 16 },
-  groupItem: { marginBottom: 12 },
+  headerBtn: { padding: 4, minWidth: 56 },
+  headerBtnText: { fontFamily: 'monospace', fontSize: 13, color: '#111111', letterSpacing: 1 },
+  headerTitle: { fontFamily: 'monospace', fontSize: 12, fontWeight: '700', letterSpacing: 2, color: '#111111' },
+  body: { flex: 1, paddingHorizontal: 20 },
+  groupItem: { marginBottom: 4 },
   groupInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(17,17,27,0.10)',
   },
-  groupName: { fontSize: 16, fontWeight: '500' },
-  groupActions: { flexDirection: 'row', gap: 8 },
-  actionBtn: { padding: 8 },
-  editForm: { padding: 16, backgroundColor: '#f9f9f9', borderRadius: 12 },
-  addForm: { marginTop: 16, padding: 16, backgroundColor: '#f9f9f9', borderRadius: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  groupNameRow: { flexDirection: 'row', alignItems: 'center' },
+  groupDot: { width: 7, height: 7, marginRight: 10 },
+  groupName: { fontSize: 16, fontWeight: '500', color: '#111111', letterSpacing: -0.3 },
+  groupActions: { flexDirection: 'row', gap: 16 },
+  actionBtn: { padding: 4 },
+  actionText: { fontFamily: 'monospace', fontSize: 10, letterSpacing: 1, color: '#8A8A85' },
+  actionTextDel: { color: '#E1352B' },
+  editForm: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#111111',
+    marginBottom: 8,
+  },
+  addForm: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#111111',
+  },
+  sectionTitle: {
+    fontFamily: 'monospace',
+    fontSize: 10,
+    letterSpacing: 2,
+    color: '#8A8A85',
+    marginBottom: 12,
+  },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#111111',
+    paddingVertical: 8,
     fontSize: 16,
+    color: '#111111',
   },
   row: { flexDirection: 'row', gap: 12, marginTop: 16 },
   btnSecondary: {
     flex: 1,
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#e0e0e0',
+    borderRadius: 0,
+    borderWidth: 1.5,
+    borderColor: '#111111',
+    backgroundColor: '#FAFAF7',
     alignItems: 'center',
   },
   btnPrimary: {
     flex: 1,
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#2196F3',
+    borderRadius: 0,
+    backgroundColor: '#111111',
     alignItems: 'center',
   },
-  btnDisabled: { opacity: 0.5 },
-  btnPrimaryText: { color: '#fff', fontWeight: '600' },
+  btnDisabled: { opacity: 0.35 },
+  btnPrimaryText: { color: '#FAFAF7', fontWeight: '700', fontFamily: 'monospace', letterSpacing: 1, fontSize: 12 },
   addBtn: {
     marginTop: 24,
     padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#2196F3',
+    borderRadius: 0,
+    borderWidth: 2,
+    borderColor: '#111111',
+    backgroundColor: '#FAFAF7',
     alignItems: 'center',
   },
-  addBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  addBtnText: { color: '#111111', fontFamily: 'monospace', fontSize: 12, fontWeight: '700', letterSpacing: 2 },
 });

@@ -143,13 +143,10 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
               {groupState.groups.map((group) => (
                 <TouchableOpacity
                   key={group.id}
-                  style={[
-                    styles.option,
-                    selectedGroupId === group.id && styles.optionActive,
-                    selectedGroupId === group.id && { backgroundColor: group.color },
-                  ]}
+                  style={[styles.option, selectedGroupId === group.id && styles.optionActive]}
                   onPress={() => setSelectedGroupId(group.id)}
                 >
+                  <View style={[styles.optionDot, { backgroundColor: group.color }]} />
                   <Text style={[styles.optionText, selectedGroupId === group.id && styles.optionTextActive]}>
                     {group.name}
                   </Text>
@@ -197,40 +194,46 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#FAFAF7' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: '#111111',
   },
-  headerBtn: { padding: 8 },
-  headerBtnText: { fontSize: 16, color: '#666' },
-  headerBtnPrimary: { color: '#2196F3', fontWeight: '600' },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
-  disabled: { opacity: 0.5 },
-  body: { flex: 1, padding: 16 },
-  field: { marginBottom: 20 },
-  label: { fontSize: 14, color: '#666', marginBottom: 8 },
+  headerBtn: { padding: 4, minWidth: 56 },
+  headerBtnText: { fontFamily: 'monospace', fontSize: 13, color: '#111111', letterSpacing: 1 },
+  headerBtnPrimary: { color: '#E1352B', fontWeight: '700', textAlign: 'right' },
+  headerTitle: { fontFamily: 'monospace', fontSize: 12, fontWeight: '700', letterSpacing: 2, color: '#111111' },
+  disabled: { opacity: 0.35 },
+  body: { flex: 1, paddingHorizontal: 20 },
+  field: { marginBottom: 22, marginTop: 4 },
+  label: { fontFamily: 'monospace', fontSize: 10, letterSpacing: 2, color: '#8A8A85', marginBottom: 8 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#111111',
+    paddingVertical: 8,
     fontSize: 16,
+    color: '#111111',
+    letterSpacing: -0.2,
   },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    borderRadius: 0,
+    borderWidth: 1.5,
+    borderColor: '#111111',
+    backgroundColor: '#FAFAF7',
   },
-  optionActive: { backgroundColor: '#e0e0e0' },
-  optionText: { fontSize: 14, color: '#666' },
-  optionTextActive: { color: '#333', fontWeight: '600' },
+  optionDot: { width: 7, height: 7, marginRight: 6 },
+  optionActive: { backgroundColor: '#111111' },
+  optionText: { fontFamily: 'monospace', fontSize: 11, letterSpacing: 1, color: '#111111' },
+  optionTextActive: { color: '#FAFAF7', fontWeight: '700' },
 });

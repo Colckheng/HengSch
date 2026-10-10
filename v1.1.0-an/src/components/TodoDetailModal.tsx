@@ -43,11 +43,12 @@ export function TodoDetailModal({ isOpen, onClose, todo, onEdit }: TodoDetailMod
         </View>
         <ScrollView style={styles.body}>
           <View style={[styles.statusBadge, isCompleted ? styles.statusCompleted : styles.statusPending]}>
-            <Text style={styles.statusText}>{isCompleted ? '✓ 已完成' : '○ 待完成'}</Text>
+            <Text style={[styles.statusText, isCompleted && styles.statusTextDone]}>{isCompleted ? '✓ DONE' : '○ PENDING'}</Text>
           </View>
           <Text style={styles.title}>{todo.title}</Text>
           {group && (
-            <View style={[styles.badge, { backgroundColor: group.color }]}>
+            <View style={styles.badge}>
+              <View style={[styles.badgeDot, { backgroundColor: group.color }]} />
               <Text style={styles.badgeText}>{group.name}</Text>
             </View>
           )}
@@ -94,41 +95,54 @@ export function TodoDetailModal({ isOpen, onClose, todo, onEdit }: TodoDetailMod
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#FAFAF7' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: '#111111',
   },
-  headerBtn: { padding: 8 },
-  headerBtnText: { fontSize: 16, color: '#666' },
-  headerBtnPrimary: { color: '#2196F3', fontWeight: '600' },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
-  body: { flex: 1, padding: 16 },
+  headerBtn: { padding: 4, minWidth: 56 },
+  headerBtnText: { fontFamily: 'monospace', fontSize: 13, color: '#111111', letterSpacing: 1 },
+  headerBtnPrimary: { color: '#E1352B', fontWeight: '700', textAlign: 'right' },
+  headerTitle: { fontFamily: 'monospace', fontSize: 12, fontWeight: '700', letterSpacing: 2, color: '#111111' },
+  body: { flex: 1, paddingHorizontal: 20 },
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 0,
+    borderWidth: 1.5,
     marginBottom: 16,
+    marginTop: 18,
   },
-  statusCompleted: { backgroundColor: '#E8F5E9' },
-  statusPending: { backgroundColor: '#FFF3E0' },
-  statusText: { fontSize: 14, fontWeight: '500' },
-  title: { fontSize: 22, fontWeight: '600', marginBottom: 12 },
+  statusCompleted: { backgroundColor: '#111111', borderColor: '#111111' },
+  statusPending: { backgroundColor: '#FAFAF7', borderColor: '#E1352B' },
+  statusText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '700', letterSpacing: 1, color: '#111111' },
+  statusTextDone: { color: '#FAFAF7' },
+  title: { fontSize: 24, fontWeight: '700', color: '#111111', letterSpacing: -0.6, marginBottom: 14 },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 6,
+    borderRadius: 0,
+    borderWidth: 1.5,
+    borderColor: '#111111',
     marginBottom: 16,
   },
-  badgeText: { fontSize: 12, color: '#666' },
-  section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 12, color: '#999', marginBottom: 4 },
-  sectionContent: { fontSize: 16, color: '#333' },
+  badgeDot: { width: 7, height: 7, marginRight: 8 },
+  badgeText: { fontFamily: 'monospace', fontSize: 10, letterSpacing: 1, color: '#111111' },
+  section: {
+    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(17,17,27,0.10)',
+    paddingBottom: 14,
+  },
+  sectionTitle: { fontFamily: 'monospace', fontSize: 10, letterSpacing: 2, color: '#8A8A85', marginBottom: 6 },
+  sectionContent: { fontSize: 15, color: '#111111', lineHeight: 22 },
 });

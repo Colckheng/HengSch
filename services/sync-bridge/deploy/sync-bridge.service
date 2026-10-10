@@ -1,0 +1,21 @@
+[Unit]
+Description=HengSch sync bridge (HTTP read-merge-write gateway)
+After=network.target
+
+[Service]
+Type=simple
+User=syncuser
+Group=syncuser
+WorkingDirectory=/opt/hengsch/sync-bridge
+EnvironmentFile=/opt/hengsch/sync-bridge/.env
+ExecStart=/usr/local/bin/node src/server.js
+Restart=always
+RestartSec=3
+# 数据文件与 SFTP 用户同属，读写无需额外权限
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/syncuser
+
+[Install]
+WantedBy=multi-user.target
