@@ -8,6 +8,7 @@ interface TodoDetailModalProps {
   onClose: () => void;
   todo: Todo | null;
   onEdit?: (todo: Todo) => void;
+  onDelete?: (todo: Todo) => void;
 }
 
 const CYCLE_LABELS: Record<string, string> = {
@@ -17,7 +18,7 @@ const CYCLE_LABELS: Record<string, string> = {
   custom: '自定义',
 };
 
-export function TodoDetailModal({ isOpen, onClose, todo, onEdit }: TodoDetailModalProps): React.ReactElement {
+export function TodoDetailModal({ isOpen, onClose, todo, onEdit, onDelete }: TodoDetailModalProps): React.ReactElement {
   const { getGroupById } = useGroups();
 
   if (!isOpen || !todo) return <></>;
@@ -35,11 +36,18 @@ export function TodoDetailModal({ isOpen, onClose, todo, onEdit }: TodoDetailMod
             <Text style={styles.headerBtnText}>关闭</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>待办详情</Text>
-          {onEdit && (
-            <TouchableOpacity onPress={() => onEdit(todo)} style={styles.headerBtn}>
-              <Text style={[styles.headerBtnText, styles.headerBtnPrimary]}>编辑</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.headerRight}>
+            {onEdit && (
+              <TouchableOpacity onPress={() => onEdit(todo)} style={styles.headerBtn}>
+                <Text style={[styles.headerBtnText, styles.headerBtnPrimary]}>编辑</Text>
+              </TouchableOpacity>
+            )}
+            {onDelete && (
+              <TouchableOpacity onPress={() => onDelete(todo)} style={styles.headerBtn}>
+                <Text style={[styles.headerBtnText, styles.headerBtnDanger]}>删除</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
         <ScrollView style={styles.body}>
           <View style={[styles.statusBadge, isCompleted ? styles.statusCompleted : styles.statusPending]}>
@@ -105,9 +113,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#111111',
   },
-  headerBtn: { padding: 4, minWidth: 56 },
+  headerBtn: { padding: 4, minWidth: 44 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerBtnText: { fontFamily: 'monospace', fontSize: 13, color: '#111111', letterSpacing: 1 },
-  headerBtnPrimary: { color: '#E1352B', fontWeight: '700', textAlign: 'right' },
+  headerBtnPrimary: { color: '#111111', fontWeight: '700', textAlign: 'right' },
+  headerBtnDanger: { color: '#E1352B', fontWeight: '700', textAlign: 'right' },
   headerTitle: { fontFamily: 'monospace', fontSize: 12, fontWeight: '700', letterSpacing: 2, color: '#111111' },
   body: { flex: 1, paddingHorizontal: 20 },
   statusBadge: {
