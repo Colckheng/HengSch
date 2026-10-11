@@ -124,7 +124,7 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
                       className="group-name-input"
                       autoFocus
                     />
-                    <div className="group-actions">
+                    <div className="form-actions">
                       <button
                         className="button button-secondary"
                         onClick={handleCancelEdit}
@@ -187,7 +187,7 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
                 selectedColor={selectedColor}
                 onColorSelect={setSelectedColor}
               />
-              <div className="group-actions">
+              <div className="form-actions">
                 <button
                   className="button button-secondary"
                   onClick={handleCancelAdd}

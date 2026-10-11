@@ -5,7 +5,7 @@ import { GroupProvider, useGroups } from './context/GroupContext';
 import { WindowControls } from './components/WindowControls';
 import { TodoList } from './components/TodoList';
 import { Odometer } from './components/Odometer';
-import { IconPlus, IconGroups } from './components/Icons';
+import { IconGroups } from './components/Icons';
 import { AddTodoModal } from './components/AddTodoModal';
 import { EditTodoModal } from './components/EditTodoModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
@@ -36,10 +36,11 @@ function AppContent(): JSX.Element {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
-  const { isCompactMode } = useWindow();
-  const { state, completeByMonitor, setMonitorProgress, allTodos, isInitialized: todosReady, applySyncedTodos } = useTodos();
+  const { isCompactMode, toggleCompactMode } = useWindow();
+  const { state, addTodo, completeByMonitor, setMonitorProgress, allTodos, isInitialized: todosReady, applySyncedTodos } = useTodos();
   const { allGroups, isInitialized: groupsReady, applySyncedGroups } = useGroups();
   const bootSyncedRef = useRef(false);
+  const [quickAddTitle, setQuickAddTitle] = useState('');
 
   // 监测配置随任务变化推送给主进程
   useEffect(() => {
@@ -129,6 +130,14 @@ function AppContent(): JSX.Element {
     setIsAddModalOpen(true);
   };
 
+  const handleQuickAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = quickAddTitle.trim();
+    if (!title) return;
+    addTodo({ title, type: 'once', status: 'pending', groupId: 'default' });
+    setQuickAddTitle('');
+  };
+
   const handleEditTodo = (todo: Todo) => {
     setEditingTodo(todo);
     setIsEditModalOpen(true);
@@ -166,20 +175,36 @@ function AppContent(): JSX.Element {
       {!isCompactMode && (
         <div className="window-controls">
           <div className="main-actions">
-            <button className="window-button add-todo-nav" onClick={handleAddTodo} aria-label="添加待办事项" title="添加待办事项">
-              <IconPlus size={16} />
-            </button>
             <button className="window-button group-manager-nav" onClick={handleOpenGroupManager} aria-label="分组管理" title="分组管理">
               <IconGroups />
             </button>
           </div>
+          <span className="title-brand">HengSch Todo</span>
           <div className="window-controls-right">
             <WindowControls />
           </div>
         </div>
       )}
       {isCompactMode && (
-        <div className="compact-drag-area"></div>
+        <div className="compact-bar">
+          <span className="compact-bar-title">
+            TODO <b>{pad(pendingCount)}</b>
+          </span>
+          <div className="compact-bar-actions">
+            {syncStatus && (
+              <button
+                className={`compact-sync ${syncStatus.state === 'AUTH ERROR' || syncStatus.state === 'REMOTE ERROR' ? 'error' : ''} ${syncStatus.state === 'SYNCING' ? 'busy' : ''}`}
+                onClick={() => setIsSyncModalOpen(true)}
+                title="同步设置"
+              >
+                {syncLabel(syncStatus)}
+              </button>
+            )}
+            <button className="compact-exit" onClick={toggleCompactMode} aria-label="退出小窗模式" title="退出小窗（Alt+Q）">
+              ✕
+            </button>
+          </div>
+        </div>
       )}
       <div className="content">
         <header className="swiss-head">
@@ -215,6 +240,17 @@ function AppContent(): JSX.Element {
             + Add Task
           </button>
         </footer>
+      )}
+      {isCompactMode && (
+        <form className="compact-add" onSubmit={handleQuickAdd}>
+          <input
+            value={quickAddTitle}
+            onChange={(e) => setQuickAddTitle(e.target.value)}
+            placeholder="＋ 快速添加，回车保存"
+            aria-label="快速添加待办"
+            autoComplete="off"
+          />
+        </form>
       )}
       <AddTodoModal isOpen={isAddModalOpen} onClose={handleCloseAddModal} />
       <EditTodoModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} todo={editingTodo} />

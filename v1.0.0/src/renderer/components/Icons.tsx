@@ -24,11 +24,21 @@ export function IconPlus({ size = 16 }: IconProps): JSX.Element {
 
 export function IconGroups({ size = 16 }: IconProps): JSX.Element {
   return (
-    <svg {...base(size)}>
-      <rect x="4" y="4" width="7" height="7" />
-      <rect x="13" y="4" width="7" height="7" />
-      <rect x="4" y="13" width="7" height="7" />
-      <rect x="13" y="13" width="7" height="7" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="butt"
+      strokeLinejoin="miter"
+      aria-hidden
+    >
+      <rect x="4.5" y="4.5" width="6" height="6" />
+      <rect x="13.5" y="4.5" width="6" height="6" />
+      <rect x="4.5" y="13.5" width="6" height="6" />
+      <rect x="13.5" y="13.5" width="6" height="6" />
     </svg>
   );
 }

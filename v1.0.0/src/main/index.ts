@@ -40,6 +40,9 @@ const REVEAL_HOVER_PX = 6;
 // 注意：这个值不要太大，否则在角落/边缘移动鼠标时容易导致误判
 // 进一步减小到8px，确保只在窗口实际位置附近才触发
 const REVEAL_ALONG_EDGE_SLOP_PX = 8;
+// 小窗尺寸上限：防止拖成比正常窗口还大
+const COMPACT_MAX_W = 640;
+const COMPACT_MAX_H = 560;
 let isCompactMode = false;
 let snappedEdge: SnappedEdge = null;
 let isHidden = false;
@@ -50,6 +53,22 @@ let hoverPollTimer: NodeJS.Timeout | null = null;
 let animTimer: NodeJS.Timeout | null = null;
 let hoverWasHit = false;
 let hoverStartBlockedUntil = 0;
+// 自缩入/弹出转换后是否发生过新的用户活动：
+// 弹出后若用户没有再活动（鼠标静止），不允许再次自动缩入——杜绝"弹出→闲置→缩入→悬停→弹出"死循环
+let activitySinceTransition = true;
+// 缩入完成时的光标位置：窗口在静止光标下移开时 Chromium 会合成 mousemove，
+// 光标真实位移小于阈值时忽略 userActivity 的自动弹出，防止"缩入→立马弹出"循环
+let cursorAtHideX = 0;
+let cursorAtHideY = 0;
+const REAL_MOVE_PX = 12;
+// 缩入/弹出动画时长（与 hideToEdge/showFromEdge 内的 durationMs 一致）
+const ANIM_DURATION_MS = 180;
+// 动画结束后继续屏蔽 move/resize 自触发的宽限期（毫秒）。
+// Windows 上 setBounds/setResizable 会产生 WM_MOVE，Electron 异步派发，
+// 若在 isHidden 翻转后才送达，会触发 move 处理器里的 showFromEdge——
+// 造成"缩入后立马被自己弹出"的死循环。宽限期内 move/resize 一律不处理。
+const MOVE_SUPPRESS_GRACE_MS = 400;
+let suppressMoveHandlingUntil = 0;
 
 function getAutoHideEnabled(): boolean {
   return (store.get(AUTO_HIDE_ENABLED_KEY, true) as boolean) ?? true;
@@ -146,6 +165,8 @@ function snapWindowToEdge(edge: Exclude<SnappedEdge, null>): void {
   // 小窗位置记忆：贴边后也更新一下保存值
   store.set('compactWindowBounds', mainWindow.getBounds());
 
+  // 拖拽吸附本身就是一次用户活动，允许后续闲置自动缩入
+  activitySinceTransition = true;
   resetAutoHideIdleTimer();
 }
 
@@ -155,6 +176,8 @@ function hideToEdge(): void {
   if (!getAutoHideEnabled()) return;
   if (!snappedEdge) return;
   if (isHidden) return;
+  // 弹出后没有新的用户活动 → 不再自动缩入（防止静止鼠标触发缩入/弹出循环）
+  if (!activitySinceTransition) return;
 
   const bounds = mainWindow.getBounds();
   const workArea = getWorkAreaForBounds(bounds);
@@ -171,10 +194,12 @@ function hideToEdge(): void {
 
   clearIdleTimer();
   clearAnimTimer();
+  // 动画期间+宽限期内屏蔽 move/resize 处理（WM_MOVE 异步自触发）
+  suppressMoveHandlingUntil = Date.now() + ANIM_DURATION_MS + MOVE_SUPPRESS_GRACE_MS;
 
   const from = bounds;
   const to = hiddenBounds;
-  const durationMs = 180;
+  const durationMs = ANIM_DURATION_MS;
   const steps = Math.max(1, Math.round(durationMs / 16));
   let step = 0;
 
@@ -198,18 +223,22 @@ function hideToEdge(): void {
       clearAnimTimer();
       mainWindow.setBounds(to);
       isHidden = true;
+      // 缩入完成视为一次转换：之后必须有新的用户活动才允许再次缩入
+      activitySinceTransition = false;
+      // 记录缩入完成时的光标位置，用于甄别"窗口移开产生的合成鼠标事件"
+      const c = screen.getCursorScreenPoint();
+      cursorAtHideX = c.x;
+      cursorAtHideY = c.y;
 
       // 缩入后禁用窗口resize能力，避免鼠标悬停时显示缩放图标并拦截我们的hoverPoll检测
+      // setResizable 会再次产生异步 WM_MOVE，先延长屏蔽期再调用
+      suppressMoveHandlingUntil = Date.now() + MOVE_SUPPRESS_GRACE_MS;
       mainWindow.setResizable(false);
 
       // 缩入后轮询鼠标位置：鼠标悬停在“保留 4px 附近的小带宽”即可自动弹出（无需点击）
-      // 为避免“刚缩入就立刻弹出/循环”，采用进入触发 + 严格初始化：
-      // - 缩入完成时，无论鼠标是否在触发区，都强制标记为已命中，并延长阻塞时间到2000ms
-      // - 这样可以确保即使检测逻辑误判，也需要等待更长时间，并且需要"移出再移入"才会弹出
-      // - 用户必须先把鼠标移出触发区，然后再移回触发区，才会弹出
       clearHoverPoll();
-      // 无论鼠标是否在触发区，都强制标记为已命中，并延长阻塞时间
-      // 这样可以确保用户必须"移出再移入"才会弹出，避免立刻弹出/循环
+      // 初始标记为“鼠标已在触发带”：若用户松手时鼠标还停在带内（贴顶边时最常见），
+      // 必须先移出再移回才允许弹出，否则刚缩入就会被自己触发弹出
       hoverStartBlockedUntil = Date.now() + 2000;
       hoverWasHit = true;
 
@@ -220,13 +249,16 @@ function hideToEdge(): void {
         const workArea = getWorkAreaForBounds(current);
         const cursor = screen.getCursorScreenPoint();
 
-        const hit = Date.now() >= hoverStartBlockedUntil && isCursorInRevealBand(cursor, workArea, snappedEdge);
+        // hoverWasHit 只记录鼠标【真实】是否在触发带内，不受屏蔽期影响；
+        // 屏蔽期内若沿用旧逻辑覆写为 false，鼠标静止时会在屏蔽结束后被误判为“新进入”而立即弹出
+        const inBand = isCursorInRevealBand(cursor, workArea, snappedEdge);
+        const blocked = Date.now() < hoverStartBlockedUntil;
 
-        // 进入触发：只有从“未命中”变为“命中”才弹出
-        if (hit && !hoverWasHit) {
+        // 进入触发：只有从“带外”变为“带内”（且不在屏蔽期）才弹出
+        if (!blocked && inBand && !hoverWasHit) {
           showFromEdge();
         }
-        hoverWasHit = hit;
+        hoverWasHit = inBand;
       }, 50);
     }
   }, 16);
@@ -236,6 +268,11 @@ function showFromEdge(): void {
   if (!mainWindow) return;
   if (!isCompactMode) return;
   if (!isHidden) return;
+
+  // 立即翻转状态：任何动画期间/之后迟到的 move 事件都无法重入 showFromEdge
+  isHidden = false;
+  // 动画期间+宽限期内屏蔽 move/resize 处理（WM_MOVE 异步自触发）
+  suppressMoveHandlingUntil = Date.now() + ANIM_DURATION_MS + MOVE_SUPPRESS_GRACE_MS;
 
   clearHoverPoll();
   clearAnimTimer();
@@ -265,7 +302,7 @@ function showFromEdge(): void {
 
   const from = current;
   const to: Electron.Rectangle = { ...target, x, y };
-  const durationMs = 180;
+  const durationMs = ANIM_DURATION_MS;
   const steps = Math.max(1, Math.round(durationMs / 16));
   let step = 0;
 
@@ -289,12 +326,16 @@ function showFromEdge(): void {
       clearAnimTimer();
       mainWindow.setBounds(to);
       isHidden = false;
+      // 弹出完成视为一次转换：之后必须有新的用户活动才允许再次自动缩入
+      activitySinceTransition = false;
 
       // 动画完成后确保窗口完全恢复正常状态（可拖动、可调整大小）
+      // setResizable 会再次产生异步 WM_MOVE，先延长屏蔽期再调用
+      suppressMoveHandlingUntil = Date.now() + MOVE_SUPPRESS_GRACE_MS;
       mainWindow.setResizable(true);
       mainWindow.setMovable(true);
 
-      // 弹出后继续计时
+      // 弹出后继续计时（无活动时到点会被 activitySinceTransition 拦住，不会再次缩入）
       resetAutoHideIdleTimer();
     }
   }, 16);
@@ -385,22 +426,40 @@ function createWindow(): void {
   mainWindow.on('resize', () => {
     if (mainWindow) {
       const bounds = mainWindow.getBounds();
-      store.set('windowBounds', bounds);
+      // 小窗与正常窗口的尺寸记忆分开存，避免互相污染
+      if (isCompactMode) {
+        // 缩入/弹出动画期间的中间帧 bounds 是垃圾值，不落盘
+        if (!isHidden && Date.now() >= suppressMoveHandlingUntil) {
+          store.set('compactWindowBounds', bounds);
+        }
+      } else {
+        store.set('windowBounds', bounds);
+      }
     }
   });
 
   mainWindow.on('move', () => {
     if (mainWindow) {
       const bounds = mainWindow.getBounds();
-      store.set('windowBounds', bounds);
+      // 正常窗口移动才更新 windowBounds；小窗移动不污染正常窗口记忆
+      if (!isCompactMode) {
+        store.set('windowBounds', bounds);
+      }
 
       // 小窗模式下：拖动过程中不断重置闲置计时；拖动结束后做吸附
       if (isCompactMode) {
+        // 缩入/弹出动画期间及宽限期内的 move 一律是 setBounds/setResizable 的异步自触发
+        // （Windows WM_MOVE 延迟派发）。若不屏蔽：缩入完成、isHidden=true 后迟到的 move
+        // 会命中下面的 showFromEdge，造成"缩入→立马被自己弹出"死循环。
+        if (Date.now() < suppressMoveHandlingUntil) return;
+
         if (isHidden) {
-          // 隐藏状态不允许拖动，保险起见先弹出
+          // 缩入状态下不该有正常拖动；真收到 move（如显示器变化）则弹出避免窗口丢失
           showFromEdge();
         }
 
+        // 拖动即用户活动，允许后续闲置自动缩入
+        activitySinceTransition = true;
         resetAutoHideIdleTimer();
 
         if (moveEndDebounceTimer) clearTimeout(moveEndDebounceTimer);
@@ -571,11 +630,16 @@ ipcMain.handle('window:setCompactMode', (_, isCompact: boolean) => {
 
       originalBounds = currentBounds;
       mainWindow.setMinimumSize(400, 300);
-      
+      // 小窗尺寸上限：防止拖成比正常窗口还大
+      mainWindow.setMaximumSize(COMPACT_MAX_W, COMPACT_MAX_H);
+
       // 检查是否有保存的小窗模式大小和位置
       const compactBounds = store.get('compactWindowBounds') as { width: number; height: number; x?: number; y?: number } | undefined;
       if (compactBounds) {
-        mainWindow.setSize(compactBounds.width, compactBounds.height);
+        mainWindow.setSize(
+          clamp(compactBounds.width, 400, COMPACT_MAX_W),
+          clamp(compactBounds.height, 300, COMPACT_MAX_H)
+        );
         if (compactBounds.x !== undefined && compactBounds.y !== undefined) {
           mainWindow.setPosition(compactBounds.x, compactBounds.y);
         }
@@ -589,6 +653,8 @@ ipcMain.handle('window:setCompactMode', (_, isCompact: boolean) => {
       const wa = getWorkAreaForBounds(b);
       const edge = computeSnappedEdge(b, wa);
       if (edge) snapWindowToEdge(edge);
+      // 进入小窗本身是用户活动，允许闲置后自动缩入
+      activitySinceTransition = true;
       resetAutoHideIdleTimer();
     } else {
       // 退出小窗前：如果处于隐藏状态先弹出，避免保存到屏外
@@ -608,6 +674,8 @@ ipcMain.handle('window:setCompactMode', (_, isCompact: boolean) => {
       store.set('compactWindowBounds', currentBounds);
       
       mainWindow.setMinimumSize(600, 400);
+      // 恢复正常窗口的尺寸上限（解除小窗限制）
+      mainWindow.setMaximumSize(10000, 10000);
       if (originalBounds) {
         mainWindow.setSize(originalBounds.width, originalBounds.height);
         if (originalBounds.x !== undefined && originalBounds.y !== undefined) {
@@ -638,7 +706,14 @@ ipcMain.handle('window:autoHide:setEnabled', (_, enabled: boolean) => {
 });
 
 ipcMain.handle('window:userActivity', () => {
-  // 任何用户活动都视为“活跃”，重置闲置计时；如果已经缩入，也弹出
-  if (isHidden) showFromEdge();
+  // 任何用户活动都视为“活跃”，重置闲置计时；如果已经缩入，仅在光标真实移动后弹出
+  if (isHidden) {
+    const c = screen.getCursorScreenPoint();
+    const moved = Math.hypot(c.x - cursorAtHideX, c.y - cursorAtHideY);
+    // 窗口在静止光标下移开会产生合成 mousemove（光标坐标不变），
+    // 距离未变则视为噪声不弹出；用户真实移动鼠标后才会弹出
+    if (moved >= REAL_MOVE_PX) showFromEdge();
+  }
+  activitySinceTransition = true;
   resetAutoHideIdleTimer();
 });

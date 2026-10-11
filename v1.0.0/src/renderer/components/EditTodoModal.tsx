@@ -3,7 +3,10 @@ import type { Todo, TodoType, CycleType, RecurringTodo, MonitorConfig } from '..
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import { IconClose } from './Icons';
+import { GroupSelect } from './GroupSelect';
+import { SwissSelect } from './SwissSelect';
 import { MonitorSection } from './MonitorSection';
+import { TYPE_OPTIONS, CYCLE_OPTIONS } from './selectOptions';
 
 interface EditTodoModalProps {
   isOpen: boolean;
@@ -150,38 +153,35 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
           </div>
 
           <div className="form-group">
-            <label htmlFor="type">类型</label>
-            <select id="type" value={type} onChange={(e) => setType(e.target.value as TodoType)}>
-              <option value="once">一次性待办事项</option>
-              <option value="recurring">循环待办事项</option>
-            </select>
+            <label htmlFor="type-select">类型</label>
+            <SwissSelect
+              id="type-select"
+              options={TYPE_OPTIONS}
+              value={type}
+              onChange={(v) => setType(v as TodoType)}
+            />
           </div>
 
           <div className="form-group">
-            <label htmlFor="group">分组</label>
-            <select id="group" value={selectedGroupId} onChange={(e) => setSelectedGroupId(e.target.value)}>
-              {groupState.groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
+            <label htmlFor="group-select">分组</label>
+            <GroupSelect
+              id="group-select"
+              groups={groupState.groups}
+              value={selectedGroupId}
+              onChange={setSelectedGroupId}
+            />
           </div>
 
           {type === 'recurring' && (
             <>
               <div className="form-group">
-                <label htmlFor="cycleType">循环周期</label>
-                <select
-                  id="cycleType"
+                <label htmlFor="cycle-select">循环周期</label>
+                <SwissSelect
+                  id="cycle-select"
+                  options={CYCLE_OPTIONS}
                   value={cycleType}
-                  onChange={(e) => setCycleType(e.target.value as CycleType)}
-                >
-                  <option value="daily">每天</option>
-                  <option value="weekly">每周</option>
-                  <option value="monthly">每月</option>
-                  <option value="custom">自定义</option>
-                </select>
+                  onChange={(v) => setCycleType(v as CycleType)}
+                />
               </div>
 
               {cycleType === 'custom' && (

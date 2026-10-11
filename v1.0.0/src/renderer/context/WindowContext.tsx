@@ -24,6 +24,7 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
   const [isAutoStart, setIsAutoStart] = useState(false);
   const [isAutoHideEnabled, setIsAutoHideEnabled] = useState(true);
   const lastActivitySentAtRef = useRef<number>(0);
+  const prevAlwaysOnTopRef = useRef<boolean>(false);
 
   useEffect(() => {
     loadWindowSettings();
@@ -36,6 +37,12 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
 
       const compactMode = await window.electronAPI.store.get('compactMode');
       setIsCompactMode(Boolean(compactMode));
+      if (compactMode) {
+        // 重启后恢复小窗：同步主进程状态（贴边/缩入/尺寸上限），并置顶
+        await window.electronAPI.window.setCompactMode(true);
+        await window.electronAPI.window.setAlwaysOnTop(true);
+        setIsAlwaysOnTop(true);
+      }
 
       const autoStart = await window.electronAPI.autoStart.get();
       setIsAutoStart(autoStart);
@@ -61,12 +68,16 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
     try {
       const newValue = !isCompactMode;
       setIsCompactMode(newValue);
+      if (newValue) {
+        prevAlwaysOnTopRef.current = isAlwaysOnTop;
+      }
       await window.electronAPI.window.setCompactMode(newValue);
       await window.electronAPI.store.set('compactMode', newValue);
-      
-      // 小窗模式激活时自动置顶，退出时取消置顶
-      await window.electronAPI.window.setAlwaysOnTop(newValue);
-      setIsAlwaysOnTop(newValue);
+
+      // 小窗强制置顶；退出时恢复进小窗前的置顶状态（不再无条件取消）
+      const topValue = newValue ? true : prevAlwaysOnTopRef.current;
+      await window.electronAPI.window.setAlwaysOnTop(topValue);
+      setIsAlwaysOnTop(topValue);
     } catch (error) {
       console.error('Failed to toggle compact mode:', error);
     }
@@ -84,6 +95,10 @@ export function WindowProvider({ children }: { children: ReactNode }): JSX.Eleme
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // 输入框/文本域内不触发退出小窗，避免打字误触
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
       // 按下alt+q键且处于小窗模式时，退出小窗模式
       if (event.key === 'q' && event.altKey && isCompactMode) {
         toggleCompactMode();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { MonitorConfig } from '../types';
+import { SwissSelect } from './SwissSelect';
 
 interface MonitorSectionProps {
   monitor?: MonitorConfig;
@@ -83,14 +84,16 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
         <>
           <div className="form-group">
             <label htmlFor="monitor-exe">运行进程</label>
-            <select id="monitor-exe" value={exeName} onChange={(e) => handleExe(e.target.value)}>
-              <option value="">选择正在运行的进程…</option>
-              {exeOptions.map((name) => (
-                <option key={name.toLowerCase()} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+            <SwissSelect
+              id="monitor-exe"
+              options={[
+                { value: '', label: '选择正在运行的进程…' },
+                ...exeOptions.map((name) => ({ value: name, label: name }))
+              ]}
+              value={exeName}
+              onChange={handleExe}
+              placeholder="选择正在运行的进程…"
+            />
             <input
               type="text"
               className="monitor-exe-manual"

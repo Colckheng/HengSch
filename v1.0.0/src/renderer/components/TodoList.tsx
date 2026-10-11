@@ -100,7 +100,7 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
         )}
         <div className="todo-list-empty">
           <p>Nothing here yet</p>
-          <p>点击顶栏 + 或右下 ADD TASK 添加待办</p>
+          <p>{isCompactMode ? '在底部输入框快速添加' : '点击右下 ADD TASK 添加待办'}</p>
         </div>
       </>
     );
@@ -135,7 +135,7 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
         </div>
       )}
       <div className="todo-list" ref={listRef}>
-        {(isCompactMode ? filteredTodos.slice(0, 6) : filteredTodos).map((todo) => (
+        {filteredTodos.map((todo) => (
           <div
             key={todo.id}
             data-flip-id={todo.id}
