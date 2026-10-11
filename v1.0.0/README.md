@@ -1,296 +1,175 @@
-# HengSch Todo
+# HengSch Todo — 桌面端（v1.0.0）
 
-一款功能完整的待办事项管理软件，采用微软便签风格设计。
+Electron 桌面待办应用：Swiss Precision 设计、小窗贴边、进程监测自动完成、SFTP 云同步。
 
 ## 功能特性
 
-### 待办事项管理
-- ✅ 支持一次性待办事项和循环待办事项
-- ✅ 循环待办事项提供完整的时间配置选项
-  - 预设时间周期：一天、一周、一个月
-  - 自定义时间周期设置功能
-- ✅ 任务状态管理（完成/未完成）
-- ✅ 视觉状态区分（颜色、图标、样式）
-- ✅ 横向拖放排序功能
-- ✅ 待办事项详情查看
+### 待办事项
+- 一次性 / 循环任务（每天 / 每周 / 每月 / 自定义天数），完成时自动续期下次到期
+- 原生 HTML5 拖拽排序、详情查看、编辑、删除（确认框）
+- 循环任务可配置**进程监测**：指定进程名与阈值分钟数，进程持续运行达标即自动标记完成（详见下文）
 
 ### 分组管理
-- ✅ 创建自定义分组
-- ✅ 为分组选择颜色主题
-- ✅ 编辑和删除分组
-- ✅ 按分组筛选待办事项
-- ✅ 默认"未分类"分组
-- ✅ 分组颜色在待办卡片上显示
+- 建 / 改 / 删 / 颜色，按分组筛选，默认「未分类」分组不可删
 
-### 软件运行特性
-- ✅ 开机自启动功能（Windows/macOS/Linux）
-- ✅ 窗口置顶功能
-- ✅ 窗口最小化操作
-- ✅ 小窗模式（紧凑视图）
-  - 自动隐藏顶部控制栏
-  - 限制显示6个待办事项
-  - 自动置顶窗口
-  - Alt+Q 快捷键退出小窗模式
-- ✅ 窗口大小和位置记忆
-- ✅ 小窗模式独立的位置和大小记忆
+### 窗口与系统
+- 置顶、最小化、最大化、开机自启（Windows / macOS / Linux）
+- 小窗模式（紧凑视图）：自动隐藏顶栏、最多显示 6 条、自动置顶，Alt+Q 退出；独立记忆位置大小
+- 四边贴边吸附（阈值 16px，多显示器 workArea）+ 闲置 5s 自动缩入（窄边 4px、180ms 滑动动画、悬停窄边弹出）；开关在设置中
+- 主窗口 / 小窗位置大小分别记忆
 
-### 界面设计
-- 🎨 微软便签风格的卡片式布局
-- 🎨 柔和的阴影效果和圆角设计
-- 🎨 多种颜色主题的待办事项卡片
-- 🎨 清晰的状态标识和交互反馈
-- 🎨 分组颜色主题显示
-- 🎨 响应式设计，适配不同窗口大小
+### 云同步（SFTP）
+- 直写服务器上的 `sync.json`（与手机 / Web 端 HTTP 桥同一个文件），LWW + 墓碑客户端合并
+- 设置弹窗：主机 / 端口 / 用户 / 远端路径（支持 `~/`）+「启用云同步」+ 测试连接
+- 首次启动生成 SSH 密钥对，公钥自动展示，上传到服务器 `authorized_keys` 即可
+- 页脚状态芯片：`SYNCING / SYNCED / OFFLINE / AUTH ERROR / REMOTE ERROR`
+- 协议与合并算法详见 [../docs/sync.md](../docs/sync.md)
+
+### 进程监测（桌面专属）
+- 循环任务可绑定「进程名 + 阈值分钟数」；主进程 30s 轮询进程列表（tasklist / ps）
+- 达标即自动完成该循环任务（走 `toggleTodoStatus` 续期逻辑）
+- 可选「监测日志」：写 Windows 计划任务 `HengSchMonitor` 输出，保留 7 天
+- 设置界面 `MonitorSection` 提供进程名搜索、阈值、日志开关
+
+### 界面
+- Swiss Precision 风格：里程表数字、发丝线、直角纸感卡片，与 Web / 手机端视觉统一
 
 ## 技术栈
 
-- **框架**: Electron + React + TypeScript
-- **构建工具**: Vite
-- **状态管理**: React Context API + useReducer
-- **拖放**: 原生 HTML5 Drag and Drop API
-- **数据存储**: electron-store
-- **打包工具**: electron-builder
-- **代码规范**: ESLint + Prettier
+- Electron 30 + React 18 + TypeScript + Vite 5（vite-plugin-electron）
+- 状态：Context + useReducer；存储：electron-store（主进程）经 preload IPC 暴露
+- 拖放：原生 HTML5 Drag and Drop；SFTP：ssh2
+- 打包：electron-builder（产物 `release/`）
+- 共享：`@hengsch/shared-types` / `shared-logic` / `shared-storage`（workspace 依赖）
 
 ## 系统要求
 
-- **Node.js**: >= 16.0.0
-- **npm**: >= 8.0.0
-- **操作系统**: Windows 10+, macOS 10.15+, Linux (主流发行版)
+- Node.js ≥ 16（开发），Windows 10+ / macOS 10.15+ / Linux
 
-## 安装和运行
+## 安装与运行
 
-### 开发环境
-
-1. 克隆项目
 ```bash
-git clone <repository-url>
-cd HengSch
-```
-
-2. 安装依赖
-```bash
+# 仓库根目录（workspace 安装）
 npm install
+
+cd v1.0.0
+npm run electron:dev      # 开发（Vite + Electron）
+npm run build             # tsc && vite build
+npm run electron:build    # 打包，产物在 release/
 ```
 
-3. 启动开发服务器
-```bash
-npm run dev
-```
-
-4. 启动Electron应用（开发模式）
-```bash
-npm run electron:dev
-```
-
-### 生产构建
-
-1. 构建应用
-```bash
-npm run build
-```
-
-2. 打包应用
-```bash
-npm run electron:build
-```
-
-打包完成后，安装包将生成在 `release` 目录中。
-
-### 代码检查和格式化
+代码检查：
 
 ```bash
-# 运行ESLint检查
-npm run lint
-
-# 使用Prettier格式化代码
-npm run format
+npm run lint              # ESLint（--max-warnings 0）
+npm run format            # Prettier
+npx tsc --noEmit          # 类型门禁
 ```
 
 ## 使用说明
 
-### 添加待办事项
+### 添加待办
+1. 顶部「+」→ 填标题（必填）、描述、类型（一次性 / 循环）、分组
+2. 循环任务选周期（每天 / 每周 / 每月 / 自定义天数）；可展开「进程监测」配置自动完成条件
+3. 「添加」保存
 
-1. 点击顶部的"+"按钮
-2. 在弹出的对话框中填写信息：
-   - 标题（必填）
-   - 描述（可选）
-   - 类型：一次性待办事项 / 循环待办事项
-   - 分组：选择要添加到的分组
-   - 循环周期（仅循环待办事项）：每天 / 每周 / 每月 / 自定义
-3. 点击"添加"按钮保存
-
-### 管理待办事项
-
-- **查看详情**：点击待办事项卡片查看详细信息
-- **标记完成/未完成**：点击卡片左上角的圆形复选框
-- **编辑待办事项**：点击卡片右下角的 ✏️ 按钮
-- **删除待办事项**：点击卡片右下角的 🗑️ 按钮
-- **拖放排序**：拖动卡片调整顺序
+### 管理待办
+- 完成切换：卡片左上角圆形复选框（循环任务完成后自动算下次到期）
+- 详情：点击卡片；编辑 ✏️ / 删除 🗑️：卡片右下角（删除有确认）
+- 排序：拖拽卡片
 
 ### 分组管理
+顶部「📁」→ 新建（名称 + 颜色）/ 编辑 / 删除（默认分组不可删）；主界面点分组按钮筛选。
 
-1. 点击顶部的"📁"按钮打开分组管理
-2. **新建分组**：
-   - 点击"+ 新建分组"按钮
-   - 输入分组名称
-   - 选择分组颜色
-   - 点击"添加"按钮
-3. **编辑分组**：点击分组上的 ✏️ 按钮
-4. **删除分组**：点击分组上的 🗑️ 按钮（默认分组不能删除）
-5. **按分组筛选**：在主界面点击分组按钮进行筛选
+### 窗口控制（无边框标题栏右侧）
+- ▲/△ 置顶 · ⬛/⬜ 小窗（Alt+Q 退出）· ⏻/⏼ 自启 · − 最小化 · □ 最大化 · ✕ 关闭
 
-### 窗口控制
-
-- **置顶/取消置顶**：点击 ▲/△ 按钮
-- **小窗模式**：点击 ⬛/⬜ 按钮切换紧凑视图
-  - 小窗模式下自动隐藏顶部控制栏
-  - 只显示前6个待办事项
-  - 自动置顶窗口
-  - 按Alt+Q退出小窗模式
-- **开机自启动**：点击 ⏻/⏼ 按钮切换开机自启动
-- **最小化**：点击 − 按钮最小化窗口
-- **最大化/还原**：点击 □ 按钮切换窗口大小
-- **关闭**：点击 ✕ 按钮关闭应用
+### 云同步配置
+页脚同步芯片 →「同步设置」：
+1. 填 SFTP 主机（如 `39.102.49.72`）、端口 22、用户、远端路径 `~/sync.json`
+2. 勾选「启用云同步」；把弹窗里的公钥追加到服务器 `~/.ssh/authorized_keys`
+3. 「测试连接」（连通 + 目录可写）→「保存」→ 首拍 5s 后开始，之后 60s 周期
 
 ## 项目结构
 
 ```
-HengSch/
+v1.0.0/
 ├── src/
-│   ├── main/                    # Electron 主进程
-│   │   ├── index.ts            # 主进程入口，窗口管理和IPC通信
-│   │   ├── preload.ts          # 预加载脚本，暴露API到渲染进程
-│   │   └── auto-start.ts       # 开机自启动功能实现
-│   ├── renderer/               # React 渲染进程
-│   │   ├── App.tsx            # 根组件
-│   │   ├── main.tsx           # 渲染进程入口
-│   │   ├── components/         # React 组件
-│   │   │   ├── TodoCard.tsx          # 待办事项卡片组件
-│   │   │   ├── TodoList.tsx          # 待办事项列表组件
-│   │   │   ├── AddTodoModal.tsx      # 添加待办事项模态框
-│   │   │   ├── EditTodoModal.tsx     # 编辑待办事项模态框
-│   │   │   ├── TodoDetailModal.tsx   # 待办事项详情模态框
-│   │   │   ├── GroupManagerModal.tsx # 分组管理模态框
-│   │   │   ├── ColorPicker.tsx       # 颜色选择器组件
-│   │   │   └── WindowControls.tsx    # 窗口控制按钮组件
-│   │   ├── context/            # Context 状态管理
-│   │   │   ├── TodoContext.tsx       # 待办事项状态管理
-│   │   │   ├── GroupContext.tsx      # 分组状态管理
-│   │   │   └── WindowContext.tsx     # 窗口状态管理
-│   │   ├── types/             # TypeScript 类型定义
-│   │   │   ├── index.ts              # 主要类型定义
-│   │   │   └── electron.d.ts         # Electron API 类型定义
-│   │   └── styles/            # 样式文件
-│   │       └── index.css              # 全局样式文件
-├── public/                     # 静态资源
-├── dist/                       # 构建输出目录
-├── release/                    # 打包输出目录
-├── package.json               # 项目配置和依赖
-├── tsconfig.json              # TypeScript 配置
-├── vite.config.ts            # Vite 构建配置
-├── electron-builder.json      # Electron 打包配置
-└── README.md                 # 项目文档
+│   ├── main/                         # 主进程
+│   │   ├── index.ts                  # 窗口、贴边/缩入状态机、IPC
+│   │   ├── preload.ts                # 白名单 API 暴露
+│   │   ├── auto-start.ts             # 开机自启
+│   │   ├── sync-service.ts           # SFTP 同步（ssh2、原子写、周期调度）
+│   │   └── monitor-service.ts        # 进程监测轮询与自动完成
+│   └── renderer/                     # 渲染进程
+│       ├── App.tsx / main.tsx
+│       ├── components/               # TodoCard/List、Add/Edit/Detail、
+│       │                             # GroupManager、SyncSettings、MonitorSection、
+│       │                             # ConfirmDialog、ColorPicker、GroupSelect、
+│       │                             # SwissSelect、Odometer、Icons、WindowControls
+│       ├── context/                  # TodoContext / GroupContext / WindowContext
+│       ├── types/                    # index.ts + electron.d.ts
+│       └── styles/index.css
+├── package.json / tsconfig.json / vite.config.ts / electron-builder.json
+└── README.md
 ```
 
-## 核心功能实现
+## 核心实现
 
 ### 状态管理
+- **TodoContext**：增删改查、完成切换（shared `toggleTodoStatus`）、排序、同步结果整体应用
+- **GroupContext**：分组 CRUD
+- **WindowContext**：置顶 / 小窗 / 最小化等 UI 状态
 
-项目使用 React Context API 和 useReducer 进行状态管理，分为三个主要的 Context：
+### 数据持久化（electron-store）
+待办、分组、窗口位置大小（含小窗独立）、置顶、自启状态、同步配置（私钥单独存）、监测进度与日志开关。
 
-1. **TodoContext**: 管理待办事项的增删改查和排序
-2. **GroupContext**: 管理分组的增删改查
-3. **WindowContext**: 管理窗口状态（置顶、最小化、小窗模式等）
+### 主/渲染 IPC
+窗口控制、存储读写、自启切换、同步（configure / test / status 推送）、监测配置。
 
-### 数据持久化
+### 贴边缩入（主进程状态机）
+吸附阈值 16px；缩入后窄边 4px；悬停 6px 命中弹出；动画 180ms 多帧 `setBounds`；多显示器取窗口所在 `workArea`；拖动过程抑制缩入。
 
-使用 `electron-store` 实现数据持久化，主要存储：
-- 待办事项列表
-- 分组列表
-- 窗口位置和大小
-- 小窗模式位置和大小
-- 窗口置顶状态
-- 小窗模式状态
-- 开机自启动状态
+### SFTP 同步（`src/main/sync-service.ts`）
+ssh2 连接 → `ext_openssh_expandPath` 展开 `~/` → 读远端 → `mergeSyncStates` → 原子写（tmp + rename，失败退化普通 rename，带重试）→ 回读校验。常量：首拍 5s、周期 60s、离线退避 5s×2ⁿ 上限 60s、PUT 重试 3 次。
 
-### IPC 通信
+## 门禁（提交前）
 
-主进程和渲染进程之间通过 Electron 的 IPC (Inter-Process Communication) 进行通信：
-- 窗口控制：最小化、最大化、关闭、置顶、小窗模式切换
-- 数据存储：读取、写入、删除配置数据
-- 自启动控制：设置和获取开机自启动状态
-
-## 开发指南
-
-### 添加新功能
-
-1. 在相应的 Context 中添加状态和操作函数
-2. 在主进程中添加必要的 IPC 处理器
-3. 在预加载脚本中暴露新的 API
-4. 创建或更新相应的组件
-5. 更新 TypeScript 类型定义
-
-### 代码规范
-
-- 使用 TypeScript 进行类型检查
-- 遵循 ESLint 规则
-- 使用 Prettier 格式化代码
-- 组件使用函数式组件和 Hooks
-- 状态管理优先使用 Context API
-
-### 调试技巧
-
-- 使用 Chrome DevTools 调试渲染进程
-- 使用 `console.log` 和 `console.error` 进行日志输出
-- 使用 Electron DevTools 查看主进程日志
+1. `npx tsc --noEmit`
+2. `npm run lint`（零警告）
+3. 仓库根 `npm test`（shared-logic 48 项，覆盖本端复用的合并 / 循环续期逻辑）
 
 ## 已知问题
 
-1. 开机自启动状态检测在某些平台上可能不准确
-2. 大量待办事项时可能需要实现虚拟滚动来优化性能
+- 大量待办（数百条+）未做虚拟滚动，可能出现渲染性能瓶颈
+- 自启状态在部分平台的检测可能不准（系统 API 差异）
 
-## 性能优化
+## 安全
 
-- 使用 React.memo 和 useMemo 优化组件渲染
-- 使用防抖优化频繁的状态更新
-- 优化 IPC 通信频率
-- 使用 CSS 硬件加速
-- 优化图片和静态资源加载
-
-## 安全性
-
-- 启用 contextIsolation 隔离渲染进程
-- 禁用 nodeIntegration 防止渲染进程访问 Node.js API
-- 使用预加载脚本安全地暴露 API
-- 验证所有用户输入
-- 避免使用危险的 exec 命令
-
-## 开源协议
-
-ISC License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-在提交代码前，请确保：
-1. 代码通过 ESLint 检查
-2. 代码使用 Prettier 格式化
-3. 添加必要的注释
-4. 更新相关文档
-
-## 作者
-
-HengStar
+- `contextIsolation: true` + `nodeIntegration: false`，preload 白名单暴露
+- SSH 私钥独立存储，不随 SyncConfig 序列化到普通字段
+- 校验用户输入；避免动态 exec（监测用固定 tasklist/ps 命令）
 
 ## 更新日志
 
 ### v1.0.0
-- 初始版本发布
-- 实现基本的待办事项管理功能
-- 支持分组管理
-- 支持小窗模式
-- 支持开机自启动
-- 支持窗口置顶
-- 支持拖放排序
+- 初始版本：待办 / 分组 / 小窗 / 置顶 / 自启 / 拖放排序
+
+### v1.0.1
+- 小窗四边自动吸附（多显示器）、闲置自动缩入 + 悬停弹出（无动画版）
+
+### v1.0.2
+- 缩入 / 弹出动效（180ms）；窄边固定 4px；启动不再自动开 DevTools
+
+### v1.0.3
+- 修复角落多边吸附优先级（固定 上 > 下 > 左 > 右）、悬停弹出命中、弹出后无法移动
+- 后续修复：右上角等角落缩入后循环弹出问题（已解决并验收）
+
+### v1.0.4（当前工作区）
+- Swiss Precision 设计语言移植（Odometer / SwissSelect / 直角卡片）
+- 进程监测自动完成循环任务 + 监测日志
+- SFTP 云同步（与手机 / Web 共享 sync.json，LWW + 墓碑）
+
+## 作者
+
+HengStar · ISC License

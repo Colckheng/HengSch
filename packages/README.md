@@ -1,87 +1,92 @@
 # HengSch Shared Packages
 
-本目录包含 HengSch 项目的共享代码包，采用 Monorepo 架构，供桌面端、Web 端、移动端共同使用。
+HengSch 项目的共享代码包，Monorepo 架构，供桌面端、Web 端、移动端共同使用。总览见 [../README.md](../README.md)，架构细节见 [../docs/architecture.md](../docs/architecture.md)。
 
 ## 包说明
 
 ### @hengsch/shared-types
 
-共享的 TypeScript 类型定义，包括：
-- `Todo`、TodoItem、RecurringTodo`：待办事项相关类型
-- `Group`：分组相关类型
-- `TodoType、CycleType`：枚举类型
+共享 TypeScript 类型定义（`src/index.ts`）：
+
+- `TodoType` / `CycleType`：任务类型与周期枚举
+- `TodoItem` / `RecurringTodo` / `Todo`：待办（recurring 含 `nextDueDate`、`monitor?`）
+- `Group`：分组
+- `SyncedMeta`（`updatedAt` / `deviceId` / `deleted`）：云同步元数据，挂在 Todo 与 Group 上
+- `MonitorConfig`（`exeName` / `thresholdMinutes`）：进程监测配置
+- `SyncConfig`：桌面 SFTP 同步配置；`SyncState` / `SyncStatus`：页脚状态机
+- `SyncPayload`：同步全量载荷
 
 ### @hengsch/shared-logic
 
-共享的业务逻辑，包括：
-- `calculateNextDueDate`：计算循环任务的下次到期时间
-- `toggleTodoStatus`：切换待办事项状态（含循环任务的下次到期时间计算）
-- `sortTodosByStatus`：按状态排序待办事项
-- `filterTodosByGroup`：按分组筛选待办事项
-- `generateTodoId、generateGroupId`：生成 ID 的工具函数
+共享业务逻辑（纯函数，ESM 输出，vitest 单测，根 `npm test` 共 48 项）：
+
+- `todo-utils.ts`
+  - `calculateNextDueDate`：计算循环任务下次到期
+  - `toggleTodoStatus`：完成切换（循环任务续期）
+  - `sortTodosByStatus` / `filterTodosByGroup`
+  - `generateTodoId` / `generateGroupId`
+- `sync.ts`（云同步核心，详见 [../docs/sync.md](../docs/sync.md)）
+  - `mergeSyncStates`：双端全量合并（LWW + 墓碑 + 孤儿改绑 + 确定性排序）
+  - `pickWinner` / `normalizeSynced` / `parseSyncFile`
+  - `TOMBSTONE_TTL_MS`（30 天）、`SyncFile` 类型
+- `monitor.ts`：进程监测进度计算（配合桌面端 monitor-service）
+- `index.ts` 统一重导出
 
 ### @hengsch/shared-storage
 
-存储接口抽象，定义统一的存储接口 `IStorage`：
-- `get<T>(key: string): Promise<T | undefined>`
-- `set<T>(key: string, value: T): Promise<void>`
-- `delete(key: string): Promise<void>`
-- `clear?(): Promise<void>`（可选）
-- `keys?(): Promise<string[]>`（可选）
+存储抽象 `IStorage`：
 
-不同端可以实现各自的存储实现：
-- 桌面端：基于 `electron-store`，通过 IPC 接口实现
-- Web 端：基于 `localStorage` 或 `IndexedDB`
-- 移动端：基于 `AsyncStorage` / `MMKV` 等
+```ts
+get<T>(key: string): Promise<T | undefined>
+set<T>(key: string, value: T): Promise<void>
+delete(key: string): Promise<void>
+clear?(): Promise<void>
+keys?(): Promise<string[]>
+```
+
+各端实现：
+
+- 桌面端：electron-store（经 preload IPC）
+- Web 端：localStorage（`v1.1.0-web/src/utils/localStorageAdapter.ts`）
+- 移动端：AsyncStorage（`v1.1.0-an/src/utils/asyncStorageAdapter.ts`）
 
 ## 使用方式
 
-### 安装依赖
+### 安装
 
-在根目录运行：
+仓库根目录（workspaces 覆盖 `v1.0.0`、`v1.1.0-web`、`packages/*`）：
+
 ```bash
 npm install
 ```
 
-这会自动安装所有 workspace 包的依赖。
+### 构建
 
-### 构建包
-
-构建所有共享包：
 ```bash
-npm run build:packages
+npm run build:packages       # 根目录构建全部共享包（tsc → dist/）
+# 或单包：cd packages/shared-logic && npm run build
 ```
 
-或单独构建某个包：
-```bash
-cd packages/shared-types
-npm run build
-```
+### 引用（注意三种方式不同）
 
-### 在项目中使用
-
-在 `v1.0.0`、`v1.1.0-web`、`v1.1.0-an` 中，通过 workspace 协议引用：
+- **桌面端**（workspace 依赖，解析到 `dist/`，需先 build:packages）：
 
 ```json
-{
-  "dependencies": {
-    "@hengsch/shared-types": "workspace:*",
-    "@hengsch/shared-logic": "workspace:*",
-    "@hengsch/shared-storage": "workspace:*"
-  }
-}
+{ "dependencies": { "@hengsch/shared-logic": "*" } }
 ```
 
-然后在代码中导入：
+- **Web 端**：vite alias 直接指向**源码**（`../packages/*/src/index.ts`），无需预构建。
+- **移动端**：内嵌副本 `v1.1.0-an/shared/`，改完 packages 后根目录 `npm run sync-shared` 同步。
+
 ```typescript
-import type { Todo, Group } from '@hengsch/shared-types';
-import { toggleTodoStatus, sortTodosByStatus } from '@hengsch/shared-logic';
+import type { Todo, Group, SyncedMeta } from '@hengsch/shared-types';
+import { toggleTodoStatus, mergeSyncStates } from '@hengsch/shared-logic';
 import type { IStorage } from '@hengsch/shared-storage';
 ```
 
 ## 开发说明
 
-- 所有包使用 TypeScript 编写
-- 包之间可以相互依赖（如 `shared-logic` 依赖 `shared-types`）
-- 开发时可以通过 TypeScript 路径别名直接引用源码，无需构建
-- 生产构建时需要先构建共享包，再构建应用
+- TypeScript 编写；包间可相互依赖（`shared-logic` → `shared-types`）
+- **改业务逻辑一律改 `packages/`**，然后：桌面 / Web 直接生效（dev 走源码或重构建）；移动端跑 `npm run sync-shared`
+- 修改后必跑根目录 `npm test`（sync / monitor 单测）
+- 输出为 ESM（兼容 Vite/Rollup 命名导出；历史上曾因 CommonJS 出过解析问题）

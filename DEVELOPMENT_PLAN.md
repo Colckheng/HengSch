@@ -1,29 +1,41 @@
 ## HengSch 项目多端开发规划（v1.0.x / v1.1.x）
 
-本文档描述 HengSch 多端（桌面、Web、移动）的总体规划与实施状态。后期如有调整，建议在本文档基础上更新版本记录，而不是另起新文档。
+本文档描述 HengSch 多端（桌面、Web、移动）的总体规划与实施状态。后期如有调整，在本文档基础上更新版本记录，而不是另起新文档。
+
+> 操作性文档（如何跑、如何部署、协议细节）见 [README.md](README.md) 与 `docs/`；本文侧重规划、里程碑与变更记录。
 
 ---
 
 ## 一、当前状态概览
 
 ### v1.0.0 桌面端（已完成）
-- **技术栈**：Electron + React + TypeScript + Vite  
-- **目录位置**：`v1.0.0/`  
-- **主要特性**：待办（一次性 + 循环）、拖拽排序、分组管理、小窗模式、贴边缩入、置顶、开机自启动、窗口记忆
+- **技术栈**：Electron 30 + React 18 + TypeScript + Vite 5
+- **目录位置**：`v1.0.0/`
+- **主要特性**：待办（一次性 + 循环）、拖拽排序、分组管理、小窗模式、四边贴边吸附 + 闲置缩入、置顶、开机自启、窗口记忆、Swiss Precision UI、**进程监测自动完成**、**SFTP 云同步（LWW + 墓碑）**
 
 ### v1.1.0-web 网页端（已完成）
-- **技术栈**：Vite + React + TypeScript  
-- **目录位置**：`v1.1.0-web/`  
-- **主要特性**：待办、分组管理、拖拽排序（原生 HTML5）、响应式布局、PWA（离线 + 安装到主屏）
+- **技术栈**：Vite 5 + React 18 + TypeScript + vite-plugin-pwa
+- **目录位置**：`v1.1.0-web/`
+- **主要特性**：Swiss Precision UI、待办 / 分组全套、详情弹窗（编辑 / 删除）、**HTTP 云同步（可启用 / 停用）**、PWA（离线 + 主屏）、**移动端响应式（≤640 / ≤380px）**、触屏长按拖拽排序
+- **部署**：自托管 nginx（阿里云 ECS，`http://39.102.49.72/`），非 Vercel / Netlify（HTTPS 与 HTTP 桥混合内容冲突）
 
 ### v1.1.0-an 移动端（已完成）
-- **技术栈**：Expo + React Native + TypeScript  
-- **目录位置**：`v1.1.0-an/`  
-- **主要特性**：待办、分组管理、分组筛选、EAS Build 打包 APK
+- **技术栈**：Expo 51 + React Native 0.74 + TypeScript
+- **目录位置**：`v1.1.0-an/`
+- **主要特性**：Swiss UI、待办 / 分组 / 筛选、**HTTP 云同步**、状态条 + 设置弹窗；APK 本地 gradle / EAS 双通道交付
+
+### services/sync-bridge 同步桥（已部署）
+- **技术栈**：零依赖 Node ≥18 HTTP 服务（etag 乐观锁 + 原子写 + CORS）
+- **部署**：systemd `sync-bridge` @ `39.102.49.72:8642`，数据文件 `/home/syncuser/sync.json` 与桌面 SFTP 共用
+
+### 文档（已补齐）
+- 根 [README.md](README.md)：总入口与快速开始
+- `docs/architecture.md`：架构总览；`docs/sync.md`：同步协议深潜；`docs/deployment.md`：云端部署运维
+- 各端 README：`v1.0.0/`、`v1.1.0-web/`、`v1.1.0-an/`、`services/sync-bridge/`、`packages/`
 
 ---
 
-## 二、v1.0.x（桌面端）规划：小窗模式吸附 + 贴边缩入
+## 二、v1.0.x（桌面端）规划：小窗模式吸附 + 贴边缩入（已完成）
 
 ### 2.1 需求目标
 
@@ -32,246 +44,106 @@
    - 支持多显示器：以当前窗口所在显示器的工作区域为基准。
 
 2. **闲置自动缩入（Auto-hide）**
-   - 小窗贴边后，在一段时间内无用户交互时，自动向对应边缘“缩进去”（类似老版 QQ 贴边隐藏），支持上下左右四条边全部缩入。
-   - 窗口缩入后只保留一条可见窄边，鼠标移到窄边时自动弹出恢复。
-   - 行为可配置：提供一个简洁的“启用自动贴边缩入”开关，闲置时间默认固定为 5 秒。
+   - 小窗贴边后，一段时间无用户交互自动向对应边缘缩入（类老版 QQ），上下左右四边全支持。
+   - 缩入后只留一条窄边，鼠标靠近自动弹出。
+   - 行为可配置：简洁的「启用自动贴边缩入」开关，闲置时间默认 5 秒。
 
 3. **交互稳定性**
-   - 拖动窗口过程中不触发缩入逻辑。
-   - 用户有操作时（鼠标移动、点击、滚动、键盘输入），应重置闲置计时器，避免频繁缩入/弹出造成抖动。
+   - 拖动窗口过程中不触发缩入；用户活动重置闲置计时器。
 
-### 2.2 技术设计思路
+### 2.2 技术设计（已实现，作为背景保留）
 
-#### 2.2.1 主进程（`src/main/index.ts`）职责
-
-- 使用 Electron `BrowserWindow` + `screen`：
-  - 通过 `screen.getDisplayMatching(windowBounds).workArea` 获取当前窗口所在显示器的工作区域。
-  - 监听 `move` 事件，并做防抖/节流，判断“拖动结束”。
-  - 根据窗口与四个边缘的距离，决定是否吸附并修正位置。
-- 小窗模式相关状态：
-  - `isCompactMode`: 是否处于小窗模式（已有）。
-  - `snappedEdge`: `'left' | 'right' | 'top' | 'bottom' | null`。
-  - `isHidden`: 是否已缩入边缘。
-  - `idleTimer` / `animTimer`: 闲置计时器与动画计时器句柄。
-- 自动缩入与弹出：
-  - 闲置达到设定时间（默认 5 秒）后，若处于小窗模式且已贴边，则执行缩入：
-    - 通过多次 `setBounds` 模拟滑动动画（或先实现为一步到位的无动画版本，降低复杂度）。
-    - 缩入后保留一条窄边（例如宽度/高度 8 像素）在屏幕可见区域。
-  - 当检测到鼠标靠近该窄边时，执行弹出还原原始窗口位置。
-- IPC 通信扩展（视需要逐步增加）：
-  - `window:userActivity`：渲染进程通知有用户活动，用于重置闲置计时器。
-  - 预留配置类 IPC：`window:setAutoHideConfig` / `window:getAutoHideConfig`（延迟时间、是否启用自动缩入等）。
-
-#### 2.2.2 渲染进程（React）职责
-
-- 在小窗模式下，监听用户交互事件，例如：
-  - `mousemove`、`mousedown`、`wheel`、`keydown` 等。
-- 当检测到用户交互时，通过 `window.electronAPI` 调用主进程（如 `window.userActivity()`）来重置闲置计时器。
-- 继续使用现有的 `WindowContext` 维护 `isCompactMode` 等 UI 状态，不直接参与窗口坐标计算和动画，尽量将“物理窗口行为”放在主进程处理。
+- 主进程 `src/main/index.ts`：`screen.getDisplayMatching(workArea)`、move 事件防抖判定拖动结束、`setBounds` 多帧模拟动画。
+- 状态：`snappedEdge`、`isHidden`、闲置 / 动画计时器；窄边 4px、吸附阈值 16px、弹出命中 6px、动画 180ms。
+- 渲染进程监听 mousemove / mousedown / wheel / keydown 经 IPC 上报用户活动。
 
 ### 2.3 版本拆分与里程碑
 
-- **v1.0.1**
-  - 实现基本的“拖动结束自动吸附四边”（多显示器支持）。
-  - 无动画版本的“闲置自动缩入 + 鼠标靠近自动弹出”，支持上下左右四边。
-  - 闲置时间采用固定值 5 秒，提供一个简洁的启用/禁用开关（不做复杂时间调节 UI）。
-
-- **v1.0.2**
-  - 为“小窗贴边缩入 / 弹出”增加动效版本（滑动动画，更接近 QQ 贴边体验）。
-  - 调整缩入后保留在屏幕内的窄边像素值，当前规划为固定 **4 像素**（后续可根据体验微调）。
-  - 调整应用启动行为：进入应用后不再自动打开开发者工具 / 检查页面，仅在开发调试需要时手动开启。
-  - 在保留界面简洁的前提下，细化与整理相关配置与实现（如边缘判定、防抖处理等）。
-
-- **v1.0.3**（已完成）
-  - 修复角落/多边同时满足吸附阈值时的吸附边选择：改为固定优先级 **上 > 下 > 左 > 右**（而不是按距离最小）。
-  - 修复缩入后需要点击才弹出的问题：改为鼠标悬停在保留的窄边区域（当前为 4px）即可自动弹出，并提升命中稳定性。
-  - 修复弹出后无法移动窗口的问题：确保弹出动画过程中和完成后窗口状态完全恢复。
-  - **已知问题**：在右上角等角落位置，缩入后可能出现“立刻自动弹出并循环”的bug，已尝试多种修复方案但问题仍存在，待后续版本进一步优化。
+- **v1.0.1**（已完成）：四边吸附（多显示器）+ 无动画缩入 / 弹出，闲置固定 5s + 开关。
+- **v1.0.2**（已完成）：动效版缩入 / 弹出（180ms），窄边定为 4px，启动不再自动开 DevTools。
+- **v1.0.3**（已完成）：吸附优先级固定 上 > 下 > 左 > 右；悬停窄边自动弹出；修复弹出后无法移动。右上角循环弹出 bug 后续已修复并验收。
 
 ---
 
-## 三、v1.1.0 总体规划：移动端 + 网页端
+## 三、v1.1.0 总体规划：移动端 + 网页端 + 共享层
 
-v1.1.0 计划新增两个子项目：
+### 3.1 Monorepo 组织（已落地）
 
-- **v1.1.0-web**：Web 网页版本（浏览器使用）。
-- **v1.1.0-an**：移动端版本（Android / iOS）。
+- `v1.0.0/`、`v1.1.0-web/`、`packages/*` 在 npm workspaces 内；`v1.1.0-an` 独立工程（自包含构建），`shared/` 为内嵌副本 + `npm run sync-shared`。
+- `packages/shared-types`、`shared-logic`、`shared-storage`：类型 / 业务逻辑（含单测）/ 存储抽象。
 
-### 3.1 目录与仓库组织建议（Monorepo）
+### 3.2 跨端共享策略（已落地）
 
-在当前仓库下建议形成以下结构：
-
-- `v1.0.0/`：现有 Electron 桌面端。
-- `v1.1.0-web/`：Web 版本工程（Vite + React + TS）。
-- `v1.1.0-an/`：移动端工程（Expo + React Native + TypeScript）。
-- `packages/`：存放可复用的共享代码：
-  - `packages/shared-types/`：Todo、Group、窗口配置等 TypeScript 类型定义。
-  - `packages/shared-logic/`：纯业务逻辑模块（如循环任务计算、排序、过滤、数据迁移等），输出 ESM 格式以兼容 Vite/Rollup。
-  - `packages/shared-storage/`：存储接口定义与默认实现（桌面端、Web 端、移动端可有各自实现）。
-  - （可选）`packages/shared-ui/`：跨 Web + Electron 共用的一些基础 UI 组件或样式工具。
-
-根目录已配置 npm workspaces，统一管理 `v1.0.0`、`v1.1.0-web`、`packages/*`。`v1.1.0-an` 为独立工程，不在 workspaces 内，便于 EAS Build 自包含构建。
-
-### 3.2 跨端共享策略
-
-**目标**：业务规则只写一份，各端只写“壳 + 适配层”。
-
-共享内容包括但不限于：
-
-- **数据模型**：
-  - Todo 类型（一次性 / 循环、时间配置、完成状态等）。
-  - Group 类型（分组名称、颜色、排序等）。
-  - 配置项（是否自动缩入、缩入延迟时间等）。
-
-- **业务逻辑**（放在 `shared-logic` 中）：
-  - 循环任务的生成与下次时间计算。
-  - 任务排序、筛选（按分组、状态、时间等）。
-  - 数据迁移逻辑（版本升级时字段变更）。
-
-- **存储抽象**（放在 `shared-storage` 中）：
-  - 定义统一的存储接口：
-    - `get(key: string): Promise<any>`
-    - `set(key: string, value: any): Promise<void>`
-    - `delete(key: string): Promise<void>`
-  - 不同端的具体实现：
-    - 桌面端：基于 `electron-store`，通过预加载脚本暴露的 IPC 接口实现。
-    - Web 端：基于 `localStorage` 或 `IndexedDB`。
-    - 移动端：基于 `AsyncStorage` / `MMKV` / 其他持久化方案。
+- 数据模型、循环续期、排序筛选、**云同步合并（LWW + 墓碑）**、监测计算全部下沉 `shared-*`。
+- 各端只写「壳 + 适配层」：存储适配（electron-store / localStorage / AsyncStorage）、同步传输（SFTP / HTTP）、UI 组件。
 
 ---
 
-## 四、v1.1.0-web（网页端）规划
+## 四、v1.1.0-web（网页端）（已完成）
 
 ### 4.1 技术栈与结构
 
-- **技术栈**：Vite + React + TypeScript（与桌面端渲染层保持一致风格）。
-- **目录位置**：`v1.1.0-web/`。
-- **核心依赖**：
-  - `react` / `react-dom`
-  - 与桌面端共享的 `shared-*` 包。
-  - 拖拽排序使用原生 HTML5 DnD API，无需额外库。
+- Vite 5 + React 18 + TS（strict + noUnusedLocals/Parameters）；vite alias 直引 `packages/*/src`。
+- Swiss Precision UI 组件全套（TodoCard/List、Add/Edit/Detail、GroupManager、SyncSettings、ConfirmDialog、SwissSelect、Odometer 等）+ ErrorBoundary。
 
-### 4.2 功能目标
+### 4.2 功能（全部完成）
 
-- 对齐桌面端的核心功能：
-  - Todo 增删改查，一次性 / 循环任务。
-  - 分组管理（新增、编辑、删除、颜色）。
-  - 拖拽排序。
-  - 任务详情查看。
-- 适配 Web 环境：
-  - **响应式布局**：桌面端与移动端均做相应适配。
-  - **移动端交互**：
-    - 添加/编辑待办：移动端使用全屏展示。
-    - 分组管理：移动端使用侧边抽屉。
-  - 无手势操作（按设计暂不实现左滑删除等）。
-  - 顶部工具栏（+ 添加、📁 分组管理）。
+- 待办 / 分组全套；详情弹窗含编辑 / 删除；HTML5 拖拽 + **触屏长按 300ms 拖拽**（长按激活、黑线落点、拖后抑制误触点击）。
+- **HTTP 云同步**：SyncContext（首拍 5s、周期 60s、离线退避、409 重试、visibility/online 触发、StrictMode 安全）；设置弹窗含「启用」开关；localStorage 存配置与 deviceId。
+- 响应式：`@media ≤640px / ≤380px`，触屏禁文本选择、iOS 安全区、16px 输入防缩放、`100dvh`。
+- **PWA**：vite-plugin-pwa，autoUpdate + workbox 预缓存。
+- 部署：nginx 自托管（index.html / sw.js no-cache、assets immutable），见 `docs/deployment.md`。
 
-### 4.3 数据存储与状态管理
+### 4.3 里程碑
 
-- 存储：
-  - 使用 `localStorage`，接口通过 `shared-storage` 封装（`LocalStorageAdapter`）。
-  - 本地离线数据，无云端同步。
-- 状态管理：
-  - 沿用 Context + `useReducer` 方案。
-  - 与桌面端共享 Todo/Group 状态结构定义。
-
-### 4.4 PWA 支持（已实现）
-
-- **manifest.json**：应用名称、描述、主题色、`display: standalone`，支持安装到主屏。
-- **Service Worker**：通过 `vite-plugin-pwa` 实现离线缓存，支持离线访问。
-
-### 4.5 里程碑
-
-- **web v0.1**（已完成）— **v1.1.0-web 开发完毕**
-  - 项目基础骨架搭建完成。
-  - 集成 `shared-types`、`shared-logic`、`shared-storage`。
-  - 实现 Todo 列表、分组管理、添加/编辑/详情等核心功能。
-  - 响应式布局（桌面端 + 移动端，添加/编辑全屏、分组侧边抽屉）。
-  - PWA 支持（manifest + Service Worker + 安装到主屏）。
-  - 问题修复（启动后白屏）：tsconfig 补充 jsx、Context 补全 useState、增加 ErrorBoundary。
-  - 代码优化：移除 Vite 模板冗余文件（main.ts、counter.ts、style.css、typescript.svg），移除未使用的 @dnd-kit 依赖。
+- **web v0.1**（已完成）：骨架、共享包接入、核心功能、响应式初版、PWA、白屏修复、模板清理。
+- **web v0.2**（已完成）：Swiss UI 移植、HTTP 同步、详情编辑 / 删除、移动端触屏适配（长按拖拽）、8 项审查 bug 修复（同步开关 / StrictMode 定时器 / no-cache 缓存策略等）、自托管上线。
 
 ---
 
-## 五、v1.1.0-an（移动端）规划
+## 五、v1.1.0-an（移动端）（已完成）
 
-### 5.1 技术方案选择（已确认）
-
-- **首选方案：React Native + TypeScript（已选）**
-  - 原生体验更好，便于后续接入系统能力（通知、Widget 等）。
-  - UI 需要针对移动端重新设计，但可以在交互上做到更贴合手机使用习惯。
-
-- **备选方案：Capacitor + React（如后期有需要可评估）**
-  - 可复用更多 Web React UI，但当前规划中不作为首选方案。
-
-**无论具体实现细节如何，移动端业务逻辑都会优先从 `shared-*` 中复用。**
-
-### 5.2 目录与结构
-
-- **目录位置**：`v1.1.0-an/`。
-- **核心内容**：
-  - 使用共享的类型和业务逻辑。
-  - 单独的移动端 UI 层，适配触摸交互与移动端屏幕尺寸。
-  - 独立的存储实现（如 AsyncStorage）。
-
-### 5.3 功能目标
-
-- 对齐桌面端 / Web 端的主要功能：
-  - Todo 管理（一次性 / 循环）。
-  - 分组管理。
-  - 基础排序和过滤。
-- 移动端特性（可作为后续增强项）：
-  - 通知/提醒（到期提醒）。
-  - 桌面小组件（如“今日待办”）。
-
-### 5.4 里程碑（粗粒度）
-
-- **an v0.1**（已完成）— **v1.1.0-an 开发完毕**
-  - 项目结构搭建完成，使用 Expo (React Native) + TypeScript，可在真机/模拟器运行。
-  - 集成 `shared-types`、`shared-logic`、`shared-storage`。
-  - 实现 Todo 与分组的基础功能：列表、详情、编辑、添加、删除、分组管理。
-  - 存储使用 AsyncStorage 实现 `IStorage` 接口。
-  - **EAS Build 打包 APK**：配置 `eas.json`，支持 `eas build --platform android --profile preview` 云构建 APK，无需本地 Android SDK。
-  - **自包含构建**：`v1.1.0-an/shared/` 内嵌 shared 包副本，EAS 构建不依赖 monorepo 父级；根目录 `npm run sync-shared` 或 `v1.1.0-an` 内 `npm run sync-shared` 可从 packages/ 同步更新。
-
-- **an v0.2**
-  - 完善 UI 交互（滑动操作、手势交互等）。
-  - 增加本地通知功能（如到期提醒）。
-  - 优化性能与启动速度。
+- Expo 51 + RN 0.74 + TS；AsyncStorage 适配 IStorage；自包含构建（内嵌 shared + sync-shared）。
+- Todo / 分组全套 + 筛选 + 列表重排；Swiss UI；页脚 SyncStatusFooter + SyncSettingsModal。
+- **HTTP 云同步**（与 Web 同构状态机：5s 首拍 / 60s 周期 / 退避 / 409 重试）；`usesCleartextTraffic` 允许 HTTP 桥。
+- APK 交付：本地 gradle `assembleRelease`（主通道）或 EAS preview；交付物 `HengSch-Todo-v1.1.0.apk`。
+- 门禁：`npx tsc --noEmit`（无独立单测，业务逻辑由根测试覆盖）。
+- 后续增强（未排期）：本地通知 / 到期提醒、桌面小组件、滑动手势。
 
 ---
 
-## 六、实施顺序与完成状态
+## 六、云同步体系（已完成）
 
-1. **第一阶段：桌面端 v1.0.x**（已完成）
-   - 小窗模式四边吸附、闲置自动缩入、鼠标靠近弹出、动效、吸附优先级等均已实现。
-
-2. **第二阶段：抽取共享代码（packages）与 Monorepo 搭建**（已完成）
-   - 创建 `packages/shared-types`、`shared-logic`、`shared-storage`，配置 npm workspaces，重构 `v1.0.0` 使用共享包。
-
-3. **第三阶段：v1.1.0-web 搭建**（已完成）
-   - 创建 `v1.1.0-web` 工程，接入共享包，实现核心功能、响应式布局、PWA 支持。
-
-4. **第四阶段：v1.1.0-an 搭建**（已完成）
-   - 采用 Expo + React Native + TypeScript，搭建 `v1.1.0-an`，实现 Todo/分组功能，使用 AsyncStorage，支持 EAS Build 打包 APK。
+- **拓扑**：三端共享 `/home/syncuser/sync.json`；桌面 SFTP（ssh2 原子写 + 回读校验）；Web / 手机走 sync-bridge HTTP（etag 乐观锁 + 串行化写 + CORS）。
+- **合并**：客户端 `mergeSyncStates`（逐条 LWW：updatedAt → deviceId → JSON 定序；墓碑 30 天 TTL；孤儿改绑 default；确定性排序），vitest 覆盖。
+- **桥**：零依赖 Node，`/health` `/sync` GET/PUT + OPTIONS 预检；401/409/413/404/405；systemd 部署；probe.sh 9 项探针。
+- 设计与运维细节：`docs/sync.md`、`docs/deployment.md`。
 
 ---
 
-## 七、后续调整与版本记录
+## 七、实施顺序与完成状态
 
-本规划是当前时间点的初版方案，后续可以根据实际开发过程中的体验与需求变化进行调整。建议在每次大的规划调整后，在本文件中追加一小节“变更记录”，例如：
+1. **第一阶段：桌面端 v1.0.x**（已完成）——吸附、缩入、动效、优先级、角落 bug 修复。
+2. **第二阶段：Monorepo + packages**（已完成）——三个共享包 + workspaces + 桌面重构接入。
+3. **第三阶段：v1.1.0-web**（已完成）——v0.1 核心 + v0.2 Swiss UI / 同步 / 移动适配 / 上线。
+4. **第四阶段：v1.1.0-an**（已完成）——Expo 工程 + 核心功能 + HTTP 同步 + APK。
+5. **第五阶段：云同步体系**（已完成）——shared-logic 合并、sync-bridge 服务、桌面 SFTP、三端配对。
+6. **第六阶段：硬化与运维**（已完成）——桥 CORS、nginx 自托管、移动端响应式、8 项 bug 修复、文件清理、文档补齐。
 
-- 2026-01-20：初版规划文档创建，确认移动端采用 React Native + TypeScript，自动缩入支持四边，闲置时间默认 5 秒且提供简洁开关。
-- 2026-01-22：v1.0.3 开发完成，修复了角落吸附优先级、悬停弹出、弹出后无法移动等问题。已知问题：右上角等角落位置缩入后可能出现循环弹出的bug，待后续版本优化。
-- 2026-01-31：第二阶段（Monorepo 搭建）完成，创建了 `packages/shared-types`、`packages/shared-logic`、`packages/shared-storage` 三个共享包，并重构 `v1.0.0` 使用这些共享模块，验证了抽象设计的合理性。
-- 2026-01-31：第三阶段（v1.1.0-web）完成，创建 Web 端工程，迁移核心组件，实现响应式布局（移动端添加/编辑全屏、分组侧边抽屉），PWA 支持（manifest + Service Worker + 安装到主屏），使用 localStorage 本地存储。
-- 2026-01-31：修复 v1.1.0-web 启动白屏问题（tsconfig 补充 jsx、Context 补全 useState 导入、增加 ErrorBoundary）。
-- 2026-01-31：第四阶段（v1.1.0-an）完成，创建移动端 Expo 工程，实现 Todo/分组基础功能，使用 AsyncStorage，Metro 配置 monorepo。
-- 2026-01-31：v1.0.0 构建修复：auto-start.ts 改用 execSync 保持同步返回；GroupManagerModal 修复 state.todos 误用（改用 todoState.todos）及 useTodos 在回调内调用问题。
-- 2026-01-31：shared-logic 输出由 CommonJS 改为 ESM，解决 Vite/Rollup 命名导出解析问题。
-- 2026-01-31：v1.1.0-an 添加 EAS Build 配置，支持 `eas build --platform android` 云端打包 APK。
-- 2026-01-31：v1.1.0-an 改为自包含构建，内嵌 shared 包至 `shared/`，移除对 monorepo workspace 的构建依赖，修复 EAS Build Gradle 失败。
-- 2026-01-31：v1.1.0 系统性检查与代码优化。Web 端：移除 Vite 模板冗余文件（main.ts、counter.ts、style.css、typescript.svg），移除未使用的 @dnd-kit 依赖，移除 App.tsx 重复样式导入。根目录新增 `npm run sync-shared` 脚本。文档整体更新：补充 v1.1.0-web / v1.1.0-an 完成状态，更新技术栈描述与实施顺序。
+---
 
-这样可以方便未来回顾每一阶段的决策背景。
+## 八、变更记录
 
+- 2026-01-20：初版规划创建；确认移动端 React Native + TS；自动缩入四边、闲置 5s + 开关。
+- 2026-01-22：v1.0.3 完成（吸附优先级、悬停弹出、弹出后无法移动）；遗留右上角循环弹出问题。
+- 2026-01-31：Monorepo 搭建；v1.1.0-web v0.1 完成（含白屏修复）；v1.1.0-an 完成（EAS + 自包含构建）；shared-logic 改 ESM 输出；系统性代码优化与文档更新。
+- 2026-10-09：桌面 Swiss Precision UI 移植；进程监测 Phase 0-3（自动完成 + 日志）；SFTP LWW 同步（提交 850ebfe、fc9d37a）。
+- 2026-10-10：手机端 M1（HTTP 同步 + Swiss UI）；桌面同步修复；sync-bridge 服务上线（提交 396ee34）。
+- 2026-10-11：
+  - Web 端移植 Swiss UI + HTTP 同步 + 详情编辑 / 删除，构建通过并上线；
+  - sync-bridge 增加 CORS（OPTIONS 预检 + ACAO），云端部署验证 9/9；
+  - 放弃 Vercel / Netlify，改 nginx 自托管（index.html / sw.js no-cache、assets immutable）；
+  - Web 移动端适配（≤640 / ≤380px 媒体查询、触屏长按拖拽、iOS 安全区）；
+  - 修复 8 项审查 bug：同步「启用」开关、nginx 缓存策略、StrictMode 吞首拍定时器、触屏长按拖拽、详情弹窗编辑 / 删除、触屏禁选、删除 monitor 死 CSS、删除 -webkit-app-region 残留；
+  - 仓库文件清理（日志 / tsbuildinfo / docs 旧稿 / vercel·netlify 配置）；
+  - 文档体系补齐：根 README、docs/{architecture,sync,deployment}.md、三端 + 桥 + packages README、本文档状态刷新（本次工作尚未提交）。
