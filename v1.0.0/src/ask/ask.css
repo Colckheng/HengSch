@@ -1,0 +1,72 @@
+/* ============================================================
+   询问小窗（ask window）— Swiss Precision，无边框独立窗口
+   复用 index.css 的 :root 变量与 .button 体系
+   ============================================================ */
+
+.ask-body {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  user-select: none;
+}
+
+.ask-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 16px;
+  min-height: 0;
+}
+
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ask-mark {
+  width: 9px;
+  height: 9px;
+  background: var(--signal);
+  flex-shrink: 0;
+}
+
+.ask-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.ask-task {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--ink);
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ask-question {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.ask-actions {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.ask-actions .button {
+  flex: 1;
+}

@@ -34,9 +34,31 @@ export default defineConfig({
             }
           }
         }
+      },
+      {
+        entry: 'src/main/ask-preload.ts',
+        onstart(options) {
+          options.reload();
+        },
+        vite: {
+          build: {
+            outDir: 'dist/main',
+            rollupOptions: {
+              external: ['electron']
+            }
+          }
+        }
       }
     ])
   ],
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        ask: path.resolve(__dirname, 'ask.html')
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { app, Notification, dialog } from 'electron';
 import type Store from 'electron-store';
+import { presentAskWindow } from './ask-window';
 import {
   MonitorProgress,
   creditPresence,
@@ -121,21 +122,32 @@ async function runAskDialog(entry: MonitorEntry): Promise<void> {
   const autoNotified = prog?.notified ?? false;
   if (!shouldAskOnExit({ status, autoNotified })) return;
 
-  const result = await dialog.showMessageBox({
-    type: 'question',
-    title: 'HengSch · 进程结束',
-    message: `「${entry.title}」的进程已结束`,
-    detail:
-      status === 'completed' && autoNotified
-        ? '该任务之前已自动标记完成，它真的完成了吗？'
-        : '该任务完成了吗？',
-    buttons: ['完成', '还没做'],
-    defaultId: 1,
-    cancelId: 1,
-    noLink: true
-  });
+  const message = `「${entry.title}」的进程已结束`;
+  const detail =
+    status === 'completed' && autoNotified
+      ? '该任务之前已自动标记完成，它真的完成了吗？'
+      : '该任务完成了吗？';
 
-  const answer = result.response === 0 ? 'complete' : 'not-done';
+  let answer: 'complete' | 'not-done';
+  try {
+    // 独立询问小窗（Swiss 风格）；cancel（ESC/关闭）按「还没做」语义
+    const result = await presentAskWindow({ todoId: entry.todoId, message, detail });
+    answer = result === 'complete' ? 'complete' : 'not-done';
+  } catch {
+    // 小窗创建失败 → 回退原生弹窗，保证功能不挂
+    const result = await dialog.showMessageBox({
+      type: 'question',
+      title: 'HengSch · 进程结束',
+      message,
+      detail,
+      buttons: ['完成', '还没做'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    });
+    answer = result.response === 0 ? 'complete' : 'not-done';
+  }
+
   const action = resolveAskAction({ answer, status, autoNotified });
   if (action !== 'none') {
     send('monitor:ask-resolved', { todoId: entry.todoId, action });

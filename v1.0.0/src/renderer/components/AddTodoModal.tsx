@@ -112,7 +112,6 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
               }}
               placeholder="例：回复客户邮件…"
               autoComplete="off"
-              required
               autoFocus
               aria-invalid={titleError}
               aria-describedby={titleError ? 'title-error' : undefined}

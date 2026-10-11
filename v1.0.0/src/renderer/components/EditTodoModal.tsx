@@ -126,7 +126,6 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
               }}
               placeholder="例：回复客户邮件…"
               autoComplete="off"
-              required
               autoFocus
               aria-invalid={titleError}
               aria-describedby={titleError ? 'title-error' : undefined}
