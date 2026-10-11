@@ -11,7 +11,7 @@ import { EditTodoModal } from './components/EditTodoModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GroupManagerModal } from './components/GroupManagerModal';
 import { SyncSettingsModal } from './components/SyncSettingsModal';
-import type { Todo, RecurringTodo } from './types';
+import type { Todo } from './types';
 import type { SyncStatus } from '@hengsch/shared-types';
 import './styles/index.css';
 
@@ -37,25 +37,27 @@ function AppContent(): JSX.Element {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
   const { isCompactMode, toggleCompactMode } = useWindow();
-  const { state, addTodo, completeByMonitor, setMonitorProgress, allTodos, isInitialized: todosReady, applySyncedTodos } = useTodos();
+  const { state, addTodo, completeByMonitor, revertByMonitor, setMonitorProgress, allTodos, isInitialized: todosReady, applySyncedTodos } = useTodos();
   const { allGroups, isInitialized: groupsReady, applySyncedGroups } = useGroups();
   const bootSyncedRef = useRef(false);
   const [quickAddTitle, setQuickAddTitle] = useState('');
 
-  // 监测配置随任务变化推送给主进程
+  // 监测配置随任务变化推送给主进程（once/recurring 均可绑定）
   useEffect(() => {
     const entries = state.todos
-      .filter((t): t is RecurringTodo => t.type === 'recurring' && Boolean((t as RecurringTodo).monitor))
+      .filter((t) => Boolean(t.monitor))
       .map((t) => ({
         todoId: t.id,
         title: t.title,
         exeName: t.monitor!.exeName,
-        thresholdMinutes: t.monitor!.thresholdMinutes
+        thresholdMinutes: t.monitor!.thresholdMinutes,
+        auto: t.monitor!.auto !== false,
+        askOnExit: t.monitor!.askOnExit === true
       }));
     window.electronAPI.monitor.configure(entries).catch(() => undefined);
   }, [state.todos]);
 
-  // 进度推送与达标完成订阅
+  // 进度推送、达标完成与询问裁决订阅
   useEffect(() => {
     const api = window.electronAPI.monitor;
     let alive = true;
@@ -67,12 +69,17 @@ function AppContent(): JSX.Element {
       .catch(() => undefined);
     const offProgress = api.onProgress((p) => setMonitorProgress(p.progress));
     const offCompleted = api.onCompleted(({ todoId }) => completeByMonitor(todoId));
+    const offAsk = api.onAskResolved(({ todoId, action }) => {
+      if (action === 'complete') completeByMonitor(todoId);
+      else if (action === 'revert') revertByMonitor(todoId);
+    });
     return () => {
       alive = false;
       offProgress();
       offCompleted();
+      offAsk();
     };
-  }, [setMonitorProgress, completeByMonitor]);
+  }, [setMonitorProgress, completeByMonitor, revertByMonitor]);
 
   // 云同步：状态与合并结果订阅
   useEffect(() => {

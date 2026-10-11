@@ -55,6 +55,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_: unknown, payload: unknown) => cb(payload);
       ipcRenderer.on('monitor:completed', handler);
       return () => ipcRenderer.removeListener('monitor:completed', handler);
+    },
+    onAskResolved: (cb: (payload: unknown) => void) => {
+      const handler = (_: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on('monitor:ask-resolved', handler);
+      return () => ipcRenderer.removeListener('monitor:ask-resolved', handler);
     }
   }
 });

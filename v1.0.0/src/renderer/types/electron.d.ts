@@ -33,13 +33,24 @@ export interface ElectronAPI {
     onMerged: (cb: (payload: SyncPayload) => void) => () => void;
   };
   monitor: {
-    configure: (entries: { todoId: string; title: string; exeName: string; thresholdMinutes: number }[]) => Promise<void>;
+    configure: (
+      entries: {
+        todoId: string;
+        title: string;
+        exeName: string;
+        thresholdMinutes: number;
+        auto?: boolean;
+        askOnExit?: boolean;
+      }[]
+    ) => Promise<void>;
     listProcesses: () => Promise<string[]>;
     getProgress: () => Promise<{ day: string; progress: Record<string, { ms: number; notified: boolean }> }>;
     setJournalEnabled: (enabled: boolean) => Promise<boolean>;
     getJournalEnabled: () => Promise<boolean>;
     onProgress: (cb: (payload: { day: string; progress: Record<string, { ms: number; notified: boolean }> }) => void) => () => void;
     onCompleted: (cb: (payload: { todoId: string }) => void) => () => void;
+    /** 进程结束询问的裁决结果：complete=标记完成；revert=撤销自动完成回待办 */
+    onAskResolved: (cb: (payload: { todoId: string; action: 'complete' | 'revert' }) => void) => () => void;
   };
 }
 

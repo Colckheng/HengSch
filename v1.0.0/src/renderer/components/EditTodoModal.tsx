@@ -37,10 +37,8 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
         const recurringTodo = todo as RecurringTodo;
         setCycleType(recurringTodo.cycleType);
         setCustomCycleDays(recurringTodo.customCycleDays?.toString() || '');
-        setMonitor(recurringTodo.monitor);
-      } else {
-        setMonitor(undefined);
       }
+      setMonitor(todo.monitor);
     }
   }, [todo]);
 
@@ -87,8 +85,8 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
       description: description.trim() || undefined,
       type,
       groupId: selectedGroupId,
-      // 切换为一次性任务时清空监测配置
-      monitor: type === 'recurring' ? monitor : undefined
+      // once/recurring 均可绑定监测
+      monitor
     };
 
     if (type === 'recurring') {
@@ -199,10 +197,10 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
                   />
                 </div>
               )}
-
-              <MonitorSection monitor={monitor} onChange={setMonitor} />
             </>
           )}
+
+          <MonitorSection monitor={monitor} onChange={setMonitor} />
 
           <div className="modal-footer">
             <button type="button" className="button button-secondary" onClick={handleClose}>

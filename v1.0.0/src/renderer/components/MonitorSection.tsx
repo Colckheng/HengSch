@@ -8,11 +8,14 @@ interface MonitorSectionProps {
 }
 
 export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.Element {
-  const [enabled, setEnabled] = useState(Boolean(monitor));
+  const [auto, setAuto] = useState(monitor ? monitor.auto !== false : false);
+  const [askOnExit, setAskOnExit] = useState(monitor?.askOnExit === true);
   const [exeName, setExeName] = useState(monitor?.exeName ?? '');
   const [threshold, setThreshold] = useState(String(monitor?.thresholdMinutes ?? 10));
   const [processes, setProcesses] = useState<string[]>([]);
   const [journal, setJournal] = useState(false);
+
+  const enabled = auto || askOnExit;
 
   useEffect(() => {
     let alive = true;
@@ -33,28 +36,44 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
     return () => { alive = false; };
   }, [enabled]);
 
-  const emit = (en: boolean, exe: string, th: string): void => {
+  const emit = (a: boolean, ask: boolean, exe: string, th: string): void => {
+    if (!a && !ask) {
+      onChange(undefined);
+      return;
+    }
     const minutes = parseInt(th, 10);
-    if (en && exe.trim() && Number.isFinite(minutes) && minutes >= 1) {
-      onChange({ exeName: exe.trim(), thresholdMinutes: minutes });
+    // 阈值只对 auto 有意义：auto 必须 ≥1；ask-only 不校验阈值（存默认 10）
+    const thresholdValid = !a || (Number.isFinite(minutes) && minutes >= 1);
+    if (exe.trim() && thresholdValid) {
+      onChange({
+        exeName: exe.trim(),
+        thresholdMinutes: Number.isFinite(minutes) && minutes >= 1 ? minutes : 10,
+        auto: a,
+        askOnExit: ask
+      });
     } else {
       onChange(undefined);
     }
   };
 
-  const handleToggle = (checked: boolean): void => {
-    setEnabled(checked);
-    emit(checked, exeName, threshold);
+  const handleAuto = (checked: boolean): void => {
+    setAuto(checked);
+    emit(checked, askOnExit, exeName, threshold);
+  };
+
+  const handleAskOnExit = (checked: boolean): void => {
+    setAskOnExit(checked);
+    emit(auto, checked, exeName, threshold);
   };
 
   const handleExe = (value: string): void => {
     setExeName(value);
-    emit(enabled, value, threshold);
+    emit(auto, askOnExit, value, threshold);
   };
 
   const handleThreshold = (value: string): void => {
     setThreshold(value);
-    emit(enabled, exeName, value);
+    emit(auto, askOnExit, exeName, value);
   };
 
   const handleJournal = (checked: boolean): void => {
@@ -69,15 +88,26 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
 
   return (
     <div className="monitor-section">
-      <label className="monitor-toggle" htmlFor="monitor-enabled">
+      <label className="monitor-toggle" htmlFor="monitor-auto">
         <input
-          id="monitor-enabled"
+          id="monitor-auto"
           type="checkbox"
-          checked={enabled}
-          onChange={(e) => handleToggle(e.target.checked)}
+          checked={auto}
+          onChange={(e) => handleAuto(e.target.checked)}
         />
         <span className="monitor-toggle-label">自动监测</span>
         <span className="monitor-hint">进程运行达阈值即自动完成</span>
+      </label>
+
+      <label className="monitor-toggle" htmlFor="monitor-ask-on-exit">
+        <input
+          id="monitor-ask-on-exit"
+          type="checkbox"
+          checked={askOnExit}
+          onChange={(e) => handleAskOnExit(e.target.checked)}
+        />
+        <span className="monitor-toggle-label">进程结束询问</span>
+        <span className="monitor-hint">进程退出时弹窗问你是否完成（可撤销自动完成）</span>
       </label>
 
       {enabled && (
@@ -105,18 +135,20 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="monitor-threshold">阈值（分钟）</label>
-            <input
-              id="monitor-threshold"
-              type="number"
-              min="1"
-              value={threshold}
-              onChange={(e) => handleThreshold(e.target.value)}
-              placeholder="10"
-              autoComplete="off"
-            />
-          </div>
+          {auto && (
+            <div className="form-group">
+              <label htmlFor="monitor-threshold">阈值（分钟）</label>
+              <input
+                id="monitor-threshold"
+                type="number"
+                min="1"
+                value={threshold}
+                onChange={(e) => handleThreshold(e.target.value)}
+                placeholder="10"
+                autoComplete="off"
+              />
+            </div>
+          )}
 
           <label className="monitor-journal" htmlFor="monitor-journal">
             <input
@@ -128,7 +160,7 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
             <span>精确历史日志（每 2 分钟快照，覆盖软件未运行时段）</span>
           </label>
           <p className="monitor-note">
-            每 2 分钟由计划任务记录一次进程快照；关闭开关即移除任务。冷启动时按日志回补当日空档（精度 ±2 分钟）。
+            每 2 分钟由计划任务记录一次进程快照；关闭开关即移除任务。冷启动时按日志回补当日空档（精度 ±2 分钟）。开启后，离线期间错过的进程退出会在下次打开应用时补问一次（仅当天）。
           </p>
         </>
       )}

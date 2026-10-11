@@ -80,7 +80,8 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
         description: description.trim() || undefined,
         type: 'once',
         status: 'pending',
-        groupId: selectedGroupId
+        groupId: selectedGroupId,
+        monitor
       });
     }
 
@@ -182,10 +183,10 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
                   />
                 </div>
               )}
-
-              <MonitorSection monitor={monitor} onChange={setMonitor} />
             </>
           )}
+
+          <MonitorSection monitor={monitor} onChange={setMonitor} />
 
           <div className="modal-footer">
             <button type="button" className="button button-secondary" onClick={handleClose}>

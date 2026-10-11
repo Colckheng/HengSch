@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import type { Todo, RecurringTodo } from '../types';
+import type { Todo } from '../types';
 import { useGroups } from '../context/GroupContext';
 import { useTodos } from '../context/TodoContext';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -29,8 +29,10 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
   const { getGroupById } = useGroups();
   const { monitorProgress } = useTodos();
   const group = todo.groupId ? getGroupById(todo.groupId) : undefined;
-  const monitor = todo.type === 'recurring' ? (todo as RecurringTodo).monitor : undefined;
-  const monitorMs = monitor ? monitorProgress[todo.id]?.ms ?? 0 : 0;
+  const monitor = todo.monitor;
+  // ask-only 不显示时长徽标（阈值只对 auto 有意义）
+  const monitorBadge = monitor && monitor.auto !== false ? monitor : undefined;
+  const monitorMs = monitorBadge ? monitorProgress[todo.id]?.ms ?? 0 : 0;
 
   const handleCardClick = () => {
     if (!isDragging) {
@@ -110,9 +112,9 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
       </div>
       <div className="todo-right">
         <span className="todo-meta">
-          {monitor && (
+          {monitorBadge && (
             <span className="meta-monitor">
-              监测 {String(Math.floor(monitorMs / 60000)).padStart(2, '0')}/{monitor.thresholdMinutes} 分钟
+              监测 {String(Math.floor(monitorMs / 60000)).padStart(2, '0')}/{monitorBadge.thresholdMinutes} 分钟
             </span>
           )}
           {group && <span className="group-dot" style={{ backgroundColor: group.color }} />}

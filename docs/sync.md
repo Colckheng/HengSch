@@ -53,7 +53,7 @@ HengSch 三端（桌面 / Web / Android）共享服务器上的**同一个数据
 
 ## 3. 合并算法（客户端，`packages/shared-logic/src/sync.ts`）
 
-`mergeSyncStates(local, remote, now)`，纯函数，`sync.test.ts` 单测覆盖，48 项门禁之一。
+`mergeSyncStates(local, remote, now)`，纯函数，`sync.test.ts` 单测覆盖，62 项门禁之一。
 
 1. **补齐元数据**：两边记录先过 `normalizeSynced`（补 `updatedAt`/`deviceId`）。
 2. **逐条 LWW**（`pickWinner`）：

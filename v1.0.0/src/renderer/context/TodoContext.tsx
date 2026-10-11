@@ -29,6 +29,8 @@ interface TodoContextType {
   setMonitorProgress: (progress: Record<string, { ms: number; notified: boolean }>) => void;
   /** 监测达标：仅 pending 时标记完成（防重复/防过期状态） */
   completeByMonitor: (id: string) => void;
+  /** 进程结束询问答「还没做」：仅自动完成时撤销回待办（手动完成不撤） */
+  revertByMonitor: (id: string) => void;
   dispatch: React.Dispatch<TodoAction>;
   addTodo: (todo: Omit<Todo, 'id' | 'createdAt' | 'order'> & Partial<Pick<RecurringTodo, 'cycleType' | 'customCycleDays' | 'nextDueDate' | 'monitor'>>) => void;
   updateTodo: (id: string, updates: Partial<Todo>) => void;
@@ -208,6 +210,15 @@ export function TodoProvider({ children }: { children: ReactNode }): JSX.Element
     });
   };
 
+  const revertByMonitor = (id: string) => {
+    const todo = stateRef.current.todos.find((t) => t.id === id);
+    if (!todo || todo.status !== 'completed') return;
+    dispatch({
+      type: 'TOGGLE_TODO_STATUS',
+      payload: { id, updatedAt: Date.now(), deviceId: deviceIdRef.current }
+    });
+  };
+
   const visibleTodos = state.todos.filter(isVisible);
 
   const applySyncedTodos = (todos: Todo[]) => {
@@ -224,6 +235,7 @@ export function TodoProvider({ children }: { children: ReactNode }): JSX.Element
         monitorProgress,
         setMonitorProgress,
         completeByMonitor,
+        revertByMonitor,
         dispatch,
         addTodo,
         updateTodo,

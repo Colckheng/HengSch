@@ -33,11 +33,11 @@
 
 ### @hengsch/shared-logic（`packages/shared-logic/src/`）
 
-纯函数 + vitest 单测（根 `npm test` 的 48 项来源）：
+纯函数 + vitest 单测（根 `npm test` 的 62 项来源）：
 
 - `todo-utils.ts`：`calculateNextDueDate`、`toggleTodoStatus`（完成循环任务算下次到期并重置）、`sortTodosByStatus`、`filterTodosByGroup`、`generateTodoId` / `generateGroupId`
 - `sync.ts`：`normalizeSynced`、`pickWinner`（LWW）、`mergeSyncStates`（全量合并）、`parseSyncFile`、`TOMBSTONE_TTL_MS`（30 天）——详见 [docs/sync.md](sync.md)
-- `monitor.ts`：进程监测进度计算（配合桌面端 monitor-service）
+- `monitor.ts`：进程监测进度计算、退出沿检测与询问裁决纯函数（配合桌面端 monitor-service）
 - 以 ESM 输出（`module: dist/index.js`），兼容 Vite/Rollup 命名导出
 
 ### @hengsch/shared-storage（`packages/shared-storage/src/index.ts`）
@@ -52,7 +52,7 @@
 
 ## 3. 数据模型要点
 
-- **Todo**：`id`、`title`、`description?`、`type`、`status`、`createdAt`、`completedAt?`、`order`（排序权重）、`groupId?`（缺省 `'default'`）；recurring 额外 `cycleType` / `customCycleDays?` / `nextDueDate?` / `monitor?`
+- **Todo**：`id`、`title`、`description?`、`type`、`status`、`createdAt`、`completedAt?`、`order`（排序权重）、`groupId?`（缺省 `'default'`）、`monitor?`（进程监测，once/recurring 均可绑定）；recurring 额外 `cycleType` / `customCycleDays?` / `nextDueDate?`
 - **Group**：`id`、`name`、`color`、`createdAt`；固定 `default`（「未分类」，不可删）
 - **墓碑**：删除任务/分组时记录置 `deleted: true` + 刷新 `updatedAt`，同步合并防复活，30 天后合并时清除
 - **本地视图**：各端 Context 持「可见列表」+ 墓碑，UI 只渲染非墓碑
@@ -77,7 +77,7 @@ Provider 嵌套（Web 端为例）：`GroupProvider → TodoProvider → SyncPro
 - **主进程**（`src/main/`）：
   - `index.ts`：窗口生命周期、小窗/贴边/缩入状态机（吸附阈值 16px、窄边 4px、悬停弹出 6px、动画 180ms、多显示器 workArea）、IPC
   - `sync-service.ts`：SFTP 同步（ssh2、密钥对生成、原子写 + 回读校验、周期调度）
-  - `monitor-service.ts`：进程监测（30s 轮询 tasklist、达标自动完成循环任务、计划任务 `HengSchMonitor` 日志、7 天日志保留）
+  - `monitor-service.ts`：进程监测（30s 轮询 tasklist、达标自动完成、进程退出沿弹窗询问可撤销自动完成、计划任务 `HengSchMonitor` 日志、7 天日志保留、离线补问仅当天）
   - `auto-start.ts`：开机自启（exec-paths / LaunchAgents / desktop autostart）
   - `preload.ts`：contextIsolation 下白名单暴露 API
 - **渲染进程**（`src/renderer/`）：Swiss UI 组件 + Context；原生 HTML5 拖拽排序；`WindowControls` 无边框窗口按钮
@@ -107,7 +107,7 @@ Provider 嵌套（Web 端为例）：`GroupProvider → TodoProvider → SyncPro
 
 | 层 | 命令 | 覆盖 |
 |---|---|---|
-| shared-logic | 根 `npm test` → vitest | LWW 合并、墓碑、孤儿改绑、排序收敛、monitor 计算（48 项） |
+| shared-logic | 根 `npm test` → vitest | LWW 合并、墓碑、孤儿改绑、排序收敛、monitor 计算（62 项） |
 | sync-bridge | `cd services/sync-bridge && npm test` | 鉴权、etag/409、原子写、CORS、413/404/405（11 项） |
 | 桌面 | `npx tsc --noEmit` + `npm run lint` | 类型 + ESLint 零警告 |
 | Web | `npx tsc --noEmit` + `npm run build` | 严格类型 + 生产构建（含 PWA 生成） |

@@ -9,16 +9,16 @@ HengSch 项目的共享代码包，Monorepo 架构，供桌面端、Web 端、�
 共享 TypeScript 类型定义（`src/index.ts`）：
 
 - `TodoType` / `CycleType`：任务类型与周期枚举
-- `TodoItem` / `RecurringTodo` / `Todo`：待办（recurring 含 `nextDueDate`、`monitor?`）
+- `TodoItem` / `RecurringTodo` / `Todo`：待办（`monitor?` 挂在 TodoItem，once/recurring 均可绑定；recurring 额外含 `nextDueDate`）
 - `Group`：分组
 - `SyncedMeta`（`updatedAt` / `deviceId` / `deleted`）：云同步元数据，挂在 Todo 与 Group 上
-- `MonitorConfig`（`exeName` / `thresholdMinutes`）：进程监测配置
+- `MonitorConfig`（`exeName` / `thresholdMinutes` / `auto?` / `askOnExit?`）：进程监测配置（自动监测 / 进程结束询问双开关）
 - `SyncConfig`：桌面 SFTP 同步配置；`SyncState` / `SyncStatus`：页脚状态机
 - `SyncPayload`：同步全量载荷
 
 ### @hengsch/shared-logic
 
-共享业务逻辑（纯函数，ESM 输出，vitest 单测，根 `npm test` 共 48 项）：
+共享业务逻辑（纯函数，ESM 输出，vitest 单测，根 `npm test` 共 62 项）：
 
 - `todo-utils.ts`
   - `calculateNextDueDate`：计算循环任务下次到期
@@ -29,7 +29,7 @@ HengSch 项目的共享代码包，Monorepo 架构，供桌面端、Web 端、�
   - `mergeSyncStates`：双端全量合并（LWW + 墓碑 + 孤儿改绑 + 确定性排序）
   - `pickWinner` / `normalizeSynced` / `parseSyncFile`
   - `TOMBSTONE_TTL_MS`（30 天）、`SyncFile` 类型
-- `monitor.ts`：进程监测进度计算（配合桌面端 monitor-service）
+- `monitor.ts`：进程监测进度计算、退出沿检测与询问裁决纯函数（配合桌面端 monitor-service）
 - `index.ts` 统一重导出
 
 ### @hengsch/shared-storage
