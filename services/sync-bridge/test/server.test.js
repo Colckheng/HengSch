@@ -113,3 +113,16 @@ test('未知路径 → 404；错误方法 → 405', async () => {
   assert.strictEqual((await req('GET', '/nope')).status, 404);
   assert.strictEqual((await req('DELETE', '/sync')).status, 405);
 });
+
+test('OPTIONS 预检 → 204 + CORS 头', async () => {
+  const res = await fetch(`${base}/sync`, { method: 'OPTIONS' });
+  assert.strictEqual(res.status, 204);
+  assert.strictEqual(res.headers.get('access-control-allow-origin'), '*');
+  assert.match(res.headers.get('access-control-allow-methods') || '', /PUT/);
+  assert.match(res.headers.get('access-control-allow-headers') || '', /Authorization/i);
+});
+
+test('普通请求带 CORS 头', async () => {
+  const res = await fetch(`${base}/health`);
+  assert.strictEqual(res.headers.get('access-control-allow-origin'), '*');
+});

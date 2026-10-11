@@ -6,6 +6,14 @@ const { checkAuth } = require('./auth');
 
 const MAX_BODY = 8 * 1024 * 1024;
 
+// Web 端（浏览器）跨域访问需要 CORS；token 走 Authorization 头，PUT 会触发 OPTIONS 预检
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Max-Age': '86400'
+};
+
 /** 从 .env 与 process.env 读配置（process.env 优先） */
 function loadEnv(dir) {
   const env = {};
@@ -29,7 +37,7 @@ function etagOf(buf) {
 
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
   res.end(body);
 }
 
@@ -110,6 +118,13 @@ function createBridge({ file, token, maxBody = MAX_BODY }) {
       console.log(`${req.method} ${url.pathname} ${status} ${Date.now() - started}ms`);
     };
     res.on('finish', () => finish(res.statusCode));
+
+    // CORS 预检（浏览器跨域 PUT/带 Authorization 的请求先发 OPTIONS）
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, CORS_HEADERS);
+      res.end();
+      return;
+    }
 
     if (url.pathname === '/health' && req.method === 'GET') {
       sendJson(res, 200, { ok: true });
