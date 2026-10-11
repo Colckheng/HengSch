@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
-import type { Todo } from '@hengsch/shared-types';
+import type { Todo } from '../types';
 import { useGroups } from '../context/GroupContext';
+import { ConfirmDialog } from './ConfirmDialog';
+import { IconEdit, IconTrash } from './Icons';
 
 interface TodoCardProps {
   todo: Todo;
@@ -10,9 +12,18 @@ interface TodoCardProps {
   onDetail: (todo: Todo) => void;
 }
 
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: '2-digit' })
+    .format(d)
+    .replace(/\//g, '.');
+}
+
 export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCardProps): JSX.Element {
   const isCompleted = todo.status === 'completed';
   const [isDragging, setIsDragging] = useState(false);
+  const [popKey, setPopKey] = useState(0);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { getGroupById } = useGroups();
   const group = todo.groupId ? getGroupById(todo.groupId) : undefined;
@@ -23,8 +34,18 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
     }
   };
 
+  const handleCardKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    if (!isDragging) {
+      onDetail(todo);
+    }
+  };
+
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setPopKey((k) => k + 1);
     onToggle(todo.id);
   };
 
@@ -35,9 +56,12 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('确定要删除这个待办事项吗？')) {
-      onDelete(todo.id);
-    }
+    setConfirmingDelete(true);
+  };
+
+  const confirmDelete = () => {
+    onDelete(todo.id);
+    setConfirmingDelete(false);
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -58,42 +82,51 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit, onDetail }: TodoCar
       ref={cardRef}
       className={`todo-card ${isCompleted ? 'completed' : ''} ${isDragging ? 'dragging' : ''} ${group ? 'group-colored' : ''}`}
       draggable
+      tabIndex={0}
+      role="button"
+      onKeyDown={handleCardKeyDown}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleCardClick}
-      style={group ? {
-        backgroundColor: group.color,
-        borderColor: isCompleted ? 'rgba(0, 0, 0, 0.2)' : `rgba(0, 0, 0, 0.15)`,
-        border: `1px solid ${isCompleted ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.15)'}`
-      } : {}}
     >
       <button
-        className={`todo-checkbox ${isCompleted ? 'checked' : ''}`}
+        key={popKey}
+        className={`todo-checkbox ${isCompleted ? 'checked' : ''} ${popKey > 0 ? 'pop' : ''}`}
         onClick={handleToggle}
         aria-label={isCompleted ? '标记为未完成' : '标记为完成'}
       >
         {isCompleted && <span className="checkmark">✓</span>}
       </button>
       <div className="todo-content">
-        {group && (
-          <span className="todo-badge group-badge" style={{ backgroundColor: group.color }}>
-            {group.name}
-          </span>
-        )}
-        <h3 className="todo-title">{todo.title}</h3>
+        <h3 className="todo-title">
+          {todo.title}
+          {todo.type === 'recurring' && <span className="recur-mark">↻</span>}
+        </h3>
         {todo.description && <p className="todo-description">{todo.description}</p>}
-        {todo.type === 'recurring' && (
-          <span className="todo-badge recurring">循环</span>
-        )}
       </div>
-      <div className="todo-actions">
-        <button className="todo-action-button edit" onClick={handleEdit} aria-label="编辑">
-          ✏
-        </button>
-        <button className="todo-action-button delete" onClick={handleDelete} aria-label="删除">
-          🗑
-        </button>
+      <div className="todo-right">
+        <span className="todo-meta">
+          {group && <span className="group-dot" style={{ backgroundColor: group.color }} />}
+          {group && <span>{group.name}</span>}
+          <span>{formatDate(todo.createdAt)}</span>
+        </span>
+        <div className="todo-actions">
+          <button className="todo-action-button edit" onClick={handleEdit} aria-label="编辑">
+            <IconEdit />
+          </button>
+          <button className="todo-action-button delete" onClick={handleDelete} aria-label="删除">
+            <IconTrash />
+          </button>
+        </div>
       </div>
+      <ConfirmDialog
+        isOpen={confirmingDelete}
+        title="删除待办"
+        message={`确定要删除「${todo.title}」吗？此操作无法撤销。`}
+        confirmText="删除"
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

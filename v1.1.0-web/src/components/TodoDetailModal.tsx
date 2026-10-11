@@ -1,13 +1,23 @@
-import { useEffect } from 'react';
-import type { Todo, RecurringTodo } from '@hengsch/shared-types';
+import { useEffect, useState } from 'react';
+import type { Todo, RecurringTodo } from '../types';
+import { IconClose } from './Icons';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface TodoDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   todo: Todo | null;
+  onEdit: (todo: Todo) => void;
+  onDelete: (id: string) => void;
 }
 
-export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps): JSX.Element {
+export function TodoDetailModal({ isOpen, onClose, todo, onEdit, onDelete }: TodoDetailModalProps): JSX.Element {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setConfirmingDelete(false);
+  }, [isOpen]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
@@ -28,13 +38,23 @@ export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps)
   const isRecurring = todo.type === 'recurring';
   const recurringTodo = isRecurring ? (todo as RecurringTodo) : null;
 
+  const handleEdit = () => {
+    onEdit(todo);
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete(todo.id);
+    setConfirmingDelete(false);
+    onClose();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content todo-detail" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>待办事项详情</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
-            ✕
+            <IconClose />
           </button>
         </div>
         <div className="modal-body">
@@ -91,10 +111,24 @@ export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps)
           </div>
         </div>
         <div className="modal-footer">
+          <button type="button" className="button button-danger" onClick={() => setConfirmingDelete(true)}>
+            删除
+          </button>
+          <button type="button" className="button button-secondary" onClick={handleEdit}>
+            编辑
+          </button>
           <button type="button" className="button button-secondary" onClick={onClose}>
             关闭
           </button>
         </div>
+        <ConfirmDialog
+          isOpen={confirmingDelete}
+          title="删除待办"
+          message={`确定要删除「${todo.title}」吗？此操作无法撤销。`}
+          confirmText="删除"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       </div>
     </div>
   );

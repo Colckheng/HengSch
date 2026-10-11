@@ -28,17 +28,17 @@ export class ErrorBoundary extends Component<Props, State> {
             padding: 24,
             fontFamily: 'sans-serif',
             maxWidth: 600,
-            margin: '40px auto',
-            background: '#fff3cd',
-            border: '1px solid #ffc107',
-            borderRadius: 8
+            margin: '40px auto'
           }}
         >
-          <h2 style={{ color: '#856404', marginBottom: 12 }}>加载出错</h2>
-          <pre style={{ overflow: 'auto', fontSize: 12 }}>{this.state.error.message}</pre>
-          <pre style={{ overflow: 'auto', fontSize: 11, marginTop: 8, color: '#666' }}>
-            {this.state.error.stack}
-          </pre>
+          <h2>应用出错了</h2>
+          <p style={{ color: '#666', marginTop: 8 }}>{this.state.error.message}</p>
+          <button
+            style={{ marginTop: 16, padding: '8px 16px', cursor: 'pointer' }}
+            onClick={() => window.location.reload()}
+          >
+            重新加载
+          </button>
         </div>
       );
     }
