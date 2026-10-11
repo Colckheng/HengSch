@@ -1,6 +1,6 @@
 {
   "name": "hengsch",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "功能完整的待办事项管理软件",
   "main": "dist/main/index.js",
   "author": "",

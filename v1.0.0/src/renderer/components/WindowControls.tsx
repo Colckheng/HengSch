@@ -54,7 +54,7 @@ export function WindowControls(): JSX.Element {
         <IconSnap hidden={isAutoHideEnabled} />
       </button>
       <button
-        className="window-button"
+        className={`window-button auto-start${isAutoStart ? ' on' : ''}`}
         onClick={toggleAutoStart}
         title={isAutoStart ? '取消开机自启动' : '开机自启动'}
         aria-label={isAutoStart ? '取消开机自启动' : '开机自启动'}

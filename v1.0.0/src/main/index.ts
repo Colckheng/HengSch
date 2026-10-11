@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import Store from 'electron-store';
-import { setAutoStart } from './auto-start';
+import { setAutoStart, getAutoStart, healAutoStart } from './auto-start';
 import {
   initMonitorService,
   configureMonitor,
@@ -487,6 +487,10 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // 自启动自愈：清掉旧注册表残留（曾指向 dev electron.exe 导致开机弹空窗），
+  // 并按存储意图重写为当前 exe 路径
+  healAutoStart(store.get('autoStart', false) as boolean);
+
   const pushToRenderer = (channel: string, payload: unknown) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(channel, payload);
@@ -613,8 +617,10 @@ ipcMain.handle('auto-start:set', (_, enable: boolean) => {
 });
 
 ipcMain.handle('auto-start:get', () => {
-  const storedValue = store.get('autoStart', false) as boolean;
-  return storedValue;
+  // 返回操作系统真实状态（旧实现返回 store 缓存，注册表被清/指错时按钮无法反映）
+  const real = getAutoStart();
+  store.set('autoStart', real);
+  return real;
 });
 
 ipcMain.handle('window:setCompactMode', (_, isCompact: boolean) => {

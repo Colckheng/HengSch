@@ -141,6 +141,17 @@ button {
   color: #fff;
 }
 
+/* 开机自启动：开启红色、关闭黑色（--ink），一眼可辨 */
+.window-button.auto-start.on {
+  color: var(--signal);
+}
+
+.window-button.auto-start.on:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
 /* ---------------- content ---------------- */
 
 .content {
