@@ -1,6 +1,6 @@
 # HengSch Todo — Web 端（v1.1.0-web）
 
-浏览器版待办应用：Swiss Precision UI + PWA 离线 + HTTP 云同步 + 移动端适配。线上部署：<http://39.102.49.72/>
+浏览器版待办应用：Swiss Precision UI + PWA 离线 + HTTP 云同步 + 移动端适配。部署到你自己的服务器见 [../docs/deployment.md](../docs/deployment.md)。
 
 ## 功能
 
@@ -40,7 +40,7 @@ npm run preview      # 本地预览构建产物
 页脚同步芯片 →「同步设置」：
 
 1. 勾选「启用云同步」
-2. 服务器地址：`http://39.102.49.72:8642`（桥根地址，无路径）
+2. 服务器地址：`http://<SERVER_IP>:8642`（桥根地址，无路径）
 3. token：服务器 `services/sync-bridge/.env` 中的 `SYNC_TOKEN`
 4. 「测试连接」（/health + /sync 鉴权）→「保存」→ 立即触发一轮，之后页脚显示 `SYNCED hh:mm`
 

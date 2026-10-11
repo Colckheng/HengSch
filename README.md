@@ -9,7 +9,7 @@
 | 移动端 | `v1.1.0-an/` | Expo 51 + React Native 0.74 | ✅ 完成（HTTP 同步 + APK 交付） |
 | 同步桥 | `services/sync-bridge/` | Node ≥18，零依赖 HTTP 服务 | ✅ 已部署（阿里云 ECS） |
 
-线上网页端：<http://39.102.49.72/> · 同步桥：<http://39.102.49.72:8642>
+网页端与同步桥均**自托管**在你自己的服务器上，部署方法见 [docs/deployment.md](docs/deployment.md)。
 
 ## 功能总览
 

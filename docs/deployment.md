@@ -1,9 +1,9 @@
 # 云端部署与运维
 
-目标环境：阿里云 ECS（Ubuntu，IP `39.102.49.72`），SSH 别名 `cloud-server`（`~/.ssh/config`，root 登录）。承载两件事：
+目标环境：一台公网 Ubuntu 服务器（下文以阿里云 ECS 为例，其它云厂商同理），通过 SSH 访问（示例中别名 `cloud-server`，按你的 `~/.ssh/config` 替换）。承载两件事：
 
-1. **Web 端**：nginx 托管静态构建产物，`http://39.102.49.72/`
-2. **同步桥**：systemd 服务 `sync-bridge`，`http://39.102.49.72:8642`
+1. **Web 端**：nginx 托管静态构建产物，`http://<SERVER_IP>/`
+2. **同步桥**：systemd 服务 `sync-bridge`，`http://<SERVER_IP>:8642`
 
 ## 1. 服务器布局
 
@@ -80,11 +80,11 @@ ssh cloud-server "sudo rm -rf /var/www/hengsch-web/* && sudo cp -r /tmp/hengsch-
 
 ```powershell
 # 缓存头
-(Invoke-WebRequest http://39.102.49.72/ -Method Head).Headers['Cache-Control']        # no-cache
-(Invoke-WebRequest http://39.102.49.72/assets/<某hash>.js -Method Head).Headers['Cache-Control']  # public, max-age=31536000, immutable
+(Invoke-WebRequest http://<SERVER_IP>/ -Method Head).Headers['Cache-Control']        # no-cache
+(Invoke-WebRequest http://<SERVER_IP>/assets/<某hash>.js -Method Head).Headers['Cache-Control']  # public, max-age=31536000, immutable
 
 # 页面与资源
-Invoke-WebRequest http://39.102.49.72/                      # 200，HTML 内引用的 js/css/sw 均 200
+Invoke-WebRequest http://<SERVER_IP>/                      # 200，HTML 内引用的 js/css/sw 均 200
 ```
 
 浏览器强刷一次（Ctrl+Shift+R）确认新版本生效。
@@ -130,7 +130,7 @@ ssh cloud-server "sudo systemctl restart sync-bridge"
 
 ```bash
 # 服务器或本地跑探针（9 项全绿）
-bash services/sync-bridge/scripts/probe.sh http://39.102.49.72:8642 <SYNC_TOKEN>
+bash services/sync-bridge/scripts/probe.sh http://<SERVER_IP>:8642 <SYNC_TOKEN>
 ```
 
 覆盖：health 200、鉴权 GET 200、无 token/错 token 401、幂等 PUT 200、回读一致、stale etag 409、DELETE 405、未知路径 404。
@@ -138,8 +138,8 @@ bash services/sync-bridge/scripts/probe.sh http://39.102.49.72:8642 <SYNC_TOKEN>
 CORS 验收（Web 端可用性前提）：
 
 ```bash
-curl -si -X OPTIONS http://39.102.49.72:8642/sync | head -5          # 204 + Access-Control-Allow-*
-curl -si -H "Origin: http://39.102.49.72" http://39.102.49.72:8642/health | grep -i access-control
+curl -si -X OPTIONS http://<SERVER_IP>:8642/sync | head -5          # 204 + Access-Control-Allow-*
+curl -si -H "Origin: http://<SERVER_IP>" http://<SERVER_IP>:8642/health | grep -i access-control
 ```
 
 单元测试（本地）：`cd services/sync-bridge && npm test`（node --test，11 项，含 CORS 断言）。

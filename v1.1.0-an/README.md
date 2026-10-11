@@ -40,7 +40,7 @@ npm run sync-shared     # 从 packages/ 同步共享代码到 shared/
 ## 同步配对
 
 1. 底部状态条（初始 `SYNC OFF — 未配置`）→ 进入「同步设置」
-2. 服务器地址：`http://39.102.49.72:8642`；token：桥 `.env` 的 `SYNC_TOKEN`
+2. 服务器地址：`http://<SERVER_IP>:8642`；token：桥 `.env` 的 `SYNC_TOKEN`
 3. 「测试连接」（/health + /sync 鉴权）→「保存」→ 状态条 60s 内变 `SYNCED hh:mm`
 4. 状态机：`SYNCING / SYNCED / OFFLINE / AUTH ERROR / REMOTE ERROR`；点击状态条可重测与「立即同步」
 

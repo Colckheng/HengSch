@@ -17,7 +17,7 @@
 - **技术栈**：Vite 5 + React 18 + TypeScript + vite-plugin-pwa
 - **目录位置**：`v1.1.0-web/`
 - **主要特性**：Swiss Precision UI、待办 / 分组全套、详情弹窗（编辑 / 删除）、**HTTP 云同步（可启用 / 停用）**、PWA（离线 + 主屏）、**移动端响应式（≤640 / ≤380px）**、触屏长按拖拽排序
-- **部署**：自托管 nginx（阿里云 ECS，`http://39.102.49.72/`），非 Vercel / Netlify（HTTPS 与 HTTP 桥混合内容冲突）
+- **部署**：自托管 nginx（任意云服务器），非 Vercel / Netlify（HTTPS 与 HTTP 桥混合内容冲突）
 
 ### v1.1.0-an 移动端（已完成）
 - **技术栈**：Expo 51 + React Native 0.74 + TypeScript
@@ -26,7 +26,7 @@
 
 ### services/sync-bridge 同步桥（已部署）
 - **技术栈**：零依赖 Node ≥18 HTTP 服务（etag 乐观锁 + 原子写 + CORS）
-- **部署**：systemd `sync-bridge` @ `39.102.49.72:8642`，数据文件 `/home/syncuser/sync.json` 与桌面 SFTP 共用
+- **部署**：systemd `sync-bridge`（默认 :8642），数据文件 `/home/syncuser/sync.json` 与桌面 SFTP 共用
 
 ### 文档（已补齐）
 - 根 [README.md](README.md)：总入口与快速开始

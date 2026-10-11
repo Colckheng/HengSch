@@ -18,7 +18,7 @@ CORS 头（所有响应携带）：`Access-Control-Allow-Origin: *`、Methods `G
 
 鉴权实现：`Authorization: Bearer <token>`，sha256 后 `timingSafeEqual` 常数时间比较；token 配置 <8 字符拒绝启动。
 
-## 服务器部署（阿里云 ECS 39.102.49.72，Ubuntu）
+## 服务器部署（Ubuntu，下文以 `cloud-server` 指代你的服务器）
 
 ```bash
 # 0. 前置：Node ≥18（本机装在 /opt/node20，已 symlink /usr/local/bin/node）
@@ -46,7 +46,7 @@ ufw allow 8642/tcp && ufw reload          # 主机防火墙
 # 阿里云安全组：放行 TCP 8642（出方向默认全开，入方向需加规则）
 
 # 5. 验收（探针自带 token 参数）
-bash scripts/probe.sh http://39.102.49.72:8642 <SYNC_TOKEN>   # 9 项全绿
+bash scripts/probe.sh http://<SERVER_IP>:8642 <SYNC_TOKEN>   # 9 项全绿
 ```
 
 > 配置键以 `.env.example` 为准：`SYNC_PORT` / `SYNC_FILE` / `SYNC_TOKEN`（`process.env` 优先于 .env）。
@@ -60,7 +60,7 @@ npm test          # node --test，11 项：鉴权、etag/409、原子写、回�
 ## 客户端配对
 
 ### Web 端（v1.1.0-web）
-打开 <http://39.102.49.72/> → 页脚同步芯片 →「同步设置」→ 勾选启用 → 地址 `http://39.102.49.72:8642` → token → 测试连接 → 保存。
+打开 `http://<SERVER_IP>/` → 页脚同步芯片 →「同步设置」→ 勾选启用 → 地址 `http://<SERVER_IP>:8642` → token → 测试连接 → 保存。
 
 ### 手机端（v1.1.0-an）
 App 底部状态条（`SYNC OFF — 未配置`）→「同步设置」→ 同上填写 → 保存 → 状态条 60s 内变 `SYNCED hh:mm`。

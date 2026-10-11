@@ -146,17 +146,17 @@ PUT 结果：
 
 1. 服务器 `services/sync-bridge/.env` 里的 `SYNC_TOKEN` 即配对 token（勿外传）。
 2. **手机 / Web**：设置弹窗（Web：页脚同步芯片 → 同步设置；手机：底部状态条 → 同步设置）：
-   - 服务器地址：`http://39.102.49.72:8642`
+   - 服务器地址：`http://<SERVER_IP>:8642`
    - token：粘贴 `SYNC_TOKEN`
    - 勾选「启用」→「测试连接」（`/health` 通 + `/sync` 鉴权过）→ 保存 → 60s 内出现 `SYNCED hh:mm`
-3. **桌面**：设置弹窗走 SFTP：主机 `39.102.49.72`、端口 22、用户、`remotePath` 填 `~/sync.json`（即 `/home/syncuser/sync.json`），首次把公钥追加到服务器该用户的 `~/.ssh/authorized_keys`。
+3. **桌面**：设置弹窗走 SFTP：主机 `<SERVER_IP>`、端口 22、用户、`remotePath` 填 `~/sync.json`（即 `/home/syncuser/sync.json`），首次把公钥追加到服务器该用户的 `~/.ssh/authorized_keys`。
 
 ## 8. 故障排查
 
 | 现象 | 原因与处理 |
 |---|---|
 | `AUTH ERROR` | token 不对或被更换；核对服务器 `.env` 的 `SYNC_TOKEN` |
-| `OFFLINE` | 网络不通 / 桥没起（`systemctl status sync-bridge`）/ 地址端口错；`curl http://39.102.49.72:8642/health` |
+| `OFFLINE` | 网络不通 / 桥没起（`systemctl status sync-bridge`）/ 地址端口错；`curl http://<SERVER_IP>:8642/health` |
 | `REMOTE ERROR` | 远端 sync.json 损坏（非 version 1 合法 JSON）；人工修复 `/home/syncuser/sync.json`（可清成 `{"version":1,"todos":[],"groups":[]}`，各端下次会全量重建——注意会丢远端数据，仅作最后手段） |
 | Web 端 409 频发 | 多端高频同时写；桥重启即可（写链清空），数据不丢 |
 | 浏览器 CORS 报错 | 桥版本过旧没带 CORS 头；更新 `server.js` 并 `systemctl restart sync-bridge` |

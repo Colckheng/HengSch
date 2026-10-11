@@ -3,7 +3,7 @@ import { storage } from './localStorageAdapter';
 /** Web 端 HTTP 同步桥配置（与手机端一致，区别于桌面 SFTP） */
 export interface WebSyncConfig {
   enabled: boolean;
-  /** 形如 http://39.102.49.72:8642（无路径，桥固定 /sync /health） */
+  /** 形如 http://<服务器IP>:8642（无路径，桥固定 /sync /health） */
   serverUrl: string;
   token: string;
 }

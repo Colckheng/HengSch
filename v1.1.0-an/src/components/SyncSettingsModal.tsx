@@ -115,7 +115,7 @@ export function SyncSettingsModal({ isOpen, onClose }: SyncSettingsModalProps): 
               style={styles.input}
               value={serverUrl}
               onChangeText={setServerUrl}
-              placeholder="http://39.102.49.72:8642"
+              placeholder="http://<服务器IP>:8642"
               placeholderTextColor="#B5B5B0"
               autoCapitalize="none"
               autoCorrect={false}
