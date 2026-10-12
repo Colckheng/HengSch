@@ -1,5 +1,5 @@
-import { app, Menu, Tray, nativeImage } from 'electron';
-import * as path from 'path';
+import { app, Menu, Tray } from 'electron';
+import { getAppIcon } from './app-icon';
 
 let tray: Tray | null = null;
 
@@ -10,11 +10,8 @@ let tray: Tray | null = null;
  */
 export function createTray(onShow: () => void): void {
   try {
-    const iconPath = app.isPackaged
-      ? path.join(__dirname, '../assets/icon.ico')
-      : path.join(app.getAppPath(), 'public/assets/icon.ico');
-    const image = nativeImage.createFromPath(iconPath);
-    if (image.isEmpty()) return;
+    const image = getAppIcon();
+    if (!image) return;
 
     tray = new Tray(image);
     tray.setToolTip('HengSch Todo');

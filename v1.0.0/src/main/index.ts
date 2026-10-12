@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import Store from 'electron-store';
 import { setAutoStart, getAutoStart, healAutoStart } from './auto-start';
 import { abortAskWindows } from './ask-window';
+import { getAppIcon } from './app-icon';
 import {
   initMonitorService,
   configureMonitor,
@@ -425,7 +426,9 @@ function createWindow(): void {
     transparent: false,
     backgroundColor: '#f0f0f0',
     resizable: true,
-    alwaysOnTop: store.get('alwaysOnTop', false) as boolean
+    alwaysOnTop: store.get('alwaysOnTop', false) as boolean,
+    // dev 下 electron.exe 自带原子 logo，必须显式指定应用图标，任务栏/Alt-Tab 才是 H.
+    icon: getAppIcon() ?? undefined
   });
 
   if (!app.isPackaged) {
