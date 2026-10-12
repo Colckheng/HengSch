@@ -129,3 +129,15 @@ export function shouldReaskOffline(input: {
 }): boolean {
   return input.seenPresentToday && !input.currentlyRunning && input.status === 'pending';
 }
+
+/**
+ * 僵死态：任务待办但当日已 notified——答「还没做」撤销自动完成、
+ * 或用户手动撤销完成都会产生此态；此时记账与达标判定都短路，监测停摆。
+ * 调用方应重置当日进度（createDayProgress(now)），让监测周期从现在重新开始。
+ */
+export function isProgressStale(
+  progress: MonitorProgress | undefined,
+  status: 'pending' | 'completed' | null
+): boolean {
+  return status === 'pending' && (progress?.notified ?? false);
+}

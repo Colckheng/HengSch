@@ -12,7 +12,8 @@ import {
   detectExitEdge,
   shouldAskOnExit,
   resolveAskAction,
-  shouldReaskOffline
+  shouldReaskOffline,
+  isProgressStale
 } from './monitor';
 
 const p = (ms: number, checkpointAt: number, notified = false): MonitorProgress => ({
@@ -244,5 +245,27 @@ describe('shouldReaskOffline（离线补问，仅当天）', () => {
 
   it('当天没玩过 → 不补问', () => {
     expect(shouldReaskOffline({ seenPresentToday: false, currentlyRunning: false, status: 'pending' })).toBe(false);
+  });
+});
+
+describe('isProgressStale（撤销/手动取消完成后的僵死态检测）', () => {
+  it('待办 + 当日已通知 → 僵死态', () => {
+    expect(isProgressStale(p(600_000, 1000, true), 'pending')).toBe(true);
+  });
+
+  it('已完成 + 当日已通知 → 正常态（自动完成的正常终态，不重置）', () => {
+    expect(isProgressStale(p(600_000, 1000, true), 'completed')).toBe(false);
+  });
+
+  it('待办 + 未通知 → 正常态（监测本来就在跑）', () => {
+    expect(isProgressStale(p(30_000, 1000, false), 'pending')).toBe(false);
+  });
+
+  it('无进度记录 → 正常态', () => {
+    expect(isProgressStale(undefined, 'pending')).toBe(false);
+  });
+
+  it('任务不存在（null）→ 正常态', () => {
+    expect(isProgressStale(p(600_000, 1000, true), null)).toBe(false);
   });
 });

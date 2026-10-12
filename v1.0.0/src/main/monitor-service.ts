@@ -17,7 +17,8 @@ import {
   detectExitEdge,
   shouldAskOnExit,
   resolveAskAction,
-  shouldReaskOffline
+  shouldReaskOffline,
+  isProgressStale
 } from '@hengsch/shared-logic';
 
 const execP = promisify(exec);
@@ -149,6 +150,14 @@ async function runAskDialog(entry: MonitorEntry): Promise<void> {
   }
 
   const action = resolveAskAction({ answer, status, autoNotified });
+  if (action === 'revert') {
+    // 撤销 = 用户说「没做」：当日进度重置、解除当天只问一次，监测周期从现在重新开始
+    const resetNow = Date.now();
+    progressStore[progressKey(entry.todoId, resetNow)] = createDayProgress(resetNow);
+    persistProgress();
+    pushProgress(resetNow);
+    askedToday.delete(askKey(entry.todoId, resetNow));
+  }
   if (action !== 'none') {
     send('monitor:ask-resolved', { todoId: entry.todoId, action });
   }
@@ -394,29 +403,34 @@ async function bootstrap(entries: MonitorEntry[]): Promise<void> {
   let changed = false;
   for (const entry of entries) {
     const key = progressKey(entry.todoId, now);
-    let prog = progressStore[key] ?? createDayProgress(dayStart);
     const exe = exeLower(entry.exeName);
-
-    // ③ 逐行喂事件（行间隔 2min，creditPresence 天然按行补记）
-    for (const line of journalLines) {
-      prog = creditPresence(prog, { t: line.t, present: line.run.includes(exe) });
-    }
-    // ② 仍在运行：从 max(StartTime, 今日0点, checkpoint) 补到现在
+    const status = findTodoStatus(entry.todoId);
     // Windows 进程名不带扩展名，查询键去掉 .exe
     const startMs = starts.get(exe.replace(/\.exe$/, ''));
     const currentlyRunning = Boolean(startMs);
-    if (startMs) {
-      prog = backfillFromStart(prog, startMs, now, dayStart);
+
+    let prog = progressStore[key] ?? createDayProgress(dayStart);
+    if (isProgressStale(prog, status)) {
+      // 僵死态（待办 + 当日已 notified）：答「还没做」撤销或手动取消完成产生，监测已停摆。
+      // 重置当日进度、从现在开始记账；跳过 journal 喂入与回溯，避免一启动又立刻达标
+      prog = createDayProgress(now);
+    } else {
+      // ③ 逐行喂事件（行间隔 2min，creditPresence 天然按行补记）
+      for (const line of journalLines) {
+        prog = creditPresence(prog, { t: line.t, present: line.run.includes(exe) });
+      }
+      // ② 仍在运行：从 max(StartTime, 今日0点, checkpoint) 补到现在
+      if (startMs) {
+        prog = backfillFromStart(prog, startMs, now, dayStart);
+      }
     }
+
     // 初始化退出沿基线：冷启动时"在跑"记 true，后续 tick 观察到不在跑即退出沿
     if (entry.askOnExit) {
       lastRunning.set(entry.todoId, currentlyRunning);
-    }
 
-    // 离线补问：当天快照出现过、当前不在跑、任务仍待办 → 排队询问（仅当天日志）
-    if (entry.askOnExit) {
+      // 离线补问：当天快照出现过、当前不在跑、任务仍待办 → 排队询问（仅当天日志）
       const seenPresentToday = journalLines.some((l) => l.run.includes(exe));
-      const status = findTodoStatus(entry.todoId);
       if (status && shouldReaskOffline({ seenPresentToday, currentlyRunning, status })) {
         enqueueAsk(entry);
       }

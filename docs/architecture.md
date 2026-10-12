@@ -77,7 +77,7 @@ Provider 嵌套（Web 端为例）：`GroupProvider → TodoProvider → SyncPro
 - **主进程**（`src/main/`）：
   - `index.ts`：窗口生命周期、小窗/贴边/缩入状态机（吸附阈值 16px、窄边 4px、悬停弹出 6px、动画 180ms、多显示器 workArea）、IPC
   - `sync-service.ts`：SFTP 同步（ssh2、密钥对生成、原子写 + 回读校验、周期调度）
-  - `monitor-service.ts`：进程监测（30s 轮询 tasklist、达标自动完成、进程退出沿弹窗询问可撤销自动完成、计划任务 `HengSchMonitor` 日志、7 天日志保留、离线补问仅当天）
+  - `monitor-service.ts`：进程监测（30s 轮询 tasklist、达标自动完成、进程退出沿询问小窗可撤销自动完成、撤销后当日进度重置并允许再次询问、启动时检测「待办+已通知」僵死态自愈、计划任务 `HengSchMonitor` 日志、7 天日志保留、离线补问仅当天）
   - `auto-start.ts`：开机自启（exec-paths / LaunchAgents / desktop autostart）
   - `preload.ts`：contextIsolation 下白名单暴露 API
 - **渲染进程**（`src/renderer/`）：Swiss UI 组件 + Context；原生 HTML5 拖拽排序；`WindowControls` 无边框窗口按钮
