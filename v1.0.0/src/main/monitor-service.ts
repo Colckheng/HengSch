@@ -60,6 +60,10 @@ const lastRunning = new Map<string, boolean>();
 /** 当天已询问过的 todoId（防骚扰；key 带日期跨天重置） */
 let askedDay = '';
 const askedToday = new Set<string>();
+/** 当天已答复过的 todoId（持久化到 store：同任务当天不再重复弹，重启也不弹） */
+const ANSWERED_STORE_KEY = 'monitorAsked';
+let answeredDay = '';
+let answeredToday = new Set<string>();
 /** 弹窗串行队列 */
 const askQueue: MonitorEntry[] = [];
 let askBusy = false;
@@ -74,13 +78,26 @@ function pruneAsked(now: number): void {
     askedDay = day;
     askedToday.clear();
   }
+  if (answeredDay !== day) {
+    answeredDay = day;
+    answeredToday.clear();
+    persistAnswered();
+  }
+}
+
+function persistAnswered(): void {
+  try {
+    store.set(ANSWERED_STORE_KEY, { day: answeredDay, ids: [...answeredToday] });
+  } catch {
+    // 落盘失败降级为内存语义（重启后当天会再问一次）
+  }
 }
 
 function enqueueAsk(entry: MonitorEntry): void {
   const now = Date.now();
   pruneAsked(now);
   const key = askKey(entry.todoId, now);
-  if (askedToday.has(key)) return;
+  if (askedToday.has(key) || answeredToday.has(entry.todoId)) return;
   askedToday.add(key); // 入队即标记，防排队期间重复触发
   askQueue.push(entry);
   void drainAskQueue();
@@ -149,14 +166,18 @@ async function runAskDialog(entry: MonitorEntry): Promise<void> {
     answer = result.response === 0 ? 'complete' : 'not-done';
   }
 
+  // 任何答复（含 ESC/关闭小窗）都记入当天并落盘：同任务当天不再重复弹，重启也不弹
+  answeredToday.add(entry.todoId);
+  persistAnswered();
+
   const action = resolveAskAction({ answer, status, autoNotified });
   if (action === 'revert') {
-    // 撤销 = 用户说「没做」：当日进度重置、解除当天只问一次，监测周期从现在重新开始
+    // 撤销 = 用户说「没做」：当日进度重置，监测周期从现在重新开始
+    // （不再解除当天只问一次：答复已持久化，同任务当天不重复弹，跨天自然恢复）
     const resetNow = Date.now();
     progressStore[progressKey(entry.todoId, resetNow)] = createDayProgress(resetNow);
     persistProgress();
     pushProgress(resetNow);
-    askedToday.delete(askKey(entry.todoId, resetNow));
   }
   if (action !== 'none') {
     send('monitor:ask-resolved', { todoId: entry.todoId, action });
@@ -491,6 +512,12 @@ export function initMonitorService(
   send = sendFn;
   progressStore = (store.get(PROGRESS_STORE_KEY, {}) as Record<string, MonitorProgress>) ?? {};
   journalEnabled = store.get(JOURNAL_ENABLED_KEY, false) as boolean;
+  // 载入当天已答复集合（跨天则丢弃旧数据重新开始）
+  const answered = store.get(ANSWERED_STORE_KEY) as { day?: string; ids?: string[] } | undefined;
+  answeredDay = dayKey(Date.now());
+  answeredToday = new Set(
+    answered && answered.day === answeredDay && Array.isArray(answered.ids) ? answered.ids : []
+  );
 
   // journal 开启时确保计划任务存在（/create 幂等，可修复被外部删除的任务）
   if (journalEnabled) {
@@ -508,6 +535,11 @@ export function stopMonitorService(): void {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+}
+
+/** 退出流程：清空排队中的询问，配合 abortAskWindows 保证干净退出 */
+export function cancelAskQueue(): void {
+  askQueue.length = 0;
 }
 
 export function configureMonitor(entries: MonitorEntry[]): void {

@@ -15,6 +15,8 @@ const ASK_HEIGHT = 250;
 
 /** 串行队列保证同时至多一个小窗，此 resolver 对应当前小窗 */
 let pendingResolve: ((answer: AskAnswer) => void) | null = null;
+/** 当前存活的小窗（退出流程强制收尾用） */
+let activeWindow: BrowserWindow | null = null;
 
 ipcMain.handle('ask:answer', (_event, answer: AskAnswer) => {
   if (pendingResolve) {
@@ -36,6 +38,7 @@ export function presentAskWindow(payload: AskPayload): Promise<AskAnswer> {
       if (settled) return;
       settled = true;
       pendingResolve = null;
+      activeWindow = null;
       if (!win.isDestroyed()) win.destroy();
       resolve(answer);
     };
@@ -68,6 +71,8 @@ export function presentAskWindow(payload: AskPayload): Promise<AskAnswer> {
       }
     });
 
+    activeWindow = win;
+
     win.once('ready-to-show', () => {
       if (!win.isDestroyed()) {
         win.show();
@@ -87,4 +92,19 @@ export function presentAskWindow(payload: AskPayload): Promise<AskAnswer> {
       if (!win.isDestroyed()) win.webContents.send('ask:present', payload);
     });
   });
+}
+
+/**
+ * 退出流程调用：当前小窗按 cancel 结算并销毁，不再阻塞 window-all-closed。
+ * 与 monitor-service 的 cancelAskQueue 配对使用，保证 app.quit() 干净退出。
+ */
+export function abortAskWindows(): void {
+  if (pendingResolve) {
+    const resolve = pendingResolve;
+    pendingResolve = null;
+    resolve('cancel'); // settle 内部会销毁小窗并按「还没做」语义收尾
+  } else if (activeWindow && !activeWindow.isDestroyed()) {
+    activeWindow.destroy();
+  }
+  activeWindow = null;
 }

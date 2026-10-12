@@ -3,6 +3,7 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import Store from 'electron-store';
 import { setAutoStart, getAutoStart, healAutoStart } from './auto-start';
+import { abortAskWindows } from './ask-window';
 import {
   initMonitorService,
   configureMonitor,
@@ -10,6 +11,8 @@ import {
   getTodayProgress,
   setJournalEnabled,
   getJournalEnabled,
+  stopMonitorService,
+  cancelAskQueue,
   type MonitorEntry
 } from './monitor-service';
 import {
@@ -21,10 +24,22 @@ import {
   getSyncStatus
 } from './sync-service';
 import type { SyncConfig, SyncPayload } from '@hengsch/shared-types';
+import { createTray } from './tray';
 
 const store = new Store();
 let mainWindow: BrowserWindow | null = null;
 let originalBounds: { width: number; height: number; x?: number; y?: number } | null = null;
+/** 退出流程标志：置位后才允许主窗口真正销毁（否则关闭 = 隐藏到托盘） */
+let isQuitting = false;
+
+// 单实例锁：重复双击不再起第二个进程（两个实例会各自轮询弹窗）；第二个启动请求聚焦已有窗口
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    showMainWindow();
+  });
+}
 
 type SnappedEdge = 'left' | 'right' | 'top' | 'bottom' | null;
 
@@ -423,6 +438,15 @@ function createWindow(): void {
     mainWindow = null;
   });
 
+  // 关闭按钮（X / Alt+F4 / 任务栏关闭）= 隐藏到托盘，后台继续监测；
+  // 真正退出（托盘「退出」）在 before-quit 置 isQuitting 后放行销毁
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
   mainWindow.on('resize', () => {
     if (mainWindow) {
       const bounds = mainWindow.getBounds();
@@ -486,6 +510,19 @@ function createWindow(): void {
   });
 }
 
+/** 显示并聚焦主窗口（托盘点击 / 第二实例唤起用） */
+function showMainWindow(): void {
+  if (isQuitting) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    // 启动尚未完成时由 whenReady 自建窗口，这里不提前创建
+    if (app.isReady()) createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 app.whenReady().then(() => {
   // 自启动自愈：清掉旧注册表残留（曾指向 dev electron.exe 导致开机弹空窗），
   // 并按存储意图重写为当前 exe 路径
@@ -499,6 +536,16 @@ app.whenReady().then(() => {
   initMonitorService(store, pushToRenderer);
   initSyncService(store, pushToRenderer);
   createWindow();
+  createTray(showMainWindow);
+});
+
+// 退出流程：置位放行主窗口销毁 + 收尾询问队列/小窗 + 停轮询，保证退出后零残留
+app.on('before-quit', () => {
+  if (isQuitting) return;
+  isQuitting = true;
+  cancelAskQueue();
+  abortAskWindows();
+  stopMonitorService();
 });
 
 app.on('window-all-closed', () => {
