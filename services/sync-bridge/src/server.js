@@ -20,9 +20,13 @@ function loadEnv(dir) {
   const file = path.join(dir, '.env');
   try {
     for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-      if (m && m[2] && !m[2].startsWith('#')) {
-        env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+      if (m && m[2]) {
+        // trim 去掉尾随空白：旧写法 `(.*)\s*$` 会把 "abc " 的尾空格吃进值里 → 401 极难排查
+        const value = m[2].trim();
+        if (value && !value.startsWith('#')) {
+          env[m[1]] = value.replace(/^["']|["']$/g, '');
+        }
       }
     }
   } catch {
@@ -78,7 +82,8 @@ function createBridge({ file, token, maxBody = MAX_BODY }) {
       if (size > maxBody) {
         aborted = true;
         sendJson(res, 413, { error: 'body too large' });
-        req.destroy();
+        // 等响应发完再断开，避免立即 destroy 截断 413 响应体
+        res.on('finish', () => req.destroy());
         return;
       }
       chunks.push(chunk);
@@ -87,6 +92,19 @@ function createBridge({ file, token, maxBody = MAX_BODY }) {
     req.on('end', () => {
       if (aborted) return;
       const body = Buffer.concat(chunks);
+      // 结构校验：任意持 token 的客户端都能 PUT，不校验会让 null/垃圾元素写进文件，
+      // 导致其它端下次合并读属性抛错，且被误分类为 OFFLINE（误导排查方向）
+      let parsed;
+      try {
+        parsed = JSON.parse(body.toString('utf8'));
+      } catch {
+        sendJson(res, 400, { error: 'body must be valid JSON' });
+        return;
+      }
+      if (!parsed || !Array.isArray(parsed.todos) || !Array.isArray(parsed.groups)) {
+        sendJson(res, 400, { error: 'body must be a sync payload ({ todos, groups })' });
+        return;
+      }
       const expected = url.searchParams.get('etag'); // null = 客户端侧无文件
 
       const task = writeChain.then(async () => {
@@ -113,7 +131,14 @@ function createBridge({ file, token, maxBody = MAX_BODY }) {
 
   const server = http.createServer((req, res) => {
     const started = Date.now();
-    const url = new URL(req.url, 'http://bridge');
+    let url;
+    try {
+      url = new URL(req.url, 'http://bridge');
+    } catch {
+      res.writeHead(400, CORS_HEADERS);
+      res.end();
+      return;
+    }
     const finish = (status) => {
       console.log(`${req.method} ${url.pathname} ${status} ${Date.now() - started}ms`);
     };
@@ -186,6 +211,11 @@ if (require.main === module) {
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+  // 兜底：未捕获异常记录后退出（systemd Restart=always 会拉起），避免无声崩溃
+  process.on('uncaughtException', (err) => {
+    console.error('[bridge] uncaughtException:', err);
+    process.exit(1);
+  });
 }
 
 module.exports = { createBridge };

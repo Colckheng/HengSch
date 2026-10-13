@@ -34,12 +34,13 @@ ipcMain.handle('ask:answer', (_event, answer: AskAnswer) => {
 export function presentAskWindow(payload: AskPayload): Promise<AskAnswer> {
   return new Promise((resolve) => {
     let settled = false;
+    let win: BrowserWindow | null = null; // 先声明：settle 可能在 win 赋值前（构造抛错）被调用
     const settle = (answer: AskAnswer): void => {
       if (settled) return;
       settled = true;
       pendingResolve = null;
       activeWindow = null;
-      if (!win.isDestroyed()) win.destroy();
+      if (win && !win.isDestroyed()) win.destroy();
       resolve(answer);
     };
     pendingResolve = settle;
@@ -48,7 +49,7 @@ export function presentAskWindow(payload: AskPayload): Promise<AskAnswer> {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const area = display.workArea;
 
-    const win = new BrowserWindow({
+    win = new BrowserWindow({
       width: ASK_WIDTH,
       height: ASK_HEIGHT,
       x: Math.round(area.x + (area.width - ASK_WIDTH) / 2),

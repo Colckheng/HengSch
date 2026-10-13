@@ -61,6 +61,16 @@ describe('pickWinner / normalizeSynced', () => {
     expect(pickWinner(undefined, a)).toBe(a);
     expect(pickWinner(undefined, undefined)).toBeUndefined();
   });
+
+  it('末级裁决跨端确定：键序不同不会选出不同内容（旧实现会震荡）', () => {
+    // 同两条记录，一端按 a→b 键序序列化、另一端按 b→a；内容相同仅键序不同
+    const P = { id: 'x', createdAt: 1, updatedAt: 5, deviceId: 'd', a: 'z', b: 'a' };
+    const Q = { id: 'x', createdAt: 1, updatedAt: 5, deviceId: 'd', a: 'a', b: 'z' };
+    const Pr = { id: 'x', createdAt: 1, updatedAt: 5, deviceId: 'd', b: 'a', a: 'z' };
+    const Qr = { id: 'x', createdAt: 1, updatedAt: 5, deviceId: 'd', b: 'z', a: 'a' };
+    expect(pickWinner(P, Q)).toEqual(pickWinner(Pr, Qr));
+    expect(pickWinner(Q, P)).toEqual(pickWinner(Qr, Pr));
+  });
 });
 
 describe('mergeSyncStates · LWW 矩阵', () => {
@@ -81,6 +91,15 @@ describe('mergeSyncStates · LWW 矩阵', () => {
   it('单边新增（远端有本地无）→ 进入结果', () => {
     const out = mergeSyncStates(wrap([], []), wrap([todo({ id: 't2' })], []), NOW);
     expect(out.todos.map((t) => t.id)).toEqual(['t2']);
+  });
+
+  it('脏数据防护：非法元素被忽略且不抛错（远端可被任意客户端写入）', () => {
+    const dirtyTodos = [null, undefined, 42, 'x', { nope: 1 }, todo({ id: 't1' })] as unknown as Todo[];
+    const dirtyGroups = [{}, group({ id: 'g1' })] as unknown as Group[];
+    expect(() => mergeSyncStates(wrap([], []), wrap(dirtyTodos, dirtyGroups), NOW)).not.toThrow();
+    const out = mergeSyncStates(wrap([], []), wrap(dirtyTodos, dirtyGroups), NOW);
+    expect(out.todos.map((t) => t.id)).toEqual(['t1']);
+    expect(out.groups.map((g) => g.id)).toEqual(['g1']);
   });
 
   it('删 vs 改：墓碑更新 → 删除胜出', () => {

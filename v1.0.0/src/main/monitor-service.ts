@@ -54,6 +54,11 @@ let progressStore: Record<string, MonitorProgress> = {};
 let journalEnabled = false;
 const bootstrappedIds = new Set<string>();
 let pollTimer: NodeJS.Timeout | null = null;
+/** tick/bootstrap 串行锁：两者都改 progressStore，防并发丢更新 */
+let cycleBusy = false;
+const waitUntilIdle = async (): Promise<void> => {
+  while (cycleBusy) await new Promise((r) => setTimeout(r, 50));
+};
 
 /** 每个任务上次观测是否在跑（退出沿检测用） */
 const lastRunning = new Map<string, boolean>();
@@ -414,93 +419,106 @@ function checkThreshold(entry: MonitorEntry, prog: MonitorProgress): MonitorProg
 
 /** 首次 configure：③ journal 冷启动补空档 + ② 仍在运行进程回溯 + 离线退出补问 */
 async function bootstrap(entries: MonitorEntry[]): Promise<void> {
-  const now = Date.now();
-  const dayStart = dayStartMs(now);
-  pruneJournal(now);
+  await waitUntilIdle(); // 不与进行中的 tick 并发改 progressStore
+  cycleBusy = true;
+  try {
+    const now = Date.now();
+    const dayStart = dayStartMs(now);
+    pruneJournal(now);
 
-  const journalLines = readJournalLines().filter((l) => l.t >= dayStart && l.t <= now);
-  const starts = await getProcessStartTimes();
+    const journalLines = readJournalLines().filter((l) => l.t >= dayStart && l.t <= now);
+    const starts = await getProcessStartTimes();
 
-  let changed = false;
-  for (const entry of entries) {
-    const key = progressKey(entry.todoId, now);
-    const exe = exeLower(entry.exeName);
-    const status = findTodoStatus(entry.todoId);
-    // Windows 进程名不带扩展名，查询键去掉 .exe
-    const startMs = starts.get(exe.replace(/\.exe$/, ''));
-    const currentlyRunning = Boolean(startMs);
+    let changed = false;
+    for (const entry of entries) {
+      const key = progressKey(entry.todoId, now);
+      const exe = exeLower(entry.exeName);
+      const status = findTodoStatus(entry.todoId);
+      // Windows 进程名不带扩展名，查询键去掉 .exe
+      const startMs = starts.get(exe.replace(/\.exe$/, ''));
+      const currentlyRunning = Boolean(startMs);
 
-    let prog = progressStore[key] ?? createDayProgress(dayStart);
-    if (isProgressStale(prog, status)) {
-      // 僵死态（待办 + 当日已 notified）：答「还没做」撤销或手动取消完成产生，监测已停摆。
-      // 重置当日进度、从现在开始记账；跳过 journal 喂入与回溯，避免一启动又立刻达标
-      prog = createDayProgress(now);
-    } else {
-      // ③ 逐行喂事件（行间隔 2min，creditPresence 天然按行补记）
-      for (const line of journalLines) {
-        prog = creditPresence(prog, { t: line.t, present: line.run.includes(exe) });
+      let prog = progressStore[key] ?? createDayProgress(dayStart);
+      if (isProgressStale(prog, status)) {
+        // 僵死态（待办 + 当日已 notified）：答「还没做」撤销或手动取消完成产生，监测已停摆。
+        // 重置当日进度、从现在开始记账；跳过 journal 喂入与回溯，避免一启动又立刻达标
+        prog = createDayProgress(now);
+      } else {
+        // ③ 逐行喂事件（行间隔 2min，creditPresence 天然按行补记）
+        for (const line of journalLines) {
+          prog = creditPresence(prog, { t: line.t, present: line.run.includes(exe) });
+        }
+        // ② 仍在运行：从 max(StartTime, 今日0点, checkpoint) 补到现在
+        if (startMs) {
+          prog = backfillFromStart(prog, startMs, now, dayStart);
+        }
       }
-      // ② 仍在运行：从 max(StartTime, 今日0点, checkpoint) 补到现在
-      if (startMs) {
-        prog = backfillFromStart(prog, startMs, now, dayStart);
+
+      // 初始化退出沿基线：冷启动时"在跑"记 true，后续 tick 观察到不在跑即退出沿
+      if (entry.askOnExit) {
+        lastRunning.set(entry.todoId, currentlyRunning);
+
+        // 离线补问：当天快照出现过、当前不在跑、任务仍待办 → 排队询问（仅当天日志）
+        const seenPresentToday = journalLines.some((l) => l.run.includes(exe));
+        if (status && shouldReaskOffline({ seenPresentToday, currentlyRunning, status })) {
+          enqueueAsk(entry);
+        }
       }
-    }
 
-    // 初始化退出沿基线：冷启动时"在跑"记 true，后续 tick 观察到不在跑即退出沿
-    if (entry.askOnExit) {
-      lastRunning.set(entry.todoId, currentlyRunning);
-
-      // 离线补问：当天快照出现过、当前不在跑、任务仍待办 → 排队询问（仅当天日志）
-      const seenPresentToday = journalLines.some((l) => l.run.includes(exe));
-      if (status && shouldReaskOffline({ seenPresentToday, currentlyRunning, status })) {
-        enqueueAsk(entry);
-      }
-    }
-
-    prog = checkThreshold(entry, prog);
-    progressStore[key] = prog;
-    changed = true;
-  }
-
-  if (changed) {
-    persistProgress();
-    pushProgress(now);
-  }
-}
-
-async function tick(): Promise<void> {
-  if (registry.length === 0) return;
-  const now = Date.now();
-  const running = await listProcessNames();
-  if (!running) return; // 拿不到进程列表：不推进 checkpoint，下个周期重试
-
-  let changed = false;
-  for (const entry of registry) {
-    const key = progressKey(entry.todoId, now);
-    const before = progressStore[key];
-    let prog = before ?? createDayProgress(dayStartMs(now));
-    const present = running.has(exeLower(entry.exeName));
-    prog = creditPresence(prog, { t: now, present });
-    prog = checkThreshold(entry, prog);
-    if (!before || before.ms !== prog.ms || before.checkpointAt !== prog.checkpointAt || before.notified !== prog.notified) {
+      prog = checkThreshold(entry, prog);
       progressStore[key] = prog;
       changed = true;
     }
 
-    // 退出沿：上次在跑、这次不在 → 排队询问（防骚扰由 enqueueAsk 的当天 Set 保证）
-    if (entry.askOnExit) {
-      const prev = lastRunning.get(entry.todoId);
-      if (detectExitEdge(prev, present)) {
-        enqueueAsk(entry);
-      }
-      lastRunning.set(entry.todoId, present);
+    if (changed) {
+      persistProgress();
+      pushProgress(now);
     }
+  } finally {
+    cycleBusy = false;
   }
+}
 
-  if (changed) {
-    progressStore = pruneProgressEntries(progressStore, now, 7);
-    persistProgress();
-    pushProgress(now);
+async function tick(): Promise<void> {
+  if (cycleBusy) return; // 上一轮 tick/bootstrap 未结束 → 跳过本轮，防并发改 progressStore 丢更新
+  if (registry.length === 0) return;
+  cycleBusy = true;
+  try {
+    const now = Date.now();
+    pruneJournal(now); // 定期裁剪 journal（旧实现仅在 bootstrap 裁剪，长期运行会无限增长）
+    const running = await listProcessNames();
+    if (!running) return; // 拿不到进程列表：不推进 checkpoint，下个周期重试
+
+    let changed = false;
+    for (const entry of registry) {
+      const key = progressKey(entry.todoId, now);
+      const before = progressStore[key];
+      let prog = before ?? createDayProgress(dayStartMs(now));
+      const present = running.has(exeLower(entry.exeName));
+      prog = creditPresence(prog, { t: now, present });
+      prog = checkThreshold(entry, prog);
+      if (!before || before.ms !== prog.ms || before.checkpointAt !== prog.checkpointAt || before.notified !== prog.notified) {
+        progressStore[key] = prog;
+        changed = true;
+      }
+
+      // 退出沿：上次在跑、这次不在 → 排队询问（防骚扰由 enqueueAsk 的当天 Set 保证）
+      if (entry.askOnExit) {
+        const prev = lastRunning.get(entry.todoId);
+        if (detectExitEdge(prev, present)) {
+          enqueueAsk(entry);
+        }
+        lastRunning.set(entry.todoId, present);
+      }
+    }
+
+    if (changed) {
+      progressStore = pruneProgressEntries(progressStore, now, 7);
+      persistProgress();
+      pushProgress(now);
+    }
+  } finally {
+    cycleBusy = false;
   }
 }
 

@@ -1,5 +1,6 @@
 import { Client, utils } from 'ssh2';
 import type { ConnectConfig, SFTPWrapper } from 'ssh2';
+import { safeStorage } from 'electron';
 import { mergeSyncStates, parseSyncFile, normalizeSynced } from '@hengsch/shared-logic';
 import type { SyncConfig, SyncStatus, SyncPayload } from '@hengsch/shared-types';
 import type Store from 'electron-store';
@@ -61,15 +62,48 @@ function writerId(): string {
   return (store.get('deviceId') as string | undefined) ?? 'unknown';
 }
 
-export function ensureKeyPair(): { publicKey: string } {
-  let publicKey = store.get('syncPublicKey') as string | undefined;
-  if (!publicKey) {
-    const kp = utils.generateKeyPairSync('ed25519');
-    store.set('syncPrivateKey', kp.private);
-    store.set('syncPublicKey', kp.public);
-    publicKey = kp.public;
+const PRIV_ENC_KEY = 'syncPrivateKeyEnc';   // safeStorage 加密后的私钥
+const PRIV_LEGACY_KEY = 'syncPrivateKey';   // 旧版明文键（迁移后删除）
+
+/** 写入私钥：系统支持则用 safeStorage 加密（Windows 走 DPAPI），否则降级 base64 明文 */
+function writePrivateKey(pem: string): void {
+  if (safeStorage.isEncryptionAvailable()) {
+    store.set(PRIV_ENC_KEY, `enc:${safeStorage.encryptString(pem).toString('base64')}`);
+  } else {
+    store.set(PRIV_ENC_KEY, `plain:${Buffer.from(pem, 'utf8').toString('base64')}`);
   }
-  return { publicKey };
+}
+
+/** 读取私钥：优先加密存储；发现旧明文键则迁移并删除；损坏/缺失返回空串 */
+function readPrivateKey(): string {
+  const raw = store.get(PRIV_ENC_KEY) as string | undefined;
+  if (typeof raw === 'string' && raw.startsWith('enc:')) {
+    try {
+      return safeStorage.decryptString(Buffer.from(raw.slice(4), 'base64'));
+    } catch {
+      return '';
+    }
+  }
+  if (typeof raw === 'string' && raw.startsWith('plain:')) {
+    return Buffer.from(raw.slice(6), 'base64').toString('utf8');
+  }
+  // 迁移：旧版明文私钥 → 加密存储后删除明文键
+  const legacy = store.get(PRIV_LEGACY_KEY) as string | undefined;
+  if (typeof legacy === 'string' && legacy) {
+    writePrivateKey(legacy);
+    store.delete(PRIV_LEGACY_KEY);
+    return legacy;
+  }
+  return '';
+}
+
+export function ensureKeyPair(): { publicKey: string } {
+  const existingPublic = store.get('syncPublicKey') as string | undefined;
+  if (existingPublic && readPrivateKey()) return { publicKey: existingPublic };
+  const kp = utils.generateKeyPairSync('ed25519');
+  writePrivateKey(kp.private);
+  store.set('syncPublicKey', kp.public);
+  return { publicKey: kp.public };
 }
 
 function classifyError(error: unknown): SyncStatus['state'] {
@@ -106,7 +140,7 @@ function connectClient(cfg: SyncConfig): Promise<Client> {
       host: cfg.host,
       port: cfg.port || 22,
       username: cfg.username,
-      privateKey: (store.get('syncPrivateKey') as string | undefined) ?? '',
+      privateKey: readPrivateKey(),
       readyTimeout: READY_TIMEOUT_MS,
       keepaliveInterval: 15_000
     };

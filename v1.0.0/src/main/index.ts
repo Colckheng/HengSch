@@ -22,7 +22,8 @@ import {
   testConnection,
   configureSync,
   getSyncConfig,
-  getSyncStatus
+  getSyncStatus,
+  stopSyncService
 } from './sync-service';
 import type { SyncConfig, SyncPayload } from '@hengsch/shared-types';
 import { createTray } from './tray';
@@ -35,7 +36,8 @@ let isQuitting = false;
 
 // 单实例锁：重复双击不再起第二个进程（两个实例会各自轮询弹窗）；第二个启动请求聚焦已有窗口
 if (!app.requestSingleInstanceLock()) {
-  app.quit();
+  // 用 exit 而非 quit：quit 异步，之后模块顶层仍会继续执行并注册 whenReady（第二实例可能仍建窗/起轮询）
+  app.exit(0);
 } else {
   app.on('second-instance', () => {
     showMainWindow();
@@ -420,7 +422,7 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true // 沙箱渲染进程；preload 仅用 contextBridge/ipcRenderer，兼容沙箱
     },
     frame: false,
     transparent: false,
@@ -436,6 +438,13 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
   }
+
+  // 安全：禁止渲染层开新窗口；拦截外部导航（防止在带 preload 的窗口里加载任意站点）
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = app.isPackaged ? url.startsWith('file://') : url.startsWith('http://localhost:5175');
+    if (!allowed) event.preventDefault();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -546,6 +555,14 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   if (isQuitting) return;
   isQuitting = true;
+  stopSyncService(); // 停止 SFTP 同步轮询，避免写入中途被强杀在远端留 .tmp
+  clearHoverPoll();
+  clearIdleTimer();
+  clearAnimTimer();
+  if (moveEndDebounceTimer) {
+    clearTimeout(moveEndDebounceTimer);
+    moveEndDebounceTimer = null;
+  }
   cancelAskQueue();
   abortAskWindows();
   stopMonitorService();
@@ -618,16 +635,31 @@ ipcMain.handle('window:getBounds', () => {
   return null;
 });
 
+// 渲染层只允许访问这些键（白名单 + fail-closed）。
+// 凭据/密钥类键（syncPrivateKey / syncPrivateKeyEnc）一律不进白名单，
+// 避免渲染进程经 store:get 直接取走 SSH 私钥。
+const RENDERER_STORE_KEYS = new Set<string>([
+  'todos',
+  'groups',
+  'compactMode',
+  'syncOrderMigrated'
+]);
+
 ipcMain.handle('store:get', (_, key: string) => {
+  if (typeof key !== 'string' || !RENDERER_STORE_KEYS.has(key)) return undefined;
   return store.get(key);
 });
 
 ipcMain.handle('store:set', (_, key: string, value: unknown) => {
+  if (typeof key !== 'string' || !RENDERER_STORE_KEYS.has(key)) return undefined;
   store.set(key, value);
+  return undefined;
 });
 
 ipcMain.handle('store:delete', (_, key: string) => {
+  if (typeof key !== 'string' || !RENDERER_STORE_KEYS.has(key)) return undefined;
   store.delete(key);
+  return undefined;
 });
 
 ipcMain.handle('sync:deviceInfo', () => {

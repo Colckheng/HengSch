@@ -4,11 +4,16 @@
   "version": "0.0.1",
   "main": "index.js",
   "scripts": {
+    "prestart": "node scripts/sync-shared.js",
     "start": "expo start --offline",
+    "preandroid": "node scripts/sync-shared.js",
     "android": "expo run:android",
+    "preios": "node scripts/sync-shared.js",
     "ios": "expo run:ios",
+    "preweb": "node scripts/sync-shared.js",
     "web": "expo start --web",
-    "sync-shared": "node scripts/sync-shared.js"
+    "sync-shared": "node scripts/sync-shared.js",
+    "check:shared": "node scripts/check-shared-sync.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",

@@ -15,11 +15,19 @@ export interface SyncedMeta {
 }
 
 /**
- * 进程监测配置（仅循环任务）
+ * 进程监测配置（所有任务类型均可绑定）
+ * - auto:     累计运行达阈值自动完成（旧行为，默认 true）
+ * - askOnExit: 进程退出沿弹窗询问是否完成（新行为，默认 false）
+ * 两者可单选可都选；都选时询问结果优先（可撤销自动完成）
  */
 export interface MonitorConfig {
   exeName: string;
+  /** 仅 auto 模式参与判定；ask-only 可缺省语义（UI 不显示） */
   thresholdMinutes: number;
+  /** 缺省视为 true（旧数据兼容） */
+  auto?: boolean;
+  /** 缺省视为 false */
+  askOnExit?: boolean;
 }
 
 /** 云同步连接配置（私钥单独存 electron-store，不入此结构） */
@@ -64,6 +72,8 @@ export interface TodoItem extends SyncedMeta {
   completedAt?: number;
   order: number;
   groupId?: string;
+  /** 进程监测：once/recurring 均可绑定 */
+  monitor?: MonitorConfig;
 }
 
 export interface RecurringTodo extends TodoItem {
@@ -71,7 +81,6 @@ export interface RecurringTodo extends TodoItem {
   cycleType: CycleType;
   customCycleDays?: number;
   nextDueDate?: number;
-  monitor?: MonitorConfig;
 }
 
 export type Todo = TodoItem | RecurringTodo;

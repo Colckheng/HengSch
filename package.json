@@ -12,7 +12,9 @@
     "build": "npm run build:web",
     "build:packages": "npm run build --workspaces --if-present",
     "build:web": "npm run build --workspace=v1.1.0-web",
-    "test": "npm test --workspaces --if-present",
+    "test": "npm test --workspaces --if-present && npm run test:bridge && npm run check:shared",
+    "test:bridge": "npm test --prefix services/sync-bridge",
+    "check:shared": "npm run check:shared --prefix v1.1.0-an",
     "start:an": "npm run start --prefix v1.1.0-an",
     "sync-shared": "npm run sync-shared --prefix v1.1.0-an"
   },

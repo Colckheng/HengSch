@@ -87,3 +87,57 @@ export function pruneProgressEntries(
   }
   return out;
 }
+
+/* ---------------- 退出沿询问（askOnExit） ---------------- */
+
+/** 退出沿：上次观测在跑、本次不在 → true。首次观测（prev=undefined）不触发 */
+export function detectExitEdge(prevRunning: boolean | undefined, currentlyRunning: boolean): boolean {
+  return prevRunning === true && !currentlyRunning;
+}
+
+export interface AskGateInput {
+  status: 'pending' | 'completed';
+  /** 当日 progress.notified——是否走过自动完成链路（用于区分自动完成与手动完成） */
+  autoNotified: boolean;
+}
+
+/** 弹窗门槛：待办要问；自动完成的要问（允许撤销）；手动完成的不问 */
+export function shouldAskOnExit(input: AskGateInput): boolean {
+  if (input.status === 'completed' && !input.autoNotified) return false;
+  return true;
+}
+
+/**
+ * 询问裁决（方案 A：询问结果优先）：
+ * - 答「完成」+ 待办 → complete；答「完成」+ 已完成 → none（无需动作）
+ * - 答「还没做」+ 自动完成 → revert（撤销回待办）；+ 待办 → none
+ */
+export function resolveAskAction(
+  input: { answer: 'complete' | 'not-done' } & AskGateInput
+): 'complete' | 'revert' | 'none' {
+  if (input.answer === 'complete') {
+    return input.status === 'pending' ? 'complete' : 'none';
+  }
+  return input.status === 'completed' && input.autoNotified ? 'revert' : 'none';
+}
+
+/** 离线补问（仅当天）：当天快照出现过、当前不在跑、任务仍待办 */
+export function shouldReaskOffline(input: {
+  seenPresentToday: boolean;
+  currentlyRunning: boolean;
+  status: 'pending' | 'completed';
+}): boolean {
+  return input.seenPresentToday && !input.currentlyRunning && input.status === 'pending';
+}
+
+/**
+ * 僵死态：任务待办但当日已 notified——答「还没做」撤销自动完成、
+ * 或用户手动撤销完成都会产生此态；此时记账与达标判定都短路，监测停摆。
+ * 调用方应重置当日进度（createDayProgress(now)），让监测周期从现在重新开始。
+ */
+export function isProgressStale(
+  progress: MonitorProgress | undefined,
+  status: 'pending' | 'completed' | null
+): boolean {
+  return status === 'pending' && (progress?.notified ?? false);
+}

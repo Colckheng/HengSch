@@ -71,7 +71,8 @@ test('建档 PUT（etag null）→ 200；中文 roundtrip', async () => {
 
 test('PUT etag 不匹配 → 409 + 当前 etag；文件不被改动', async () => {
   const current = await (await req('GET', '/sync')).json();
-  const res = await req('PUT', '/sync?etag=deadbeef0000', { body: 'tampered' });
+  const body = JSON.stringify({ version: 1, todos: [], groups: [], note: 'tampered' });
+  const res = await req('PUT', '/sync?etag=deadbeef0000', { body });
   assert.strictEqual(res.status, 409);
   assert.strictEqual((await res.json()).etag, current.etag);
   const after = await (await req('GET', '/sync')).json();
@@ -92,15 +93,31 @@ test('PUT etag 匹配 → 200 新 etag', async () => {
 test('并发 PUT 同一 etag → 恰好一个 200 一个 409', async () => {
   const current = await (await req('GET', '/sync')).json();
   const url = `/sync?etag=${current.etag}`;
+  const bodyA = JSON.stringify({ version: 1, todos: [{ id: 'writer-A' }], groups: [] });
+  const bodyB = JSON.stringify({ version: 1, todos: [{ id: 'writer-B' }], groups: [] });
   const [a, b] = await Promise.all([
-    req('PUT', url, { body: 'writer-A' }),
-    req('PUT', url, { body: 'writer-B' })
+    req('PUT', url, { body: bodyA }),
+    req('PUT', url, { body: bodyB })
   ]);
   const statuses = [a.status, b.status].sort();
   assert.deepStrictEqual(statuses, [200, 409]);
   // 胜者内容完整（原子写，无撕裂）
   const state = (await (await req('GET', '/sync')).json()).state;
-  assert.ok(state === 'writer-A' || state === 'writer-B', `got: ${state}`);
+  assert.ok(state === bodyA || state === bodyB, `got: ${state}`);
+});
+
+test('非法 JSON body → 400，且文件不被改动', async () => {
+  const current = await (await req('GET', '/sync')).json();
+  const res = await req('PUT', `/sync?etag=${current.etag}`, { body: 'not-json' });
+  assert.strictEqual(res.status, 400);
+  const after = await (await req('GET', '/sync')).json();
+  assert.strictEqual(after.state, current.state);
+});
+
+test('合法 JSON 但缺 todos/groups → 400', async () => {
+  const current = await (await req('GET', '/sync')).json();
+  const res = await req('PUT', `/sync?etag=${current.etag}`, { body: JSON.stringify({ foo: 1 }) });
+  assert.strictEqual(res.status, 400);
 });
 
 test('超限 body → 413', async () => {

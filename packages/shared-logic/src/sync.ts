@@ -22,8 +22,22 @@ export function normalizeSynced<T extends Identified>(record: T): T {
 }
 
 /**
- * 单条记录 LWW：updatedAt 大者胜；相等比 deviceId 字典序；再相等比内容。
- * 对输入顺序对称（merge(A,B) 与 merge(B,A) 结果一致）。
+ * 键序无关的稳定序列化：递归排序对象键，保证跨端对同一条记录产出相同字符串。
+ * 用于 pickWinner 末级裁决——直接 JSON.stringify 会受键插入顺序影响（桌面端
+ * normalizeSynced 把 updatedAt/deviceId 追加到末尾，远端记录保持文件顺序），
+ * 导致 updatedAt/deviceId 均相等时两端选出不同赢家 → 写-读-写震荡。
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(',')}}`;
+}
+
+/**
+ * 单条记录 LWW：updatedAt 大者胜；相等比 deviceId 字典序；再相等比内容（稳定键序）。
+ * 对输入顺序对称（merge(A,B) 与 merge(B,A) 结果一致），且跨端确定。
  */
 export function pickWinner<T extends Identified>(a: T | undefined, b: T | undefined): T | undefined {
   if (!a) return b;
@@ -34,7 +48,15 @@ export function pickWinner<T extends Identified>(a: T | undefined, b: T | undefi
   const ad = a.deviceId ?? '';
   const bd = b.deviceId ?? '';
   if (ad !== bd) return ad > bd ? a : b;
-  return JSON.stringify(a) >= JSON.stringify(b) ? a : b;
+  return stableStringify(a) >= stableStringify(b) ? a : b;
+}
+
+/** 过滤非对象 / 无有效 id 的脏元素——远端文件可被任意客户端写入，不设防会在归一化时读属性抛错 */
+function sanitize<T extends Identified>(list: T[]): T[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (r): r is T => !!r && typeof r === 'object' && typeof (r as Identified).id === 'string'
+  );
 }
 
 function mergeCollection<T extends Identified>(locals: T[], remotes: T[], now: number): T[] {
@@ -81,13 +103,13 @@ export function mergeSyncStates(
   now: number
 ): { todos: Todo[]; groups: Group[] } {
   const groups = mergeCollection(
-    local.groups.map(normalizeSynced),
-    remote.groups.map(normalizeSynced),
+    sanitize(local.groups).map(normalizeSynced),
+    sanitize(remote.groups).map(normalizeSynced),
     now
   );
   const todos = mergeCollection(
-    local.todos.map(normalizeSynced),
-    remote.todos.map(normalizeSynced),
+    sanitize(local.todos).map(normalizeSynced),
+    sanitize(remote.todos).map(normalizeSynced),
     now
   );
 

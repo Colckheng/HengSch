@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import * as path from 'path';
-import { exec, execSync } from 'child_process';
+import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 const WIN_RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 // 旧实现用 reg add 直写此值名：路径未加引号，且开发模式下会指向 node_modules 里的
@@ -78,6 +79,7 @@ function setAutoStartMac(enable: boolean): void {
   );
 
   if (enable) {
+    // 注意：尾部必须有闭合 </plist>，否则 plist 无效、LaunchAgent 静默不生效
     const plistContent = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -90,19 +92,21 @@ function setAutoStartMac(enable: boolean): void {
   </array>
   <key>RunAtLoad</key>
   <true/>
-</dict>`;
+</dict>
+</plist>`;
 
-    exec(`echo '${plistContent}' > "${launchAgentPath}"`, (error) => {
-      if (error) {
-        console.error('Failed to set auto-start on macOS:', error);
-      }
-    });
+    try {
+      fs.mkdirSync(path.dirname(launchAgentPath), { recursive: true });
+      fs.writeFileSync(launchAgentPath, plistContent, 'utf8');
+    } catch (error) {
+      console.error('Failed to set auto-start on macOS:', error);
+    }
   } else {
-    exec(`rm "${launchAgentPath}"`, (error) => {
-      if (error) {
-        console.error('Failed to remove auto-start on macOS:', error);
-      }
-    });
+    try {
+      fs.rmSync(launchAgentPath, { force: true });
+    } catch (error) {
+      console.error('Failed to remove auto-start on macOS:', error);
+    }
   }
 }
 
@@ -114,12 +118,7 @@ function getAutoStartMac(): boolean {
     'LaunchAgents',
     `${appName}.plist`
   );
-  try {
-    execSync(`test -f "${launchAgentPath}"`, { encoding: 'utf8' });
-    return true;
-  } catch {
-    return false;
-  }
+  return fs.existsSync(launchAgentPath);
 }
 
 function setAutoStartLinux(enable: boolean): void {
@@ -138,17 +137,18 @@ X-GNOME-Autostart-enabled=true`;
   );
 
   if (enable) {
-    exec(`mkdir -p "${path.dirname(autostartPath)}" && echo '${desktopEntry}' > "${autostartPath}"`, (error) => {
-      if (error) {
-        console.error('Failed to set auto-start on Linux:', error);
-      }
-    });
+    try {
+      fs.mkdirSync(path.dirname(autostartPath), { recursive: true });
+      fs.writeFileSync(autostartPath, desktopEntry, 'utf8');
+    } catch (error) {
+      console.error('Failed to set auto-start on Linux:', error);
+    }
   } else {
-    exec(`rm "${autostartPath}"`, (error) => {
-      if (error) {
-        console.error('Failed to remove auto-start on Linux:', error);
-      }
-    });
+    try {
+      fs.rmSync(autostartPath, { force: true });
+    } catch (error) {
+      console.error('Failed to remove auto-start on Linux:', error);
+    }
   }
 }
 
@@ -159,10 +159,5 @@ function getAutoStartLinux(): boolean {
     'autostart',
     'hengsch-todo.desktop'
   );
-  try {
-    execSync(`test -f "${autostartPath}"`, { encoding: 'utf8' });
-    return true;
-  } catch {
-    return false;
-  }
+  return fs.existsSync(autostartPath);
 }

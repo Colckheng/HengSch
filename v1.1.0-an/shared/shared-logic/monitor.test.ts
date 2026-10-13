@@ -8,7 +8,12 @@ import {
   createDayProgress,
   dayKey,
   dayStartMs,
-  pruneProgressEntries
+  pruneProgressEntries,
+  detectExitEdge,
+  shouldAskOnExit,
+  resolveAskAction,
+  shouldReaskOffline,
+  isProgressStale
 } from './monitor';
 
 const p = (ms: number, checkpointAt: number, notified = false): MonitorProgress => ({
@@ -171,5 +176,96 @@ describe('dayKey / dayStartMs / prune', () => {
     };
     const out = pruneProgressEntries(entries, now, 7);
     expect(Object.keys(out).sort()).toEqual(['a:2026-10-03', 'a:2026-10-09', 'b:2026-10-02']);
+  });
+});
+
+describe('detectExitEdge', () => {
+  it('上次在跑、本次不在 → 退出沿', () => {
+    expect(detectExitEdge(true, false)).toBe(true);
+  });
+
+  it('持续在跑 / 持续不在 / 首次观测，均不触发', () => {
+    expect(detectExitEdge(true, true)).toBe(false);
+    expect(detectExitEdge(false, false)).toBe(false);
+    expect(detectExitEdge(false, true)).toBe(false);
+    expect(detectExitEdge(undefined, false)).toBe(false);
+    expect(detectExitEdge(undefined, true)).toBe(false);
+  });
+});
+
+describe('shouldAskOnExit（弹窗门槛）', () => {
+  it('待办 → 问', () => {
+    expect(shouldAskOnExit({ status: 'pending', autoNotified: false })).toBe(true);
+    expect(shouldAskOnExit({ status: 'pending', autoNotified: true })).toBe(true);
+  });
+
+  it('自动完成（notified）→ 问（允许撤销）', () => {
+    expect(shouldAskOnExit({ status: 'completed', autoNotified: true })).toBe(true);
+  });
+
+  it('手动完成（非 notified）→ 不问', () => {
+    expect(shouldAskOnExit({ status: 'completed', autoNotified: false })).toBe(false);
+  });
+});
+
+describe('resolveAskAction（方案 A：询问结果优先）', () => {
+  it('待办 + 答「完成」→ complete', () => {
+    expect(resolveAskAction({ answer: 'complete', status: 'pending', autoNotified: false })).toBe('complete');
+  });
+
+  it('自动完成 + 答「还没做」→ revert（撤销回待办）', () => {
+    expect(resolveAskAction({ answer: 'not-done', status: 'completed', autoNotified: true })).toBe('revert');
+  });
+
+  it('自动完成 + 答「完成」→ none（保持完成）', () => {
+    expect(resolveAskAction({ answer: 'complete', status: 'completed', autoNotified: true })).toBe('none');
+  });
+
+  it('待办 + 答「还没做」→ none（保持待办）', () => {
+    expect(resolveAskAction({ answer: 'not-done', status: 'pending', autoNotified: false })).toBe('none');
+  });
+
+  it('手动完成 + 答「还没做」→ none（尊重手动操作，不撤销）', () => {
+    expect(resolveAskAction({ answer: 'not-done', status: 'completed', autoNotified: false })).toBe('none');
+  });
+});
+
+describe('shouldReaskOffline（离线补问，仅当天）', () => {
+  it('当天玩过 + 当前不在 + 待办 → 补问', () => {
+    expect(shouldReaskOffline({ seenPresentToday: true, currentlyRunning: false, status: 'pending' })).toBe(true);
+  });
+
+  it('当前还在跑 → 不补问', () => {
+    expect(shouldReaskOffline({ seenPresentToday: true, currentlyRunning: true, status: 'pending' })).toBe(false);
+  });
+
+  it('已完成 → 不补问', () => {
+    expect(shouldReaskOffline({ seenPresentToday: true, currentlyRunning: false, status: 'completed' })).toBe(false);
+  });
+
+  it('当天没玩过 → 不补问', () => {
+    expect(shouldReaskOffline({ seenPresentToday: false, currentlyRunning: false, status: 'pending' })).toBe(false);
+  });
+});
+
+describe('isProgressStale（撤销/手动取消完成后的僵死态检测）', () => {
+  it('待办 + 当日已通知 → 僵死态', () => {
+    expect(isProgressStale(p(600_000, 1000, true), 'pending')).toBe(true);
+  });
+
+  it('已完成 + 当日已通知 → 正常态（自动完成的正常终态，不重置）', () => {
+    expect(isProgressStale(p(600_000, 1000, true), 'completed')).toBe(false);
+  });
+
+  it('待办 + 未通知 → 正常态（监测本来就在跑）', () => {
+    expect(isProgressStale(p(30_000, 1000, false), 'pending')).toBe(false);
+  });
+
+  it('无进度记录 → 正常态', () => {
+    expect(isProgressStale(undefined, 'pending')).toBe(false);
+  });
+
+  it('任务不存在（null）→ 正常态', () => {
+    expect(isProgressStale(p(600_000, 1000, true), null)).toBe(false);
   });
 });
