@@ -85,6 +85,28 @@
 - [ ] 门禁五件套：`npx tsc --noEmit` / `npm run lint`（0 警告）/ `npm run build` / 根 `npm test` / `npm run reminder:integration`
 - [ ] 打包 `npx electron-builder --win nsis` 产物内含 whisper exe、不含模型与 key
 
+## 阶段 G：串行确认对话流与循环提醒时刻选择（设计 §13）
+
+**目标**：卡片内联对话流、确认后零等待推进下一条、取消走「改要求/跳过」、设置两档详细程度、循环提醒所有入口只选时刻且推进保时刻。
+
+**文件**
+- `src/main/ai-tools.ts`：`stageProposalBatch`（逐条校验、原子入队、summary 随提案）；队列轮到显示时续 TTL（`refreshProposalExpiry`）；单条 commit/reject 语义不变
+- `src/main/ai-service.ts`：新模型工具 `stage_batch`（entries≤10，三变体，schema 强制）；系统提示改写（N>1 总览轮必须一次入队；promptLevel 档1/档2 分别约束；档2 缺字段先集中问）
+- `src/main/index.ts` + `preload.ts` + `electron.d.ts`：`ai:queue:list`；`ai:settings:get/set` 支持 `promptLevel`
+- `packages/shared-logic/src/todo-utils.ts` / `reminder.ts`：`calculateNextDueDate` 锚定上一轮 `nextDueDate` 保时刻；toggle/advance 调用点传锚
+- `src/renderer/components/AiDrawer.tsx`：条目流状态机（文本/卡片/系统行）、队列推进（确认→就地终态→放出下一条）、取消问句行 `[改要求][跳过]`、挂载时 `ai:queue:list` 重建
+- `src/renderer/components/ReminderSection.tsx` / `SwissTimePicker`：循环模式=时刻+提前量（`type` 判定），一次性保持原交互；Add/Edit/AI 卡三入口传参
+- `src/renderer/components/AISettingsModal.tsx`：详细程度 SwissSelect（1/2）
+- 单测：`ai-tools` 批量原子性/续 TTL、`todo-utils` 保时刻推进（日/周/月/自定义/月尾）、promptLevel 进 prompt（纯函数化可测）
+
+**验收**
+- 多条描述 → N>1 总览 → 逐条确认就地 ✓已创建 → 自动放出下一条 → 结尾 `完成 N · 跳过 M` 系统行；单条无总览
+- 取消 → 问句行 → 跳过继续 / 改要求打字 → AI 原位替换该条
+- 档2 缺字段先集中问、答完出卡；档1 不反问
+- 循环提醒三入口只选时刻；完成一轮后提醒仍是原 HH:MM（单测+手测）
+- 关抽屉再开队列续走；重启后队列重建
+- 门禁五件套 + 新增单测 + CDP 手工清单（设计 §13.4）
+
 ## 参数表（实现时以代码为准回填）
 
 | 项 | 值 | 出处 |
@@ -96,6 +118,10 @@
 | 监测判定超时 | 8 s | `monitor-service.ts` |
 | 录音上限 | 60 s | `AiDrawer.tsx` |
 | 历史截断 | 20 条 / 30k 字符 | `ai-service.ts` |
+| 批量入队上限 | 10 条/轮，整批原子 | `ai-tools.ts` |
+| 队列 TTL | 单条 10 min，轮到显示时续期 | `ai-tools.ts` |
+| promptLevel | 1（默认）/ 2 | `ai-settings` |
+| 提醒推进锚 | 上一轮 `nextDueDate`（保时刻） | `shared-logic/todo-utils.ts` |
 | 待办上下文 | 100 条（超丢最旧已完成） | `ai-service.ts` |
 | 进程上下文 | 展示名前 60 | `ai-service.ts` |
 | 语音模型 | `ggml-small-q5_0` ≈187MB（URL+sha256 固化） | `voice-service.ts` |
@@ -103,7 +129,9 @@
 
 ## 已知风险
 
-1. `deepseek-chat` 流式工具调用的分片行为需实测（回退：工具轮非流式、纯文本轮流式）
+1. `deepseek-flash` 流式工具调用的分片行为需实测（回退：工具轮非流式、纯文本轮流式）
 2. 模型下载依赖 hf-mirror 可用性（失败给手动下载说明路径）
 3. 监测判定的“AI 理由”写进 ask-window 文案需控制长度（限 120 字）
 4. 本地 whisper 对中英夹杂口音的准确率属主观验收项，不达标再考虑换 medium 量化（约 500MB，设置里可切）
+5. 模型不遵从 `stage_batch`、退回一次一条 → 退化路径=现有单条行为，功能不坏只是无总览；prompt 与 schema 双约束，验收时观察
+6. 队列在应用重启后半途 → `ai:queue:list` 重建兜底；全丢只影响未确认卡（未落盘，零脏数据）
