@@ -669,12 +669,412 @@ button {
   padding: 6px;
   display: inline-flex;
   align-items: center;
-  margin-left: auto;
+  margin-left: 0;
   margin-right: 4px;
 }
 
 .foot-reminder:hover {
   color: var(--ink);
+}
+
+/* ---------------- AI 抽屉（底栏开关 · 右侧挤压布局） ---------------- */
+
+.foot-ai {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-2);
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.foot-ai:hover {
+  color: var(--ink);
+}
+
+.foot-ai.on {
+  color: var(--signal);
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-container.compact .ai-drawer {
+  display: none;
+}
+
+.ai-drawer {
+  display: none;
+  flex: 0 0 360px;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--paper);
+  border-left: 1px solid var(--hairline);
+}
+
+.ai-drawer.open {
+  display: flex;
+}
+
+@media (max-width: 860px) {
+  .ai-drawer.open {
+    flex-basis: 300px;
+  }
+}
+
+.ai-drawer-head {
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--s1) 0 var(--s2);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ai-drawer-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  user-select: none;
+}
+
+.ai-drawer-close {
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ai-drawer-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ai-drawer-close:hover {
+  color: var(--ink);
+}
+
+.ai-notice,
+.ai-err {
+  flex: 0 0 auto;
+  padding: 9px var(--s2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink-2);
+}
+
+.ai-err {
+  color: var(--signal);
+}
+
+.ai-msgs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.ai-empty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+
+.ai-msg-ai,
+.ai-msg-me {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 92%;
+}
+
+.ai-msg-me {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.ai-msg-role {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--ink-3);
+}
+
+.ai-msg-body {
+  border: 1px solid var(--hairline);
+  background: var(--paper-2);
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-msg-me .ai-msg-body {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.ai-card {
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-card-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ai-card-kind {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 2px 6px;
+}
+
+.ai-card-kind.danger {
+  background: var(--signal);
+}
+
+.ai-card-chip {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  border: 1px solid var(--hairline-strong);
+  padding: 2px 6px;
+}
+
+.ai-card-status {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.ai-card-status.ok {
+  color: var(--ink);
+}
+
+.ai-card-status.bad {
+  color: var(--signal);
+}
+
+.ai-card-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--signal);
+  overflow-wrap: anywhere;
+}
+
+.ai-card-footer {
+  padding: 0;
+  gap: 8px;
+}
+
+.ai-card .button {
+  padding: 9px 16px;
+  font-size: 10.5px;
+}
+
+.ai-card .button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ai-card .button:disabled:hover {
+  background: transparent;
+  color: var(--ink);
+}
+
+.ai-card .button-primary:disabled:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.ai-card-danger {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+.ai-card-danger:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.ai-card-danger:disabled:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+.ai-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+}
+
+.ai-diff-col {
+  background: var(--paper);
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.ai-diff-head {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--ink-3);
+  margin-bottom: 5px;
+}
+
+.ai-diff-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ai-diff-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.ai-delete-target {
+  border: 1px solid var(--hairline);
+  padding: 10px;
+}
+
+.ai-delete-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--signal);
+  overflow-wrap: anywhere;
+}
+
+.ai-delete-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  margin-top: 4px;
+}
+
+.ai-input {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--hairline);
+  padding: var(--s1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-input textarea {
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px;
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ai-input textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.ai-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ai-send,
+.ai-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 7px 14px;
+}
+
+.ai-send {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.ai-send:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+.ai-stop {
+  border: 1px solid var(--signal);
+  background: none;
+  color: var(--signal);
+}
+
+.ai-stop:hover {
+  background: var(--signal);
+  color: #fff;
 }
 
 /* ---------------- sync settings modal ---------------- */

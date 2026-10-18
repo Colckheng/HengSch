@@ -5,7 +5,8 @@ import { GroupProvider, useGroups } from './context/GroupContext';
 import { WindowControls } from './components/WindowControls';
 import { TodoList } from './components/TodoList';
 import { Odometer } from './components/Odometer';
-import { IconGroups, IconBell } from './components/Icons';
+import { IconGroups, IconBell, IconAI } from './components/Icons';
+import { AiDrawer } from './components/AiDrawer';
 import { AddTodoModal } from './components/AddTodoModal';
 import { EditTodoModal } from './components/EditTodoModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
@@ -35,6 +36,7 @@ function AppContent(): JSX.Element {
   const [isGroupManagerOpen, setIsGroupManagerOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
+  const [isAiOpen, setIsAiOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
@@ -215,44 +217,58 @@ function AppContent(): JSX.Element {
           </div>
         </div>
       )}
-      <div className="content">
-        <header className="swiss-head">
-          <Odometer value={pendingCount} />
-          <div className="head-right">
-            <span className="head-label">Tasks Remaining</span>
-            <span className="head-sub">
-              <i className="sq" />
-              {pad(pendingCount)} pending · {pad(completedCount)} done
-            </span>
+      <div className="app-body">
+        <div className="app-main">
+          <div className="content">
+            <header className="swiss-head">
+              <Odometer value={pendingCount} />
+              <div className="head-right">
+                <span className="head-label">Tasks Remaining</span>
+                <span className="head-sub">
+                  <i className="sq" />
+                  {pad(pendingCount)} pending · {pad(completedCount)} done
+                </span>
+              </div>
+            </header>
+            <div className="todo-container">
+              <TodoList onEdit={handleEditTodo} onDetail={handleDetailTodo} />
+            </div>
           </div>
-        </header>
-        <div className="todo-container">
-          <TodoList onEdit={handleEditTodo} onDetail={handleDetailTodo} />
-        </div>
-      </div>
-      {!isCompactMode && (
-        <footer className="page-footer">
-          <span className="foot-count">
-            <b>{pad(pendingCount)}</b> Pending · <b>{pad(completedCount)}</b> Completed ·{' '}
-            <b>{pad(state.todos.length)}</b> Total
-          </span>
-          {syncStatus && (
-            <button
-              className={`foot-sync ${syncStatus.state === 'AUTH ERROR' || syncStatus.state === 'REMOTE ERROR' ? 'error' : ''} ${syncStatus.state === 'SYNCING' ? 'busy' : ''}`}
-              onClick={() => setIsSyncModalOpen(true)}
-              title="同步设置"
-            >
-              {syncLabel(syncStatus)}
-            </button>
+          {!isCompactMode && (
+            <footer className="page-footer">
+              <span className="foot-count">
+                <b>{pad(pendingCount)}</b> Pending · <b>{pad(completedCount)}</b> Completed ·{' '}
+                <b>{pad(state.todos.length)}</b> Total
+              </span>
+              {syncStatus && (
+                <button
+                  className={`foot-sync ${syncStatus.state === 'AUTH ERROR' || syncStatus.state === 'REMOTE ERROR' ? 'error' : ''} ${syncStatus.state === 'SYNCING' ? 'busy' : ''}`}
+                  onClick={() => setIsSyncModalOpen(true)}
+                  title="同步设置"
+                >
+                  {syncLabel(syncStatus)}
+                </button>
+              )}
+              <button
+                className={`foot-ai ${isAiOpen ? 'on' : ''}`}
+                onClick={() => setIsAiOpen((value) => !value)}
+                aria-label="AI 管家"
+                title="AI 管家"
+                aria-pressed={isAiOpen}
+              >
+                <IconAI size={14} />
+              </button>
+              <button className="foot-reminder" onClick={() => setIsReminderSettingsOpen(true)} aria-label="提醒设置" title="提醒设置">
+                <IconBell size={14} />
+              </button>
+              <button className="footer-add" onClick={handleAddTodo}>
+                + Add Task
+              </button>
+            </footer>
           )}
-          <button className="foot-reminder" onClick={() => setIsReminderSettingsOpen(true)} aria-label="提醒设置" title="提醒设置">
-            <IconBell size={14} />
-          </button>
-          <button className="footer-add" onClick={handleAddTodo}>
-            + Add Task
-          </button>
-        </footer>
-      )}
+        </div>
+        <AiDrawer open={isAiOpen} onClose={() => setIsAiOpen(false)} />
+      </div>
       {isCompactMode && (
         <form className="compact-add" onSubmit={handleQuickAdd}>
           <input

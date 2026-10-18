@@ -90,3 +90,53 @@ export interface RecurringTodo extends TodoItem {
 }
 
 export type Todo = TodoItem | RecurringTodo;
+
+/* ---------------- AI 助手抽屉（进程内契约，非同步字段） ---------------- */
+
+export type AiProposalKind = 'create' | 'update' | 'delete';
+
+export interface AiCreateDraft {
+  title: string;
+  description?: string;
+  type: 'once' | 'recurring';
+  cycleType?: CycleType;
+  customCycleDays?: number;
+  groupId?: string;
+  remindAt?: number;
+  remindLeadMs?: number;
+  monitor?: MonitorConfig;
+}
+
+export interface AiUpdateDraft {
+  todoId: string;
+  title?: string;
+  /** 'clear'=移除描述 */
+  description?: string | 'clear';
+  groupId?: string;
+  /** 数字=改到该时刻；'clear'=取消提醒 */
+  remindAt?: number | 'clear';
+  remindLeadMs?: number | 'clear';
+  /** null=移除进程监测 */
+  monitor?: MonitorConfig | null;
+  /** 与主界面勾选同一套语义（循环待办走 shared-logic 的续期规则） */
+  toggleStatus?: boolean;
+}
+
+export interface AiDeleteDraft {
+  todoId: string;
+}
+
+export type AiProposal =
+  | { id: string; kind: 'create'; createdAt: number; draft: AiCreateDraft }
+  | { id: string; kind: 'update'; createdAt: number; before: Todo; draft: AiUpdateDraft }
+  | { id: string; kind: 'delete'; createdAt: number; before: Todo; draft: AiDeleteDraft };
+
+export interface AiChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AiChatResult {
+  proposals: AiProposal[];
+  error?: string;
+}

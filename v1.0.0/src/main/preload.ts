@@ -67,5 +67,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: () => ipcRenderer.invoke('reminder:list'),
     act: (command: { todoId: string; remindAt: number; action: 'complete' | 'snooze' | 'dismiss'; snoozeAt?: number }) =>
       ipcRenderer.invoke('reminder:act', command)
+  },
+  ai: {
+    chat: (messages: unknown) => ipcRenderer.invoke('ai:chat', messages),
+    stop: () => ipcRenderer.invoke('ai:stop'),
+    commit: (id: string, patch?: unknown) => ipcRenderer.invoke('ai:commit', id, patch),
+    reject: (id: string) => ipcRenderer.invoke('ai:reject', id),
+    settingsGet: () => ipcRenderer.invoke('ai:settings:get'),
+    settingsSet: (patch: unknown) => ipcRenderer.invoke('ai:settings:set', patch),
+    settingsTest: (key?: string) => ipcRenderer.invoke('ai:settings:test', key),
+    onChunk: (cb: (payload: { delta: string }) => void) => {
+      const handler = (_: unknown, payload: { delta: string }) => cb(payload);
+      ipcRenderer.on('ai:chunk', handler);
+      return () => ipcRenderer.removeListener('ai:chunk', handler);
+    }
   }
 });

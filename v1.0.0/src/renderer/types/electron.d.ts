@@ -1,4 +1,11 @@
-import type { SyncConfig, SyncStatus, SyncPayload } from '@hengsch/shared-types';
+import type { SyncConfig, SyncStatus, SyncPayload, AiChatMessage, AiChatResult } from '@hengsch/shared-types';
+
+export interface AiMaskedSettings {
+  model: 'deepseek-flash' | 'deepseek-v4-pro';
+  monitorVerdictEnabled: boolean;
+  apiKeySet: boolean;
+  apiKeyMasked: string;
+}
 
 export interface OpenReminderItem {
   todoId: string;
@@ -65,6 +72,16 @@ export interface ElectronAPI {
     preview: () => Promise<boolean>;
     list: () => Promise<OpenReminderItem[]>;
     act: (command: { todoId: string; remindAt: number; action: 'complete' | 'snooze' | 'dismiss'; snoozeAt?: number }) => Promise<{ ok: boolean; error?: string }>;
+  };
+  ai: {
+    chat: (messages: AiChatMessage[]) => Promise<AiChatResult>;
+    stop: () => Promise<void>;
+    commit: (id: string, patch?: unknown) => Promise<boolean>;
+    reject: (id: string) => Promise<boolean>;
+    settingsGet: () => Promise<AiMaskedSettings>;
+    settingsSet: (patch: { apiKey?: string; model?: 'deepseek-flash' | 'deepseek-v4-pro'; monitorVerdictEnabled?: boolean }) => Promise<AiMaskedSettings>;
+    settingsTest: (key?: string) => Promise<{ ok: boolean; message: string }>;
+    onChunk: (cb: (payload: { delta: string }) => void) => () => void;
   };
 }
 

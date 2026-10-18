@@ -27,6 +27,7 @@ import {
   stopSyncService
 } from './sync-service';
 import { initReminderService, stopReminderService, listOpenReminders, runReminderAction } from './reminder-service';
+import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, maskedAiSettings, writeAiSettings, testAiConnection, type AiChatMessage, type AiSettings } from './ai-service';
 import { previewPaper } from './paper-window';
 import { mergeSyncStates } from '@hengsch/shared-logic';
 import type { Todo, Group } from '@hengsch/shared-types';
@@ -34,6 +35,11 @@ import type { SyncConfig, SyncPayload } from '@hengsch/shared-types';
 import { createTray } from './tray';
 
 const store = new Store();
+
+// dev 调试入口：HENG_SCH_DEBUG=1 时开放 CDP（9223），供截图/验收脚本连入；打包版不生效
+if (!app.isPackaged && process.env.HENG_SCH_DEBUG === '1') {
+  app.commandLine.appendSwitch('remote-debugging-port', '9223');
+}
 let mainWindow: BrowserWindow | null = null;
 let originalBounds: { width: number; height: number; x?: number; y?: number } | null = null;
 /** 退出流程标志：置位后才允许主窗口真正销毁（否则关闭 = 隐藏到托盘） */
@@ -553,6 +559,7 @@ app.whenReady().then(() => {
   initMonitorService(store, pushToRenderer);
   initSyncService(store, pushToRenderer);
   initReminderService(store, pushToRenderer);
+  initAiService(store, pushToRenderer);
   createWindow();
   createTray(showMainWindow);
 
@@ -835,4 +842,66 @@ ipcMain.handle('reminder:act', (event, command: { todoId?: string; remindAt?: nu
   if (!command || typeof command.todoId !== 'string' || typeof command.remindAt !== 'number') throw new Error('Invalid command');
   if (command.action !== 'complete' && command.action !== 'snooze' && command.action !== 'dismiss') throw new Error('Invalid command');
   return runReminderAction({ todoId: command.todoId, remindAt: command.remindAt, action: command.action, snoozeAt: command.snoozeAt });
+});
+
+function assertTrustedSender(event: Electron.IpcMainInvokeEvent): void {
+  if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('Unauthorized');
+}
+
+function sanitizeChatMessages(messages: unknown): AiChatMessage[] {
+  if (!Array.isArray(messages)) throw new Error('Invalid messages');
+  const sanitized: AiChatMessage[] = [];
+  for (const message of messages.slice(-40)) {
+    if (!message || typeof message !== 'object') throw new Error('Invalid messages');
+    const candidate = message as { role?: unknown; content?: unknown };
+    if (candidate.role !== 'user' && candidate.role !== 'assistant') throw new Error('Invalid messages');
+    if (typeof candidate.content !== 'string') throw new Error('Invalid messages');
+    sanitized.push({ role: candidate.role, content: candidate.content.slice(0, 8000) });
+  }
+  return sanitized;
+}
+
+ipcMain.handle('ai:chat', async (event, messages: unknown) => {
+  assertTrustedSender(event);
+  const processNames = await listProcessDisplayNames();
+  return runAiChat({ messages: sanitizeChatMessages(messages), processNames });
+});
+
+ipcMain.handle('ai:stop', event => {
+  assertTrustedSender(event);
+  cancelAiChat();
+});
+
+ipcMain.handle('ai:commit', (event, id: unknown, patch: unknown) => {
+  assertTrustedSender(event);
+  if (typeof id !== 'string' || !id) throw new Error('Invalid proposal id');
+  if (patch !== undefined && (typeof patch !== 'object' || patch === null)) throw new Error('Invalid patch');
+  commitProposal(id, patch);
+  return true;
+});
+
+ipcMain.handle('ai:reject', (event, id: unknown) => {
+  assertTrustedSender(event);
+  if (typeof id !== 'string' || !id) throw new Error('Invalid proposal id');
+  return rejectProposal(id);
+});
+
+ipcMain.handle('ai:settings:get', event => {
+  assertTrustedSender(event);
+  return maskedAiSettings(store);
+});
+
+ipcMain.handle('ai:settings:set', (event, patch: unknown) => {
+  assertTrustedSender(event);
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Invalid settings');
+  const candidate = patch as Partial<AiSettings>;
+  if (candidate.apiKey !== undefined && (typeof candidate.apiKey !== 'string' || candidate.apiKey.length > 300)) throw new Error('Invalid settings');
+  writeAiSettings(store, candidate);
+  return maskedAiSettings(store);
+});
+
+ipcMain.handle('ai:settings:test', async (event, key: unknown) => {
+  assertTrustedSender(event);
+  if (key !== undefined && (typeof key !== 'string' || key.length > 300)) throw new Error('Invalid key');
+  return testAiConnection(store, key as string | undefined);
 });
