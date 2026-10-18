@@ -146,4 +146,5 @@
   - Web 移动端适配（≤640 / ≤380px 媒体查询、触屏长按拖拽、iOS 安全区）；
   - 修复 8 项审查 bug：同步「启用」开关、nginx 缓存策略、StrictMode 吞首拍定时器、触屏长按拖拽、详情弹窗编辑 / 删除、触屏禁选、删除 monitor 死 CSS、删除 -webkit-app-region 残留；
   - 仓库文件清理（日志 / tsbuildinfo / docs 旧稿 / vercel·netlify 配置）；
-  - 文档体系补齐：根 README、docs/{architecture,sync,deployment}.md、三端 + 桥 + packages README、本文档状态刷新（本次工作尚未提交）。
+  - 文档体系补齐：根 README、docs/{architecture,sync,deployment}.md、三端 + 桥 + packages README、本文档状态刷新（该批工作于 2026-10-18 随本轮提交入库）。
+- 2026-10-18：桌面端到点纸片提醒上线（新增 remindAt / remindLeadMs / reminderSettings 字段、每秒到点扫描与补弹队列、全屏透明 overlay 纸片手势「完成/稍后/丢纸篓」、提醒设置「当前提醒」面板、npm run reminder:integration 15 项集成检查）；界面文案精简、置顶提级 screen-saver、静止纸片 14px/s 游走（修复边缘死锁与 reduce-motion 短路）；README 与 docs/architecture.md 同步，docs/evidence/paper-reminder-rebuild/ 证据入库，五项门禁全绿。

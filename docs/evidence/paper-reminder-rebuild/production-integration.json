@@ -1,0 +1,22 @@
+{
+  "checks": [
+    "adaptive queue capacity",
+    "opening does not acknowledge reminder",
+    "open reminders persisted before display",
+    "dismiss saved before IPC resolves",
+    "dismiss keeps task pending",
+    "duplicate command idempotent",
+    "resolving frees queue slot",
+    "invalid snooze does not write",
+    "save failure retains reminder",
+    "snooze durable and stamp cleared",
+    "restart restores unresolved paper from previous day",
+    "real detail button saves then closes overlay",
+    "completion persisted",
+    "all overlay windows released",
+    "no renderer errors"
+  ],
+  "errors": [],
+  "store": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\hengsch-reminder-integration-7Wb18V",
+  "scope": "Production service, built renderer and preload; isolated data. Physical click-through and mixed DPI require manual checks."
+}

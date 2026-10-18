@@ -1,0 +1,101 @@
+{
+  "at": "2026-10-15T10:26:08.217Z",
+  "electron": "30.5.1",
+  "chrome": "124.0.6367.243",
+  "checks": [
+    {
+      "name": "isolated runtime, no production bridge",
+      "pass": true
+    },
+    {
+      "name": "paper canvas has rendered pixels",
+      "pass": true
+    },
+    {
+      "name": "Electron input opens details",
+      "pass": true
+    },
+    {
+      "name": "invalid custom date stays open with error",
+      "pass": true
+    },
+    {
+      "name": "snooze records selected time",
+      "pass": true
+    },
+    {
+      "name": "quick drag moves without details or crumpling",
+      "pass": true
+    },
+    {
+      "name": "quick drag changed position",
+      "pass": true
+    },
+    {
+      "name": "native long hold enters crumpling",
+      "pass": true
+    },
+    {
+      "name": "pointer cancellation restores paper without closing",
+      "pass": true
+    },
+    {
+      "name": "native back-and-forth forms ball",
+      "pass": true
+    },
+    {
+      "name": "release outside bin retains ball",
+      "pass": true
+    },
+    {
+      "name": "entering bin highlights without closing",
+      "pass": true
+    },
+    {
+      "name": "drop closes reminder but keeps task pending",
+      "pass": true
+    },
+    {
+      "name": "failed save retains actionable reminder",
+      "pass": true
+    },
+    {
+      "name": "retry after failure succeeds exactly once",
+      "pass": true
+    },
+    {
+      "name": "complete action differs from dismissal",
+      "pass": true
+    },
+    {
+      "name": "keyboard unfolds parked ball",
+      "pass": true
+    },
+    {
+      "name": "reduced motion keeps ball interaction available",
+      "pass": true
+    },
+    {
+      "name": "three samples have independent accessible objects",
+      "pass": true
+    },
+    {
+      "name": "initial paper rectangles never overlap",
+      "pass": true
+    },
+    {
+      "name": "narrow layout has no horizontal document overflow",
+      "pass": true
+    },
+    {
+      "name": "custom time and buttons reachable in narrow detail",
+      "pass": true
+    },
+    {
+      "name": "no renderer console errors",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "scope": "Isolated Electron prototype; no production persistence, OS click-through or mixed-DPI certification."
+}
