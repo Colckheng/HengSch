@@ -74,6 +74,12 @@ export interface TodoItem extends SyncedMeta {
   groupId?: string;
   /** 进程监测：once/recurring 均可绑定 */
   monitor?: MonitorConfig;
+  /** 到点提醒触发时间戳（绝对时间，已扣除提前量）；缺省=无提醒 */
+  remindAt?: number;
+  /** 最近一次提醒弹出时间；弹出时盖章，防止同一次提醒反复触发 */
+  remindedAt?: number;
+  /** 本条选用的提前量（ms，0=到点）；循环待办完成时按它重算下一周期 remindAt */
+  remindLeadMs?: number;
 }
 
 export interface RecurringTodo extends TodoItem {

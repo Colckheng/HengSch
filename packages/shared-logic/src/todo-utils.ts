@@ -1,4 +1,5 @@
 import type { Todo, RecurringTodo, CycleType } from '@hengsch/shared-types';
+import { advanceRecurringRemind } from './reminder';
 
 /**
  * 计算循环任务的下次到期时间
@@ -41,11 +42,11 @@ export function toggleTodoStatus(todo: Todo): Todo {
       recurringTodo.cycleType,
       recurringTodo.customCycleDays
     );
+    // 推进下一周期时同步重算提醒（配置过提醒的才生成新 remindAt）
     return {
-      ...recurringTodo,
-      status: newStatus,
-      completedAt,
-      nextDueDate
+      ...advanceRecurringRemind(recurringTodo, nextDueDate),
+      status: 'pending',
+      completedAt: undefined
     };
   }
 

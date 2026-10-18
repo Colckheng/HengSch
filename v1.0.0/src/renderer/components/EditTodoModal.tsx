@@ -6,6 +6,7 @@ import { IconClose } from './Icons';
 import { GroupSelect } from './GroupSelect';
 import { SwissSelect } from './SwissSelect';
 import { MonitorSection } from './MonitorSection';
+import { ReminderSection, type ReminderValue } from './ReminderSection';
 import { TYPE_OPTIONS, CYCLE_OPTIONS } from './selectOptions';
 
 interface EditTodoModalProps {
@@ -24,6 +25,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
   const [monitor, setMonitor] = useState<MonitorConfig | undefined>(undefined);
+  const [reminder, setReminder] = useState<ReminderValue | undefined>(undefined);
   const [titleError, setTitleError] = useState(false);
 
   useEffect(() => {
@@ -39,6 +41,11 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
         setCustomCycleDays(recurringTodo.customCycleDays?.toString() || '');
       }
       setMonitor(todo.monitor);
+      setReminder(
+        typeof todo.remindAt === 'number'
+          ? { remindAt: todo.remindAt, remindLeadMs: todo.remindLeadMs ?? 0 }
+          : undefined
+      );
     }
   }, [todo]);
 
@@ -50,6 +57,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
     setCustomCycleDays('');
     setSelectedGroupId('default');
     setMonitor(undefined);
+    setReminder(undefined);
     setTitleError(false);
     onClose();
   }, [onClose]);
@@ -86,7 +94,12 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
       type,
       groupId: selectedGroupId,
       // once/recurring 均可绑定监测
-      monitor
+      monitor,
+      // 关闭提醒 = 清空两个字段（undefined 会覆盖旧值）
+      remindAt: reminder?.remindAt,
+      remindLeadMs: reminder?.remindLeadMs,
+      // 清空时同步抹掉旧盖章，避免残留 remindedAt 干扰重新开启
+      remindedAt: reminder && reminder.remindAt === todo.remindAt ? todo.remindedAt : undefined
     };
 
     if (type === 'recurring') {
@@ -198,6 +211,8 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
               )}
             </>
           )}
+
+          <ReminderSection value={reminder} onChange={setReminder} />
 
           <MonitorSection monitor={monitor} onChange={setMonitor} />
 

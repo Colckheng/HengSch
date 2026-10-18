@@ -5,12 +5,13 @@ import { GroupProvider, useGroups } from './context/GroupContext';
 import { WindowControls } from './components/WindowControls';
 import { TodoList } from './components/TodoList';
 import { Odometer } from './components/Odometer';
-import { IconGroups } from './components/Icons';
+import { IconGroups, IconBell } from './components/Icons';
 import { AddTodoModal } from './components/AddTodoModal';
 import { EditTodoModal } from './components/EditTodoModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GroupManagerModal } from './components/GroupManagerModal';
 import { SyncSettingsModal } from './components/SyncSettingsModal';
+import { ReminderSettingsModal } from './components/ReminderSettingsModal';
 import type { Todo } from './types';
 import type { SyncStatus } from '@hengsch/shared-types';
 import './styles/index.css';
@@ -33,6 +34,7 @@ function AppContent(): JSX.Element {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isGroupManagerOpen, setIsGroupManagerOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
@@ -243,6 +245,9 @@ function AppContent(): JSX.Element {
               {syncLabel(syncStatus)}
             </button>
           )}
+          <button className="foot-reminder" onClick={() => setIsReminderSettingsOpen(true)} aria-label="提醒设置" title="提醒设置">
+            <IconBell size={14} />
+          </button>
           <button className="footer-add" onClick={handleAddTodo}>
             + Add Task
           </button>
@@ -264,6 +269,7 @@ function AppContent(): JSX.Element {
       <TodoDetailModal isOpen={isDetailModalOpen} onClose={handleCloseDetailModal} todo={detailTodo} />
       <GroupManagerModal isOpen={isGroupManagerOpen} onClose={handleCloseGroupManager} />
       <SyncSettingsModal isOpen={isSyncModalOpen} onClose={() => setIsSyncModalOpen(false)} status={syncStatus} />
+      <ReminderSettingsModal isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)} />
     </div>
   );
 }

@@ -3,9 +3,11 @@ node_modules/
 
 # Build output
 dist/
+dist-paper-lab/
 build/
 out/
 release/
+release-paper-reminder/
 *.tsbuildinfo
 
 # Logs

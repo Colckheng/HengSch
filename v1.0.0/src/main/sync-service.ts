@@ -279,11 +279,12 @@ export async function runCycle(localArg?: SyncPayload): Promise<{ status: SyncSt
     // store 与渲染层快照取并集（LWW），防止启动窗口/时序导致快照过期丢编辑
     const base = localState();
     const local = localArg ? mergeSyncStates(base, localArg, Date.now()) : base;
-    const merged = await runRemoteCycle(cfg, local);
+    let merged = await runRemoteCycle(cfg, local);
     if (merged === null) {
       setStatus('REMOTE ERROR', '远端 sync.json 损坏，本次不写回');
       return { status };
     }
+    merged = mergeSyncStates(localState(), merged, Date.now());
     persistMerged(merged);
     offlineStreak = 0;
     setStatus('SYNCED');

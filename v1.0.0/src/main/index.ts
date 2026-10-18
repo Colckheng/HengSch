@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { isDeepStrictEqual } from 'node:util';
 import Store from 'electron-store';
 import { setAutoStart, getAutoStart, healAutoStart } from './auto-start';
 import { abortAskWindows } from './ask-window';
@@ -25,6 +26,10 @@ import {
   getSyncStatus,
   stopSyncService
 } from './sync-service';
+import { initReminderService, stopReminderService, listOpenReminders, runReminderAction } from './reminder-service';
+import { previewPaper } from './paper-window';
+import { mergeSyncStates } from '@hengsch/shared-logic';
+import type { Todo, Group } from '@hengsch/shared-types';
 import type { SyncConfig, SyncPayload } from '@hengsch/shared-types';
 import { createTray } from './tray';
 
@@ -547,14 +552,19 @@ app.whenReady().then(() => {
   };
   initMonitorService(store, pushToRenderer);
   initSyncService(store, pushToRenderer);
+  initReminderService(store, pushToRenderer);
   createWindow();
   createTray(showMainWindow);
+
+  if (!app.isPackaged) globalShortcut.register('Alt+D', previewPaper);
+
 });
 
 // 退出流程：置位放行主窗口销毁 + 收尾询问队列/小窗 + 停轮询，保证退出后零残留
 app.on('before-quit', () => {
   if (isQuitting) return;
   isQuitting = true;
+  globalShortcut.unregisterAll();
   stopSyncService(); // 停止 SFTP 同步轮询，避免写入中途被强杀在远端留 .tmp
   clearHoverPoll();
   clearIdleTimer();
@@ -565,6 +575,7 @@ app.on('before-quit', () => {
   }
   cancelAskQueue();
   abortAskWindows();
+  stopReminderService();
   stopMonitorService();
 });
 
@@ -642,7 +653,8 @@ const RENDERER_STORE_KEYS = new Set<string>([
   'todos',
   'groups',
   'compactMode',
-  'syncOrderMigrated'
+  'syncOrderMigrated',
+  'reminderSettings'
 ]);
 
 ipcMain.handle('store:get', (_, key: string) => {
@@ -652,7 +664,12 @@ ipcMain.handle('store:get', (_, key: string) => {
 
 ipcMain.handle('store:set', (_, key: string, value: unknown) => {
   if (typeof key !== 'string' || !RENDERER_STORE_KEYS.has(key)) return undefined;
-  store.set(key, value);
+  if (key === 'todos' && Array.isArray(value)) {
+    const groups = (store.get('groups') ?? []) as Group[];
+    const todos = mergeSyncStates({ todos: (store.get('todos') ?? []) as Todo[], groups }, { todos: value as Todo[], groups }, Date.now()).todos;
+    store.set(key, todos);
+    if (!isDeepStrictEqual(todos, value) && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('sync:merged', { todos, groups });
+  } else store.set(key, value);
   return undefined;
 });
 
@@ -804,4 +821,18 @@ ipcMain.handle('window:userActivity', () => {
   }
   activitySinceTransition = true;
   resetAutoHideIdleTimer();
+});
+ipcMain.handle('reminder:preview', event => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('Unauthorized');
+  return previewPaper();
+});
+ipcMain.handle('reminder:list', event => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('Unauthorized');
+  return listOpenReminders();
+});
+ipcMain.handle('reminder:act', (event, command: { todoId?: string; remindAt?: number; action?: string; snoozeAt?: number }) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('Unauthorized');
+  if (!command || typeof command.todoId !== 'string' || typeof command.remindAt !== 'number') throw new Error('Invalid command');
+  if (command.action !== 'complete' && command.action !== 'snooze' && command.action !== 'dismiss') throw new Error('Invalid command');
+  return runReminderAction({ todoId: command.todoId, remindAt: command.remindAt, action: command.action, snoozeAt: command.snoozeAt });
 });

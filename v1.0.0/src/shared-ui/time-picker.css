@@ -1,0 +1,262 @@
+/* ============================================================
+   Swiss 时间弹层（纯点选）— 复用 index.css 的 :root 变量
+   ============================================================ */
+
+.tp-wrap {
+  position: relative;
+}
+
+.tp-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s1);
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.tp-trigger:hover {
+  border-color: var(--ink-2);
+}
+
+.tp-trigger-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.tp-trigger-caret {
+  flex-shrink: 0;
+  color: var(--ink-2);
+}
+
+.tp-panel {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  top: calc(100% + 4px);
+  width: 300px;
+  padding: 14px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(10, 10, 10, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tp-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tp-eyebrow::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background: var(--signal);
+  flex-shrink: 0;
+}
+
+/* 日期行：◀ 芯片 ▶ */
+.tp-day-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tp-arrow {
+  flex: none;
+  width: 28px;
+  height: 30px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tp-arrow:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.tp-chips {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+}
+
+.tp-chip {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tp-chip:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.tp-chip.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.tp-day-label {
+  flex: none;
+  min-width: 64px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+/* 小时网格 6×4 */
+.tp-hour-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.tp-hour {
+  padding: 7px 0;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.tp-hour:hover {
+  border-color: var(--ink);
+}
+
+.tp-hour.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* 分钟行：− 快捷 + */
+.tp-min-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tp-min-step {
+  flex: none;
+  width: 34px;
+  height: 30px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tp-min-step:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.tp-min-chips {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+}
+
+.tp-min-chip {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-min-chip:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.tp-min-chip.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.tp-current {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+}
+
+.tp-current-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tp-current-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.tp-foot {
+  display: flex;
+  gap: 8px;
+}
+
+.tp-foot .button {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.tp-invalid {
+  font-size: 11px;
+  color: var(--signal);
+  font-weight: 600;
+}

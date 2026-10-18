@@ -61,5 +61,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('monitor:ask-resolved', handler);
       return () => ipcRenderer.removeListener('monitor:ask-resolved', handler);
     }
+  },
+  reminder: {
+    preview: () => ipcRenderer.invoke('reminder:preview'),
+    list: () => ipcRenderer.invoke('reminder:list'),
+    act: (command: { todoId: string; remindAt: number; action: 'complete' | 'snooze' | 'dismiss'; snoozeAt?: number }) =>
+      ipcRenderer.invoke('reminder:act', command)
   }
 });

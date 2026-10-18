@@ -6,13 +6,20 @@
   "author": "",
   "license": "ISC",
   "scripts": {
+    "test": "node scripts/test-paper-lab.cjs",
+    "paper:dev": "vite --config vite.paper-lab.config.ts",
+    "paper:build": "vite build --config vite.paper-lab.config.ts",
+    "paper:desktop": "electron scripts/paper-lab-electron.cjs",
+    "paper:smoke": "electron scripts/paper-lab-electron.cjs --smoke",
+    "paper:record": "electron scripts/paper-lab-electron.cjs --smoke --record",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "npm run dev",
     "electron:build": "npm run build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "reminder:integration": "electron scripts/reminder-integration.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

@@ -6,6 +6,7 @@ import { IconClose } from './Icons';
 import { GroupSelect } from './GroupSelect';
 import { SwissSelect } from './SwissSelect';
 import { MonitorSection } from './MonitorSection';
+import { ReminderSection, type ReminderValue } from './ReminderSection';
 import { TYPE_OPTIONS, CYCLE_OPTIONS } from './selectOptions';
 
 interface AddTodoModalProps {
@@ -23,6 +24,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
   const [monitor, setMonitor] = useState<MonitorConfig | undefined>(undefined);
+  const [reminder, setReminder] = useState<ReminderValue | undefined>(undefined);
   const [titleError, setTitleError] = useState(false);
 
   const handleClose = useCallback(() => {
@@ -33,6 +35,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
     setCustomCycleDays('');
     setSelectedGroupId('default');
     setMonitor(undefined);
+    setReminder(undefined);
     setTitleError(false);
     onClose();
   }, [onClose]);
@@ -72,7 +75,9 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
         customCycleDays: cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined,
         nextDueDate: Date.now(),
         groupId: selectedGroupId,
-        monitor
+        monitor,
+        remindAt: reminder?.remindAt,
+        remindLeadMs: reminder?.remindLeadMs
       });
     } else {
       addTodo({
@@ -81,7 +86,9 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
         type: 'once',
         status: 'pending',
         groupId: selectedGroupId,
-        monitor
+        monitor,
+        remindAt: reminder?.remindAt,
+        remindLeadMs: reminder?.remindLeadMs
       });
     }
 
@@ -184,6 +191,8 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
               )}
             </>
           )}
+
+          <ReminderSection value={reminder} onChange={setReminder} />
 
           <MonitorSection monitor={monitor} onChange={setMonitor} />
 

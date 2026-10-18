@@ -1,5 +1,14 @@
 import type { SyncConfig, SyncStatus, SyncPayload } from '@hengsch/shared-types';
 
+export interface OpenReminderItem {
+  todoId: string;
+  remindAt: number;
+  title: string;
+  description?: string;
+  group?: string;
+  color?: string;
+}
+
 export interface ElectronAPI {
   window: {
     minimize: () => Promise<void>;
@@ -51,6 +60,11 @@ export interface ElectronAPI {
     onCompleted: (cb: (payload: { todoId: string }) => void) => () => void;
     /** 进程结束询问的裁决结果：complete=标记完成；revert=撤销自动完成回待办 */
     onAskResolved: (cb: (payload: { todoId: string; action: 'complete' | 'revert' }) => void) => () => void;
+  };
+  reminder: {
+    preview: () => Promise<boolean>;
+    list: () => Promise<OpenReminderItem[]>;
+    act: (command: { todoId: string; remindAt: number; action: 'complete' | 'snooze' | 'dismiss'; snoozeAt?: number }) => Promise<{ ok: boolean; error?: string }>;
   };
 }
 

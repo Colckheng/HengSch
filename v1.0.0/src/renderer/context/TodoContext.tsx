@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useRef, ReactNode } from 'react';
 import type { Todo, RecurringTodo } from '../types';
-import { toggleTodoStatus, sortTodosByStatus, generateTodoId } from '@hengsch/shared-logic';
+import { toggleTodoStatus, sortTodosByStatus, generateTodoId, pickWinner } from '@hengsch/shared-logic';
 
 interface TodoState {
   /** 原始数组（含墓碑），负责持久化与同步 */
@@ -9,6 +9,7 @@ interface TodoState {
 
 type TodoAction =
   | { type: 'SET_TODOS'; payload: Todo[] }
+  | { type: 'MERGE_TODOS'; payload: Todo[] }
   | { type: 'ADD_TODO'; payload: Todo }
   | { type: 'UPDATE_TODO'; payload: { id: string; updates: Partial<Todo> } }
   | { type: 'DELETE_TODO'; payload: { id: string; updatedAt: number; deviceId: string } }
@@ -58,6 +59,11 @@ function fillSyncMeta<T extends Todo>(todo: T): T {
 
 function todoReducer(state: TodoState, action: TodoAction): TodoState {
   switch (action.type) {
+    case 'MERGE_TODOS': {
+      const merged = new Map(state.todos.map(todo => [todo.id, todo]));
+      for (const todo of action.payload) merged.set(todo.id, pickWinner(merged.get(todo.id), todo)!);
+      return { ...state, todos: [...merged.values()].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
+    }
     case 'SET_TODOS':
       return { ...state, todos: action.payload };
     case 'ADD_TODO':
@@ -222,7 +228,7 @@ export function TodoProvider({ children }: { children: ReactNode }): JSX.Element
   const visibleTodos = state.todos.filter(isVisible);
 
   const applySyncedTodos = (todos: Todo[]) => {
-    dispatch({ type: 'SET_TODOS', payload: todos });
+    dispatch({ type: 'MERGE_TODOS', payload: todos });
   };
 
   return (
