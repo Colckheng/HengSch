@@ -134,9 +134,13 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
     onState(sample.id, ball || gesture.phase === 'crumpling', hot);
     return () => onState(sample.id, false, false);
   }, [sample.id, ball, gesture.phase, hot, onState]);
+  const prevCount = useRef(count);
   useEffect(() => {
-    apply(cancel(current.current, bounds));
-  }, [apply, bounds]);
+    const grew = count > prevCount.current;
+    prevCount.current = count;
+    const next = cancel(current.current, bounds);
+    apply(grew ? { ...next, center: initialPosition(index, count, bounds) } : next);
+  }, [apply, bounds, count, index]);
   useEffect(() => {
     const track = (event: PointerEvent): void => { cursor.current = { x: event.clientX, y: event.clientY }; };
     window.addEventListener('pointermove', track);
