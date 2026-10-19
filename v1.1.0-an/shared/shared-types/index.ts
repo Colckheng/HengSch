@@ -126,10 +126,17 @@ export interface AiDeleteDraft {
   todoId: string;
 }
 
+export interface AiProposalBase {
+  id: string;
+  createdAt: number;
+  /** 面向用户的一句话描述（stage_batch 总览轮必带；对话流内联展示用） */
+  summary?: string;
+}
+
 export type AiProposal =
-  | { id: string; kind: 'create'; createdAt: number; draft: AiCreateDraft }
-  | { id: string; kind: 'update'; createdAt: number; before: Todo; draft: AiUpdateDraft }
-  | { id: string; kind: 'delete'; createdAt: number; before: Todo; draft: AiDeleteDraft };
+  | (AiProposalBase & { kind: 'create'; draft: AiCreateDraft })
+  | (AiProposalBase & { kind: 'update'; before: Todo; draft: AiUpdateDraft })
+  | (AiProposalBase & { kind: 'delete'; before: Todo; draft: AiDeleteDraft });
 
 export interface AiChatMessage {
   role: 'user' | 'assistant';

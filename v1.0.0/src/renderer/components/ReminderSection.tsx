@@ -14,6 +14,8 @@ export interface ReminderValue {
 interface ReminderSectionProps {
   value?: ReminderValue;
   onChange: (value: ReminderValue | undefined) => void;
+  /** 循环待办：只选时刻（确认时落到下一次发生的该时刻），不再选日期 */
+  recurring?: boolean;
 }
 
 const DEFAULT_LEAD_KEY = 'reminderSettings';
@@ -33,7 +35,7 @@ function leadKeyOf(leadMs: number): string {
   return LEAD_OPTIONS.some((o) => o.value === String(leadMs)) ? String(leadMs) : 'custom';
 }
 
-export function ReminderSection({ value, onChange }: ReminderSectionProps): JSX.Element {
+export function ReminderSection({ value, onChange, recurring = false }: ReminderSectionProps): JSX.Element {
   const enabled = typeof value?.remindAt === 'number';
   const [defaultLeadMs, setDefaultLeadMs] = useState(FALLBACK_LEAD_MS);
   // 自定义提前量草稿：跟随 value / defaultLeadMs 同步，编辑态也能回显
@@ -136,7 +138,8 @@ export function ReminderSection({ value, onChange }: ReminderSectionProps): JSX.
               id="reminder-time"
               value={targetTs}
               onChange={handleTimeChange}
-              minTs={Date.now()}
+              mode={recurring ? 'time' : 'datetime'}
+              minTs={recurring ? undefined : Date.now()}
             />
           </div>
 

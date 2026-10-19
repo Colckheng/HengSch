@@ -15,12 +15,26 @@ interface SwissTimePickerProps {
   id?: string;
   /** 校验：早于该时间视为非法（如"请选择将来的时间"） */
   minTs?: number;
+  /**
+   * datetime=选日期+时刻（一次性待办，默认）；time=只选时刻（循环待办——
+   * 确认时自动落到"下一次发生的该时刻"：今天已过 → 明天）
+   */
+  mode?: 'datetime' | 'time';
 }
 
 const MIN_QUICK = [0, 15, 30, 45];
 
+/** time 模式：H:M 的下一次发生（今天还早就今天，否则明天） */
+function nextOccurrenceOf(h: number, m: number, now: number = Date.now()): number {
+  const dayStart = startOfLocalDay(now);
+  let candidate = dayStart + h * 3_600_000 + m * 60_000;
+  if (candidate <= now) candidate += 24 * 3600_000;
+  return candidate;
+}
+
 /** Swiss 时间弹层（纯点选）：日期芯片翻天 + 24h 网格 + 分钟步进/快捷 */
-export function SwissTimePicker({ value, onChange, id, minTs }: SwissTimePickerProps): JSX.Element {
+export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime' }: SwissTimePickerProps): JSX.Element {
+  const timeOnly = mode === 'time';
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +90,12 @@ export function SwissTimePicker({ value, onChange, id, minTs }: SwissTimePickerP
   };
 
   const handleConfirm = (): void => {
+    if (timeOnly) {
+      onChange(nextOccurrenceOf(h, m));
+      setOpen(false);
+      setError('');
+      return;
+    }
     const ts = draftTs;
     if (typeof minTs === 'number' && ts < minTs) {
       setError('请选择将来的时间');
@@ -98,7 +118,7 @@ export function SwissTimePicker({ value, onChange, id, minTs }: SwissTimePickerP
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        <span className="tp-trigger-value">{formatFull(value)}</span>
+        <span className="tp-trigger-value">{timeOnly ? formatHM(value) : formatFull(value)}</span>
         <svg className="tp-trigger-caret" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
           <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" />
         </svg>
@@ -106,29 +126,31 @@ export function SwissTimePicker({ value, onChange, id, minTs }: SwissTimePickerP
 
       {open && (
         <div className="tp-panel" role="dialog" aria-label="选择提醒时间">
-          <div className="tp-eyebrow">SCHEDULE</div>
+          <div className="tp-eyebrow">{timeOnly ? 'TIME' : 'SCHEDULE'}</div>
 
-          <div className="tp-day-row">
-            <button type="button" className="tp-arrow" onClick={() => stepDay(-1)} aria-label="前一天">
-              ◀
-            </button>
-            <div className="tp-chips">
-              {[0, 1, 2].map((i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`tp-chip${chip === i ? ' active' : ''}`}
-                  onClick={() => setDayStart(dayStartOffset(i))}
-                >
-                  {['今天', '明天', '后天'][i]}
-                </button>
-              ))}
+          {!timeOnly && (
+            <div className="tp-day-row">
+              <button type="button" className="tp-arrow" onClick={() => stepDay(-1)} aria-label="前一天">
+                ◀
+              </button>
+              <div className="tp-chips">
+                {[0, 1, 2].map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`tp-chip${chip === i ? ' active' : ''}`}
+                    onClick={() => setDayStart(dayStartOffset(i))}
+                  >
+                    {['今天', '明天', '后天'][i]}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="tp-arrow" onClick={() => stepDay(1)} aria-label="后一天">
+                ▶
+              </button>
             </div>
-            <button type="button" className="tp-arrow" onClick={() => stepDay(1)} aria-label="后一天">
-              ▶
-            </button>
-          </div>
-          <div className="tp-day-label">{formatMD(draftTs)}</div>
+          )}
+          {!timeOnly && <div className="tp-day-label">{formatMD(draftTs)}</div>}
 
           <div className="tp-hour-grid">
             {Array.from({ length: 24 }, (_, hour) => (

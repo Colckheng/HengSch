@@ -1,6 +1,6 @@
 import type Store from 'electron-store';
 import type { Todo, Group, AiProposal, AiChatMessage, AiChatResult } from '@hengsch/shared-types';
-import { stageProposal, applyProposal, type AiDataContext } from './ai-tools';
+import { stageProposal, stageProposalBatch, applyProposal, STAGE_BATCH_MAX, type AiDataContext } from './ai-tools';
 
 export type { AiChatMessage, AiChatResult };
 
@@ -8,6 +8,8 @@ export interface AiSettings {
   apiKey?: string;
   model: 'deepseek-flash' | 'deepseek-v4-pro';
   monitorVerdictEnabled: boolean;
+  /** 详细程度：1=只按用户说的+默认（默认）；2=缺字段先集中问 */
+  promptLevel: 1 | 2;
 }
 
 const ENDPOINT = 'https://api.deepseek.com/chat/completions';
@@ -20,7 +22,7 @@ const TOOL_ROUNDS = 6;
 const STREAM_TIMEOUT_MS = 60_000;
 const PROPOSAL_TTL_MS = 10 * 60_000;
 
-const DEFAULT_SETTINGS: AiSettings = { model: 'deepseek-flash', monitorVerdictEnabled: false };
+const DEFAULT_SETTINGS: AiSettings = { model: 'deepseek-flash', monitorVerdictEnabled: false, promptLevel: 1 };
 
 let storeRef: Store | null = null;
 let push: (channel: string, payload: unknown) => void = () => undefined;
@@ -40,7 +42,8 @@ export function readAiSettings(store: Store): AiSettings {
   return {
     apiKey: typeof raw?.apiKey === 'string' && raw.apiKey ? raw.apiKey : undefined,
     model: raw?.model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-flash',
-    monitorVerdictEnabled: raw?.monitorVerdictEnabled === true
+    monitorVerdictEnabled: raw?.monitorVerdictEnabled === true,
+    promptLevel: raw?.promptLevel === 2 ? 2 : 1
   };
 }
 
@@ -59,7 +62,8 @@ export function writeAiSettings(store: Store, patch: Partial<AiSettings>): AiSet
   const next: AiSettings = {
     apiKey: patch.apiKey !== undefined ? (patch.apiKey || undefined) : current.apiKey,
     model: patch.model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : patch.model === 'deepseek-flash' ? 'deepseek-flash' : current.model,
-    monitorVerdictEnabled: patch.monitorVerdictEnabled !== undefined ? patch.monitorVerdictEnabled === true : current.monitorVerdictEnabled
+    monitorVerdictEnabled: patch.monitorVerdictEnabled !== undefined ? patch.monitorVerdictEnabled === true : current.monitorVerdictEnabled,
+    promptLevel: patch.promptLevel === 2 ? 2 : patch.promptLevel === 1 ? 1 : current.promptLevel
   };
   store.set('aiSettings', next);
   return next;
@@ -143,19 +147,27 @@ export function compactTodoLines(todos: Todo[], groups: Group[]): string {
     .join('\n');
 }
 
-export function buildSystemPrompt(todos: Todo[], groups: Group[], processNames: string[], now: number): string {
+export function buildSystemPrompt(todos: Todo[], groups: Group[], processNames: string[], now: number, promptLevel: 1 | 2 = 1): string {
   const groupLines = groups.filter((group) => !group.deleted).map((group) => `${group.id}=${group.name}`).join(', ') || '（无）';
   const processes = processNames.slice(0, PROCESS_CONTEXT_LIMIT).join(', ') || '（未取到进程列表）';
+  const detailRule = promptLevel === 2
+    ? '详细程度档2：写操作入队前，若标题、时间、循环、分组、提醒等关键字段有缺失，先在一条消息里用编号列表集中提问，收到用户答复后再入队；纯查询直接回答。'
+    : '详细程度档1：只按用户明确说的字段设置，用户没说的一律用默认值，禁止向用户追问补充。';
   return [
     '你是 HengSch Todo 桌面应用内的待办管家，只用简体中文，回答简洁直接，不闲聊、不吹捧、不写客套话。',
     '你可以用工具查询、创建、修改、删除待办。写操作会先生成预览卡等用户确认（删除需二次确认），工具结果会告诉你已生成预览卡——此时只需一句话说明，不要复述字段。',
+    '对话流：',
+    '- 用户一次提到多条待办时：先用一段文字给出清单总览（每条一行，只写标题与关键属性），然后同轮调用 stage_batch 把全部条目一次入队（每条 summary 写成可独立展示的一句话描述）；入队后一句话提示“共 N 条，按顺序逐条确认”。',
+    `- 单条待办直接用 create_todo/update_todo/delete_todo；除 stage_batch（一次至多 ${STAGE_BATCH_MAX} 条）外，每轮最多一个写操作。`,
+    '- 用户消息带 [流程] 前缀时按其指示处理：要求“改”某条 → 只重新暂存那一条（新 summary+draft），不要动队列里其他条目；已由用户确认或跳过的内容不要再提。',
+    detailRule,
     '字段规则：',
     '- type：once（一次性）或 recurring（循环）；循环必须给 cycleType（daily/weekly/monthly/custom），custom 还要 customCycleDays≥1 天；一次性任务不要传 cycleType。',
-    '- remindAt 是毫秒时间戳且必须晚于现在；remindLeadMs 是提前量毫秒（0=到点，可省略）。',
+    '- remindAt 是毫秒时间戳且必须晚于现在；remindLeadMs 是提前量毫秒（0=到点，可省略）。循环待办只关心“时刻”：remindAt 给下一次发生的“时刻减提前量”，不要纠结日期。',
     '- groupId 只能从下面的分组里选（给 id 或名称），匹配不到就不传（会落到未分类）。',
     '- monitor 传 { exeName, thresholdMinutes(≥1), auto, askOnExit }，exeName 必须在“当前运行进程”列表里；用户没要求进程监测就不要传。',
     '- 标记完成/撤销完成用 update_todo 的 toggleStatus:true（与主界面勾选完全同一套规则，循环待办会续期）。',
-    '- 每轮回复最多发起一个写操作；纯查询先用 list_todos 拿最新数据。禁止编造不存在的待办 id。',
+    '- 纯查询先用 list_todos 拿最新数据。禁止编造不存在的待办 id。',
     `当前时间：${formatClock(now)}`,
     `分组列表：${groupLines}`,
     `当前运行进程：${processes}`,
@@ -240,6 +252,34 @@ const TOOLS = [
         additionalProperties: false
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'stage_batch',
+      description: `总览轮专用：一次暂存多条写操作（≤${STAGE_BATCH_MAX} 条），全部入队后用户按顺序逐条确认`,
+      parameters: {
+        type: 'object',
+        properties: {
+          entries: {
+            type: 'array',
+            maxItems: STAGE_BATCH_MAX,
+            items: {
+              type: 'object',
+              properties: {
+                summary: { type: 'string', description: '该条待办面向用户的一句话描述（会直接展示在对话流里）' },
+                action: { type: 'string', enum: ['create', 'update', 'delete'] },
+                draft: { type: 'object', description: '与对应单条工具完全相同的参数对象' }
+              },
+              required: ['summary', 'action', 'draft'],
+              additionalProperties: false
+            }
+          }
+        },
+        required: ['entries'],
+        additionalProperties: false
+      }
+    }
   }
 ] as const;
 
@@ -306,7 +346,12 @@ async function callDeepSeek(body: Record<string, unknown>, signal: AbortSignal):
   return response;
 }
 
-function parseToolArguments(name: string, args: string, ctx: AiDataContext): AiProposal {
+interface ParsedStaging {
+  proposal: AiProposal;
+  summary?: string;
+}
+
+function parseToolStaging(name: string, args: string, ctx: AiDataContext): ParsedStaging[] {
   let payload: unknown = {};
   if (args.trim()) {
     try {
@@ -315,9 +360,16 @@ function parseToolArguments(name: string, args: string, ctx: AiDataContext): AiP
       throw new Error('工具参数不是合法 JSON');
     }
   }
-  if (name === 'create_todo') return stageProposal('create', payload, ctx);
-  if (name === 'update_todo') return stageProposal('update', payload, ctx);
-  if (name === 'delete_todo') return stageProposal('delete', payload, ctx);
+  if (name === 'stage_batch') {
+    const entries = (payload as { entries?: unknown }).entries;
+    return stageProposalBatch(entries, ctx).map((entry) => {
+      entry.proposal.summary = entry.summary;
+      return { proposal: entry.proposal, summary: entry.summary };
+    });
+  }
+  if (name === 'create_todo') return [{ proposal: stageProposal('create', payload, ctx) }];
+  if (name === 'update_todo') return [{ proposal: stageProposal('update', payload, ctx) }];
+  if (name === 'delete_todo') return [{ proposal: stageProposal('delete', payload, ctx) }];
   throw new Error(`未知工具：${name}`);
 }
 
@@ -344,14 +396,15 @@ async function runToolLoop(
   ctx: AiDataContext,
   onChunk: (delta: string) => void,
   signal: AbortSignal,
-  staged: AiProposal[]
+  staged: AiProposal[],
+  promptLevel: 1 | 2
 ): Promise<void> {
   type ApiMessage =
     | { role: 'system' | 'user'; content: string }
     | { role: 'assistant'; content: string | null; tool_calls?: unknown }
     | { role: 'tool'; tool_call_id: string; content: string };
   const apiMessages: ApiMessage[] = [
-    { role: 'system', content: buildSystemPrompt(ctx.todos, ctx.groups, ctx.processNames, ctx.now) },
+    { role: 'system', content: buildSystemPrompt(ctx.todos, ctx.groups, ctx.processNames, ctx.now, promptLevel) },
     ...history
   ];
   for (let round = 0; round < TOOL_ROUNDS; round += 1) {
@@ -414,10 +467,14 @@ async function runToolLoop(
           }
           content = listTodosContent(includeCompleted, ctx);
         } else {
-          const proposal = parseToolArguments(call.name, call.args, ctx);
-          staged.push(proposal);
-          proposals.set(proposal.id, { proposal, expires: Date.now() + PROPOSAL_TTL_MS });
-          content = JSON.stringify({ staged: true, proposalId: proposal.id, note: '已生成预览卡，等待用户确认' });
+          const batch = parseToolStaging(call.name, call.args, ctx);
+          for (const item of batch) {
+            staged.push(item.proposal);
+            proposals.set(item.proposal.id, { proposal: item.proposal, expires: Date.now() + PROPOSAL_TTL_MS });
+          }
+          content = batch.length > 1 || call.name === 'stage_batch'
+            ? JSON.stringify({ staged: true, count: batch.length, proposalIds: batch.map((item) => item.proposal.id), note: `已生成 ${batch.length} 张预览卡，按顺序等用户确认` })
+            : JSON.stringify({ staged: true, proposalId: batch[0].proposal.id, note: '已生成预览卡，等待用户确认' });
         }
       } catch (error) {
         content = JSON.stringify({ error: error instanceof Error ? error.message : '参数错误' });
@@ -452,7 +509,7 @@ export async function runAiChat(options: { messages: AiChatMessage[]; processNam
   const staged: AiProposal[] = [];
   try {
     const ctx = contextFromStore(processNames);
-    await runToolLoop(trimHistory(options.messages), ctx, (delta) => push('ai:chunk', { delta }), controller.signal, staged);
+    await runToolLoop(trimHistory(options.messages), ctx, (delta) => push('ai:chunk', { delta }), controller.signal, staged, settings.promptLevel);
     return { proposals: staged };
   } catch (error) {
     const aborted = (error as Error)?.name === 'AbortError' || controller.signal.aborted;
@@ -484,4 +541,17 @@ export function commitProposal(id: string, patch?: unknown): void {
 
 export function rejectProposal(id: string): boolean {
   return proposals.delete(id);
+}
+
+/** 卡片轮到显示时续期（长队列不误杀） */
+export function refreshProposalExpiry(id: string): boolean {
+  const entry = proposals.get(id);
+  if (!entry) return false;
+  entry.expires = Date.now() + PROPOSAL_TTL_MS;
+  return true;
+}
+
+/** 未决队列（插入顺序 = 入队顺序），抽屉挂载/重启重建用 */
+export function listQueuedProposals(): AiProposal[] {
+  return [...proposals.values()].map((entry) => entry.proposal);
 }

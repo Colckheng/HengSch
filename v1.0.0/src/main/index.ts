@@ -27,7 +27,7 @@ import {
   stopSyncService
 } from './sync-service';
 import { initReminderService, stopReminderService, listOpenReminders, runReminderAction } from './reminder-service';
-import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, maskedAiSettings, writeAiSettings, testAiConnection, type AiChatMessage, type AiSettings } from './ai-service';
+import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, refreshProposalExpiry, listQueuedProposals, maskedAiSettings, writeAiSettings, testAiConnection, type AiChatMessage, type AiSettings } from './ai-service';
 import { previewPaper } from './paper-window';
 import { mergeSyncStates } from '@hengsch/shared-logic';
 import type { Todo, Group } from '@hengsch/shared-types';
@@ -884,6 +884,17 @@ ipcMain.handle('ai:reject', (event, id: unknown) => {
   assertTrustedSender(event);
   if (typeof id !== 'string' || !id) throw new Error('Invalid proposal id');
   return rejectProposal(id);
+});
+
+ipcMain.handle('ai:queue:list', event => {
+  assertTrustedSender(event);
+  return listQueuedProposals();
+});
+
+ipcMain.handle('ai:queue:touch', (event, id: unknown) => {
+  assertTrustedSender(event);
+  if (typeof id !== 'string' || !id) throw new Error('Invalid proposal id');
+  return refreshProposalExpiry(id);
 });
 
 ipcMain.handle('ai:settings:get', event => {

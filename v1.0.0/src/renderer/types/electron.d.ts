@@ -1,8 +1,10 @@
-import type { SyncConfig, SyncStatus, SyncPayload, AiChatMessage, AiChatResult } from '@hengsch/shared-types';
+import type { SyncConfig, SyncStatus, SyncPayload, AiChatMessage, AiChatResult, AiProposal } from '@hengsch/shared-types';
 
 export interface AiMaskedSettings {
   model: 'deepseek-flash' | 'deepseek-v4-pro';
   monitorVerdictEnabled: boolean;
+  /** 详细程度：1=只按用户说的+默认；2=缺字段先集中问 */
+  promptLevel: 1 | 2;
   apiKeySet: boolean;
   apiKeyMasked: string;
 }
@@ -78,8 +80,10 @@ export interface ElectronAPI {
     stop: () => Promise<void>;
     commit: (id: string, patch?: unknown) => Promise<boolean>;
     reject: (id: string) => Promise<boolean>;
+    queueList: () => Promise<AiProposal[]>;
+    queueTouch: (id: string) => Promise<boolean>;
     settingsGet: () => Promise<AiMaskedSettings>;
-    settingsSet: (patch: { apiKey?: string; model?: 'deepseek-flash' | 'deepseek-v4-pro'; monitorVerdictEnabled?: boolean }) => Promise<AiMaskedSettings>;
+    settingsSet: (patch: { apiKey?: string; model?: 'deepseek-flash' | 'deepseek-v4-pro'; monitorVerdictEnabled?: boolean; promptLevel?: 1 | 2 }) => Promise<AiMaskedSettings>;
     settingsTest: (key?: string) => Promise<{ ok: boolean; message: string }>;
     onChunk: (cb: (payload: { delta: string }) => void) => () => void;
   };

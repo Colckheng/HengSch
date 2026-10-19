@@ -192,7 +192,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
             </>
           )}
 
-          <ReminderSection value={reminder} onChange={setReminder} />
+          <ReminderSection value={reminder} onChange={setReminder} recurring={type === 'recurring'} />
 
           <MonitorSection monitor={monitor} onChange={setMonitor} />
 

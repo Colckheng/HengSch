@@ -1,7 +1,7 @@
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { stageProposal, applyProposal, type AiDataContext } from './ai-tools';
-import type { Todo, Group, MonitorConfig } from '@hengsch/shared-types';
+import { stageProposal, stageProposalBatch, applyProposal, type AiDataContext } from './ai-tools';
+import type { Todo, Group, MonitorConfig, RecurringTodo } from '@hengsch/shared-types';
 
 const NOW = 1_700_000_000_000;
 const monitor: MonitorConfig = { exeName: 'chrome.exe', thresholdMinutes: 30, auto: true, askOnExit: false };
@@ -113,4 +113,65 @@ it('commit-time patch revalidates against the same rules', () => {
   assert.throws(() => applyProposal(stageProposal('create', { title: 'A' }, ctx()), ctx(), { title: '   ' }), /标题不能为空/);
   assert.throws(() => applyProposal(stageProposal('create', { title: 'A' }, ctx()), ctx(), { monitor: { exeName: 'ghost.exe' } }), /进程不存在/);
   assert.throws(() => applyProposal(stageProposal('delete', { todoId: 't1' }, ctx()), { ...ctx(), todos: [done] }), /已被删除/);
+});
+
+it('stageProposalBatch keeps order, summaries and kinds; caps at 10', () => {
+  const batch = stageProposalBatch([
+    { summary: '绝区零日常（每日，游戏）', action: 'create', draft: { title: '绝区零日常', type: 'recurring', cycleType: 'daily', groupId: 'g1' } },
+    { summary: '原神周常', action: 'create', draft: { title: '原神周常', type: 'recurring', cycleType: 'weekly' } },
+    { summary: '删掉写周报', action: 'delete', draft: { todoId: 't1' } }
+  ], ctx());
+  assert.equal(batch.length, 3);
+  assert.deepEqual(batch.map((entry) => entry.summary), ['绝区零日常（每日，游戏）', '原神周常', '删掉写周报']);
+  assert.deepEqual(batch.map((entry) => entry.proposal.kind), ['create', 'create', 'delete']);
+  const tooMany = Array.from({ length: 11 }, (_, i) => ({ summary: `s${i}`, action: 'create', draft: { title: `t${i}` } }));
+  assert.throws(() => stageProposalBatch(tooMany, ctx()), /最多暂存 10 条/);
+});
+
+it('stageProposalBatch is atomic: any invalid entry rejects the whole batch', () => {
+  assert.throws(() => stageProposalBatch([
+    { summary: '合法', action: 'create', draft: { title: 'ok' } },
+    { summary: '非法', action: 'create', draft: { title: 'ok', groupId: '不存在' } }
+  ], ctx()), /分组不存在/);
+  assert.throws(() => stageProposalBatch([
+    { summary: '合法', action: 'create', draft: { title: 'ok' } },
+    { action: 'create', draft: { title: '缺 summary' } }
+  ], ctx()), /缺少 summary/);
+  assert.throws(() => stageProposalBatch([], ctx()), /非空数组/);
+  assert.throws(() => stageProposalBatch([{ summary: 'x', action: 'upsert', draft: {} }], ctx()), /action 只能是/);
+});
+
+it('recurring create aligns nextDueDate to target time (remindAt + lead)', () => {
+  const lead = 600_000;
+  const trigger = NOW + 3_600_000;
+  const proposal = stageProposal('create', { title: '打卡', type: 'recurring', cycleType: 'daily', remindAt: trigger, remindLeadMs: lead }, ctx());
+  const created = applyProposal(proposal, ctx())[2] as RecurringTodo;
+  assert.equal(created.remindAt, trigger);
+  assert.equal(created.nextDueDate, trigger + lead);
+});
+
+it('recurring update to remindAt realigns nextDueDate to the new target', () => {
+  const recurring: RecurringTodo = {
+    id: 'r1', title: '每日打卡', type: 'recurring', cycleType: 'daily', status: 'pending',
+    createdAt: 1, updatedAt: 1, order: 0, nextDueDate: NOW + 86_400_000,
+    remindAt: NOW + 86_400_000 - 600_000, remindLeadMs: 600_000
+  };
+  const c = ctx({ todos: [recurring] });
+  const newTarget = NOW + 2 * 86_400_000;
+  const proposal = stageProposal('update', { todoId: 'r1', remindAt: newTarget - 600_000, remindLeadMs: 600_000 }, c);
+  const target = applyProposal(proposal, c).find((item) => item.id === 'r1') as RecurringTodo;
+  assert.equal(target.remindAt, newTarget - 600_000);
+  assert.equal(target.nextDueDate, newTarget);
+});
+
+it('recurring update clearing remind keeps nextDueDate anchor', () => {
+  const recurring: RecurringTodo = {
+    id: 'r2', title: '每日打卡', type: 'recurring', cycleType: 'daily', status: 'pending',
+    createdAt: 1, updatedAt: 1, order: 0, nextDueDate: NOW + 86_400_000,
+    remindAt: NOW + 86_400_000 - 600_000, remindLeadMs: 600_000
+  };
+  const c = ctx({ todos: [recurring] });
+  const target = applyProposal(stageProposal('update', { todoId: 'r2', remindAt: 'clear' }, c), c).find((item) => item.id === 'r2') as RecurringTodo;
+  assert.equal(target.remindAt, undefined);
+  assert.equal(target.nextDueDate, NOW + 86_400_000);
 });

@@ -149,6 +149,29 @@ export function stageProposal(kind: AiProposalKind, raw: unknown, ctx: AiDataCon
   return { id: randomUUID(), kind, createdAt: ctx.now, before, draft };
 }
 
+export const STAGE_BATCH_MAX = 10;
+
+export interface StagedBatchEntry {
+  summary: string;
+  proposal: AiProposal;
+}
+
+/** 总览轮批量暂存：任一条校验失败整批抛错（调用方在全部通过前不入队，原子） */
+export function stageProposalBatch(entries: unknown, ctx: AiDataContext): StagedBatchEntry[] {
+  if (!Array.isArray(entries) || entries.length === 0) throw new Error('entries 必须是非空数组');
+  if (entries.length > STAGE_BATCH_MAX) throw new Error(`一次最多暂存 ${STAGE_BATCH_MAX} 条`);
+  const parsed = entries.map((entry) => {
+    const record = asRecord(entry);
+    const summary = typeof record.summary === 'string' ? record.summary.trim() : '';
+    if (!summary) throw new Error('每条缺少 summary（面向用户的一句话描述）');
+    if (record.action !== 'create' && record.action !== 'update' && record.action !== 'delete') {
+      throw new Error('action 只能是 create/update/delete');
+    }
+    return { summary, action: record.action as AiProposalKind, raw: record.draft };
+  });
+  return parsed.map((item) => ({ summary: item.summary, proposal: stageProposal(item.action, item.raw, ctx) }));
+}
+
 function touch(todo: Todo, now: number, deviceId: string): Todo {
   return { ...todo, updatedAt: Math.max(now, (todo.updatedAt ?? todo.createdAt ?? 0) + 1), deviceId };
 }
@@ -175,7 +198,8 @@ function applyCreate(draft: AiCreateDraft, ctx: AiDataContext): Todo {
     const recurring = base as Todo & { cycleType: CycleType; customCycleDays?: number; nextDueDate: number };
     recurring.cycleType = draft.cycleType!;
     if (draft.customCycleDays !== undefined) recurring.customCycleDays = draft.customCycleDays;
-    recurring.nextDueDate = draft.remindAt ?? ctx.now;
+    // 到期锚定目标时刻（remindAt 已扣提前量，加回 = 用户选的 HH:MM），推进时才保时刻
+    recurring.nextDueDate = draft.remindAt !== undefined ? draft.remindAt + (draft.remindLeadMs ?? 0) : ctx.now;
   }
   return base;
 }
@@ -213,6 +237,12 @@ export function applyProposal(proposal: AiProposal, ctx: AiDataContext, patch?: 
   if (draft.remindLeadMs !== undefined && draft.remindLeadMs !== 'clear') next.remindLeadMs = draft.remindLeadMs;
   if (draft.monitor === null) delete next.monitor;
   else if (draft.monitor !== undefined) next.monitor = draft.monitor;
+  if (next.type === 'recurring' && (draft.remindAt !== undefined || draft.remindLeadMs !== undefined)) {
+    const target = next.remindAt;
+    if (target !== undefined) {
+      (next as Todo & { nextDueDate?: number }).nextDueDate = target + (next.remindLeadMs ?? 0);
+    }
+  }
   if (draft.toggleStatus) next = toggleTodoStatus(next);
   return ctx.todos.map((todo) => (todo.id === next.id ? next : todo));
 }

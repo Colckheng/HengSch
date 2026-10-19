@@ -1,33 +1,53 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { AiChatMessage, AiProposal } from '@hengsch/shared-types';
+import type { AiChatMessage } from '@hengsch/shared-types';
 import { IconClose, IconGear, IconSend, IconStop } from './Icons';
 import { AiProposalCard, type AiCardStatus } from './AiProposalCard';
 import { AISettingsModal } from './AISettingsModal';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
+import {
+  emptyFlow,
+  appendText,
+  insertStaged,
+  commitCard,
+  cancelCard,
+  skipCard,
+  replaceAfterCancel,
+  markCard,
+  rebuildQueue,
+  toChatMessages,
+  type FlowState,
+  type FlowEntry
+} from '../ai-flow';
 
 interface DrawerNotice {
   kind: 'error' | 'info';
   text: string;
 }
 
-interface CardEntry {
-  proposal: AiProposal;
-  status: AiCardStatus;
-  errorText?: string;
+interface ReplaceTarget {
+  /** 被取消卡的 entry id（新条目插到它后面） */
+  anchorId: string;
+  /** 用于 [流程] 上下文的一句话（summary 或标题） */
+  label: string;
+  /** 被取消提案的 id（替换成功后从主进程队列丢弃） */
+  proposalId: string;
 }
 
 export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void }): JSX.Element {
-  const [messages, setMessages] = useState<AiChatMessage[]>([]);
+  const [flow, setFlow] = useState<FlowState>(emptyFlow);
   const [stream, setStream] = useState('');
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
   const [notice, setNotice] = useState<DrawerNotice | null>(null);
-  const [cards, setCards] = useState<CardEntry[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [amending, setAmending] = useState(false);
   const streamRef = useRef('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const replaceRef = useRef<ReplaceTarget | null>(null);
+  const restoredRef = useRef(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const { state: todoState } = useTodos();
   const { state: groupState } = useGroups();
 
@@ -48,6 +68,20 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         if (alive && !settings.apiKeySet) setNotice((current) => current ?? { kind: 'info', text: '未配置 AI：设置里填入 DeepSeek key 后可用' });
       })
       .catch(() => undefined);
+    // 未决队列恢复（仅当本会话还没有卡片时重建，只跑一次）
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      window.electronAPI.ai
+        .queueList()
+        .then((list) => {
+          if (!alive || !list.length) return;
+          setFlow((current) => {
+            if (current.entries.some((entry) => entry.kind === 'card')) return current;
+            return rebuildQueue(list);
+          });
+        })
+        .catch(() => undefined);
+    }
     return () => {
       alive = false;
     };
@@ -56,10 +90,21 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   useEffect(() => {
     const element = scrollRef.current;
     if (element) element.scrollTop = element.scrollHeight;
-  }, [messages, stream, cards, notice]);
+  }, [flow, stream, notice]);
+
+  /** 轮到显示的 pending 卡续 TTL（每个提案只 touch 一次） */
+  const touchedRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const pending = flow.entries.find(
+      (entry): entry is Extract<FlowEntry, { kind: 'card' }> => entry.kind === 'card' && entry.status === 'pending'
+    );
+    const proposalId = pending?.proposal.id;
+    if (!proposalId || proposalId === touchedRef.current) return;
+    touchedRef.current = proposalId;
+    void window.electronAPI.ai.queueTouch(proposalId).catch(() => undefined);
+  }, [flow]);
 
   async function sendMessages(next: AiChatMessage[]): Promise<void> {
-    setMessages(next);
     setBusy(true);
     setStream('');
     streamRef.current = '';
@@ -69,14 +114,23 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
       const streamed = streamRef.current;
       streamRef.current = '';
       setStream('');
-      if (streamed) setMessages((previous) => [...previous, { role: 'assistant', content: streamed }]);
+      if (streamed) setFlow((previous) => appendText(previous, 'assistant', streamed));
+      const target = replaceRef.current;
       if (result.proposals.length) {
-        setCards((previous) => [...previous, ...result.proposals.map((proposal) => ({ proposal, status: 'pending' as AiCardStatus }))]);
+        if (target) {
+          replaceRef.current = null;
+          setFlow((previous) => replaceAfterCancel(previous, target.anchorId, result.proposals));
+          window.electronAPI.ai.reject(target.proposalId).catch(() => undefined);
+        } else {
+          setFlow((previous) => insertStaged(previous, result.proposals));
+        }
       }
       if (result.error) setNotice({ kind: result.error === '已停止生成' ? 'info' : 'error', text: result.error });
     } catch (error) {
       streamRef.current = '';
       setStream('');
+      replaceRef.current = null;
+      setAmending(false);
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'AI 服务异常' });
     } finally {
       setBusy(false);
@@ -87,34 +141,48 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
     const text = input.trim();
     if (!text || busy) return;
     setInput('');
-    void sendMessages([...messages, { role: 'user', content: text }]);
+    const target = replaceRef.current;
+    const content = target ? `[流程] 重新暂存这条待办（原：${target.label}）。新要求：${text}` : text;
+    setAmending(false);
+    const next = appendText(flow, 'user', content);
+    setFlow(next);
+    void sendMessages(toChatMessages(next.entries));
   };
 
   const handleStop = () => {
     window.electronAPI.ai.stop().catch(() => undefined);
   };
 
-  const handleConfirm = async (id: string, patch?: unknown) => {
+  const handleConfirm = async (entryId: string, proposalId: string, patch?: unknown) => {
     try {
-      await window.electronAPI.ai.commit(id, patch);
-      setCards((previous) => previous.map((entry) => (entry.proposal.id === id ? { ...entry, status: 'committed', errorText: undefined } : entry)));
+      await window.electronAPI.ai.commit(proposalId, patch);
+      setFlow((previous) => commitCard(previous, entryId));
       setNotice(null);
-      window.setTimeout(() => setCards((previous) => previous.filter((entry) => entry.proposal.id !== id)), 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : '确认失败';
       const stale = /过期|已被删除|不存在|已变化/.test(message);
-      setCards((previous) => previous.map((entry) => (entry.proposal.id === id ? { ...entry, status: stale ? 'stale' : 'error', errorText: message } : entry)));
+      setFlow((previous) => markCard(previous, entryId, stale ? 'stale' : 'error', message));
     }
   };
 
-  const handleReject = async (id: string) => {
-    try {
-      await window.electronAPI.ai.reject(id);
-    } catch {
-      /* 主进程已丢弃时也把卡片收走 */
-    }
-    setCards((previous) => previous.map((entry) => (entry.proposal.id === id ? { ...entry, status: 'rejected', errorText: undefined } : entry)));
-    window.setTimeout(() => setCards((previous) => previous.filter((entry) => entry.proposal.id !== id)), 1500);
+  /** 取消：不出队不落盘，就地变已取消并问「这条怎么办？」 */
+  const handleCancel = (id: string) => {
+    replaceRef.current = null;
+    setAmending(false);
+    setFlow((previous) => cancelCard(previous, id));
+  };
+
+  const handleSkip = (cardEntryId: string, proposalId: string) => {
+    replaceRef.current = null;
+    setAmending(false);
+    window.electronAPI.ai.reject(proposalId).catch(() => undefined);
+    setFlow((previous) => skipCard(previous, cardEntryId));
+  };
+
+  const handleAmend = (cardEntryId: string, proposalId: string, label: string) => {
+    replaceRef.current = { anchorId: cardEntryId, label, proposalId };
+    setAmending(true);
+    inputRef.current?.focus();
   };
 
   const refreshKeyNotice = () => {
@@ -124,6 +192,67 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         setNotice(settings.apiKeySet ? null : { kind: 'info', text: '未配置 AI：设置里填入 DeepSeek key 后可用' });
       })
       .catch(() => undefined);
+  };
+
+  const renderEntry = (entry: FlowEntry): JSX.Element | null => {
+    if (entry.kind === 'text') {
+      return (
+        <div key={entry.id} className={entry.role === 'user' ? 'ai-msg-me' : 'ai-msg-ai'}>
+          <span className="ai-msg-role">{entry.role === 'user' ? 'YOU' : 'AI'}</span>
+          <div className="ai-msg-body">{entry.content}</div>
+        </div>
+      );
+    }
+    if (entry.kind === 'summary') {
+      return (
+        <div key={entry.id} className="ai-msg-ai">
+          <span className="ai-msg-role">AI</span>
+          <div className="ai-msg-body">{entry.content}</div>
+        </div>
+      );
+    }
+    if (entry.kind === 'system') {
+      return (
+        <div key={entry.id} className="ai-sys" role="status">
+          {entry.content}
+        </div>
+      );
+    }
+    if (entry.kind === 'ask') {
+      const card = flow.entries.find((item) => item.kind === 'card' && item.id === entry.forEntryId);
+      if (!card || card.kind !== 'card') return null;
+      const summary = card.proposal.summary
+        ?? (card.proposal.kind === 'create'
+          ? card.proposal.draft.title
+          : card.proposal.kind === 'update'
+            ? card.proposal.draft.title ?? card.proposal.before.title
+            : card.proposal.before.title);
+      return (
+        <div key={entry.id} className="ai-ask">
+          <span className="ai-ask-text">这条怎么办？</span>
+          <div className="ai-ask-actions">
+            <button type="button" className="button" onClick={() => handleAmend(card.id, card.proposal.id, summary)}>
+              改要求
+            </button>
+            <button type="button" className="button button-secondary" onClick={() => handleSkip(card.id, card.proposal.id)}>
+              跳过
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <AiProposalCard
+        key={entry.id}
+        proposal={entry.proposal}
+        status={entry.status as AiCardStatus}
+        errorText={entry.errorText}
+        todos={todoState.todos}
+        groups={groupState.groups}
+        onConfirm={(_proposalId, patch) => void handleConfirm(entry.id, entry.proposal.id, patch)}
+        onReject={() => handleCancel(entry.id)}
+      />
+    );
   };
 
   return (
@@ -142,33 +271,16 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
       <AISettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={refreshKeyNotice} />
       {notice && <div className={notice.kind === 'error' ? 'ai-err' : 'ai-notice'}>{notice.text}</div>}
       <div className="ai-msgs" ref={scrollRef}>
-        {messages.length === 0 && !stream && cards.length === 0 && (
+        {flow.entries.length === 0 && !stream && (
           <div className="ai-empty">READY · 例如「加一条明天 9 点报销」</div>
         )}
-        {messages.map((message, index) => (
-          <div key={`${index}-${message.role}`} className={message.role === 'user' ? 'ai-msg-me' : 'ai-msg-ai'}>
-            <span className="ai-msg-role">{message.role === 'user' ? 'YOU' : 'AI'}</span>
-            <div className="ai-msg-body">{message.content}</div>
-          </div>
-        ))}
+        {flow.entries.map(renderEntry)}
         {stream && (
           <div className="ai-msg-ai">
             <span className="ai-msg-role">AI</span>
             <div className="ai-msg-body ai-stream">{stream}</div>
           </div>
         )}
-        {cards.map((entry) => (
-          <AiProposalCard
-            key={entry.proposal.id}
-            proposal={entry.proposal}
-            status={entry.status}
-            errorText={entry.errorText}
-            todos={todoState.todos}
-            groups={groupState.groups}
-            onConfirm={(id, patch) => void handleConfirm(id, patch)}
-            onReject={(id) => void handleReject(id)}
-          />
-        ))}
       </div>
       <form
         className="ai-input"
@@ -178,6 +290,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         }}
       >
         <textarea
+          ref={inputRef}
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
@@ -186,7 +299,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
               submitText();
             }
           }}
-          placeholder="输入内容，回车发送（Shift+回车换行）"
+          placeholder={amending ? '说说新要求，回车发送' : '输入内容，回车发送（Shift+回车换行）'}
           rows={2}
           aria-label="AI 对话输入"
         />

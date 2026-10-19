@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stop: () => ipcRenderer.invoke('ai:stop'),
     commit: (id: string, patch?: unknown) => ipcRenderer.invoke('ai:commit', id, patch),
     reject: (id: string) => ipcRenderer.invoke('ai:reject', id),
+    queueList: () => ipcRenderer.invoke('ai:queue:list'),
+    queueTouch: (id: string) => ipcRenderer.invoke('ai:queue:touch', id),
     settingsGet: () => ipcRenderer.invoke('ai:settings:get'),
     settingsSet: (patch: unknown) => ipcRenderer.invoke('ai:settings:set', patch),
     settingsTest: (key?: string) => ipcRenderer.invoke('ai:settings:test', key),

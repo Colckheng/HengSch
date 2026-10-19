@@ -212,7 +212,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
             </>
           )}
 
-          <ReminderSection value={reminder} onChange={setReminder} />
+          <ReminderSection value={reminder} onChange={setReminder} recurring={type === 'recurring'} />
 
           <MonitorSection monitor={monitor} onChange={setMonitor} />
 

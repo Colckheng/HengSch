@@ -14,6 +14,7 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
   const [settings, setSettings] = useState<AiMaskedSettings | null>(null);
   const [keyInput, setKeyInput] = useState('');
   const [model, setModel] = useState<'deepseek-flash' | 'deepseek-v4-pro'>('deepseek-flash');
+  const [promptLevel, setPromptLevel] = useState<1 | 2>(1);
   const [verdict, setVerdict] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -31,6 +32,7 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
         if (!alive) return;
         setSettings(next);
         setModel(next.model);
+        setPromptLevel(next.promptLevel);
         setVerdict(next.monitorVerdictEnabled);
       })
       .catch(() => undefined);
@@ -103,6 +105,18 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
     }
   };
 
+  const updatePromptLevel = async (value: string) => {
+    const level: 1 | 2 = value === '2' ? 2 : 1;
+    setPromptLevel(level);
+    try {
+      const next = await window.electronAPI.ai.settingsSet({ promptLevel: level });
+      setSettings(next);
+      setNotice('已保存');
+    } catch {
+      setNotice('保存失败');
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content sync-modal" onClick={(event) => event.stopPropagation()}>
@@ -142,6 +156,17 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
                   options={[
                     { value: 'deepseek-flash', label: 'deepseek-flash' },
                     { value: 'deepseek-v4-pro', label: 'deepseek-v4-pro' }
+                  ]}
+                />
+              </label>
+              <label className="sync-wide">
+                详细程度
+                <SwissSelect
+                  value={String(promptLevel)}
+                  onChange={(value) => void updatePromptLevel(value)}
+                  options={[
+                    { value: '1', label: '只按我说的（默认）' },
+                    { value: '2', label: '缺的先问我' }
                   ]}
                 />
               </label>

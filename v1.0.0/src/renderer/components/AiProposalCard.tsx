@@ -127,8 +127,16 @@ export function AiProposalCard({ proposal, status, errorText, todos, groups, onC
   const isStale = status === 'stale' || staleByData;
   const settled = status === 'committed' || status === 'rejected';
   const shownError = localError ?? (status === 'error' ? errorText : undefined);
-  const statusLabel = status === 'committed' ? '已创建' : status === 'rejected' ? '已取消' : isStale ? '数据已变化' : '待确认';
+  const committedLabel = proposal.kind === 'create' ? '已创建' : proposal.kind === 'update' ? '已更新' : '已删除';
+  const statusLabel =
+    status === 'committed' ? committedLabel : status === 'rejected' ? '已取消' : isStale ? '数据已变化' : '待确认';
   const statusClass = status === 'committed' || status === 'rejected' ? 'ok' : isStale ? 'bad' : '';
+  const isRecurring =
+    proposal.kind === 'create'
+      ? proposal.draft.type === 'recurring'
+      : proposal.kind === 'update'
+        ? proposal.before.type === 'recurring'
+        : false;
 
   const handleReject = () => {
     if (settled) return;
@@ -299,6 +307,7 @@ export function AiProposalCard({ proposal, status, errorText, todos, groups, onC
       </div>
       <ReminderSection
         value={reminder}
+        recurring={isRecurring}
         onChange={(value) => {
           setReminder(value);
           setLocalError(null);

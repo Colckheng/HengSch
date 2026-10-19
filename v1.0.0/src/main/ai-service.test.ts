@@ -52,3 +52,24 @@ it('system prompt carries clock, groups, processes and rules', () => {
   assert.ok(prompt.includes('toggleStatus'));
   assert.equal(buildSystemPrompt([], [], [], Date.now()).includes('当前待办：\n（暂无待办）'), true);
 });
+
+it('system prompt carries serial flow rules for stage_batch overview', () => {
+  const prompt = buildSystemPrompt([], [], [], Date.now(), 1);
+  assert.ok(prompt.includes('stage_batch'));
+  assert.ok(prompt.includes('清单总览'));
+  assert.ok(prompt.includes('[流程]'));
+  assert.ok(prompt.includes('一次至多 10 条'));
+  assert.ok(prompt.includes('循环待办只关心“时刻”'));
+});
+
+it('promptLevel picks exactly one detail rule', () => {
+  const level1 = buildSystemPrompt([], [], [], Date.now(), 1);
+  assert.ok(level1.includes('详细程度档1'));
+  assert.ok(level1.includes('禁止向用户追问'));
+  assert.equal(level1.includes('详细程度档2'), false);
+
+  const level2 = buildSystemPrompt([], [], [], Date.now(), 2);
+  assert.ok(level2.includes('详细程度档2'));
+  assert.ok(level2.includes('编号列表集中提问'));
+  assert.equal(level2.includes('详细程度档1'), false);
+});
