@@ -135,9 +135,8 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
     return () => onState(sample.id, false, false);
   }, [sample.id, ball, gesture.phase, hot, onState]);
   useEffect(() => {
-    const next = cancel(current.current, bounds);
-    apply({ ...next, center: initialPosition(index, count, bounds) });
-  }, [apply, bounds, count, index]);
+    apply(cancel(current.current, bounds));
+  }, [apply, bounds]);
   useEffect(() => {
     const track = (event: PointerEvent): void => { cursor.current = { x: event.clientX, y: event.clientY }; };
     window.addEventListener('pointermove', track);
@@ -255,7 +254,7 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
   return <>
     <button ref={button} className={`paper-object ${leaving ? 'is-leaving' : ''}`} data-phase={gesture.phase} data-progress={gesture.progress.toFixed(3)} data-paper-id={sample.id} data-pointer-input={pointerInput}
       aria-label={`${ball ? '展开纸团' : '查看提醒'}：${sample.title}`}
-      style={{ zIndex: handling ? 40 : leaving ? 25 : 5 + index,
+      style={{ zIndex: handling ? 40 : leaving ? 25 : ball ? 24 : 5 + index,
         visibility: detail ? 'hidden' : 'visible' }}
       disabled={pending} onPointerDown={start} onPointerMove={drag} onPointerUp={end}
       onPointerCancel={resetGrip} onLostPointerCapture={() => { if (current.current.pointer !== null) resetGrip(); }}
