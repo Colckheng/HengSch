@@ -136,6 +136,20 @@ it('markCard sets stale/error without touching counters', () => {
   assert.equal(stale.committed, 0);
 });
 
+it('markCard cannot overwrite committed terminal state but can move pending → error → stale', () => {
+  const state = insertStaged(emptyFlow(), [proposal(undefined, 'x')]);
+  const card = cards(state)[0];
+  const errored = markCard(state, card.id, 'error', '确认失败');
+  assert.equal(cards(errored)[0].status, 'error');
+  const stale = markCard(errored, card.id, 'stale', '确认卡已过期');
+  assert.equal(cards(stale)[0].status, 'stale');
+
+  const committedState = commitCard(state, card.id);
+  const frozen = markCard(committedState, card.id, 'error', '并发失败');
+  assert.equal(cards(frozen)[0].status, 'committed');
+  assert.equal(cards(frozen)[0].errorText, undefined);
+});
+
 it('rebuildQueue restores pending cards from proposals', () => {
   const state = rebuildQueue([proposal('r1', 'x'), proposal('r2', 'y')]);
   assert.equal(cards(state).length, 1);

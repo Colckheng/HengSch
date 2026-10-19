@@ -50,6 +50,10 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const { state: todoState } = useTodos();
   const { state: groupState } = useGroups();
+  const flowRef = useRef(flow);
+  flowRef.current = flow;
+  const committingRef = useRef<Set<string>>(new Set());
+  const [committingIds, setCommittingIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     const off = window.electronAPI.ai.onChunk(({ delta }) => {
@@ -120,7 +124,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         if (target) {
           replaceRef.current = null;
           setFlow((previous) => replaceAfterCancel(previous, target.anchorId, result.proposals));
-          window.electronAPI.ai.reject(target.proposalId).catch(() => undefined);
+          window.electronAPI.ai.reject(target.proposalId).catch(() => setNotice({ kind: 'error', text: '原提案移出队列失败，请重试' }));
         } else {
           setFlow((previous) => insertStaged(previous, result.proposals));
         }
@@ -154,6 +158,9 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   };
 
   const handleConfirm = async (entryId: string, proposalId: string, patch?: unknown) => {
+    if (committingRef.current.has(entryId)) return;
+    committingRef.current.add(entryId);
+    setCommittingIds(new Set(committingRef.current));
     try {
       await window.electronAPI.ai.commit(proposalId, patch);
       setFlow((previous) => commitCard(previous, entryId));
@@ -161,7 +168,13 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
     } catch (error) {
       const message = error instanceof Error ? error.message : '确认失败';
       const stale = /过期|已被删除|不存在|已变化/.test(message);
-      setFlow((previous) => markCard(previous, entryId, stale ? 'stale' : 'error', message));
+      const entry = flowRef.current.entries.find((item) => item.id === entryId);
+      if (entry?.kind === 'card' && entry.status !== 'committed' && entry.status !== 'rejected') {
+        setFlow((previous) => markCard(previous, entryId, stale ? 'stale' : 'error', message));
+      }
+    } finally {
+      committingRef.current.delete(entryId);
+      setCommittingIds(new Set(committingRef.current));
     }
   };
 
@@ -175,7 +188,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const handleSkip = (cardEntryId: string, proposalId: string) => {
     replaceRef.current = null;
     setAmending(false);
-    window.electronAPI.ai.reject(proposalId).catch(() => undefined);
+    window.electronAPI.ai.reject(proposalId).catch(() => setNotice({ kind: 'error', text: '原提案移出队列失败，请重试' }));
     setFlow((previous) => skipCard(previous, cardEntryId));
   };
 
@@ -247,6 +260,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         proposal={entry.proposal}
         status={entry.status as AiCardStatus}
         errorText={entry.errorText}
+        busy={committingIds.has(entry.id)}
         todos={todoState.todos}
         groups={groupState.groups}
         onConfirm={(_proposalId, patch) => void handleConfirm(entry.id, entry.proposal.id, patch)}

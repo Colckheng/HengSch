@@ -4,7 +4,8 @@ import {
   computeRemindAt,
   stampReminded,
   rescheduleRemind,
-  advanceRecurringRemind
+  advanceRecurringRemind,
+  nextDueFromReminder
 } from './reminder';
 import { toggleTodoStatus } from './todo-utils';
 import type { Todo, RecurringTodo } from '@hengsch/shared-types';
@@ -135,5 +136,19 @@ describe('toggleTodoStatus · 循环提醒联动', () => {
     const completed = toggleTodoStatus(base({ id: 'b' }) as Todo);
     const reopened = toggleTodoStatus(completed) as RecurringTodo;
     expect(reopened.remindAt).toBeUndefined();
+  });
+});
+
+describe('nextDueFromReminder', () => {
+  it('有提醒 → 锚点等于目标时刻（remindAt + lead）', () => {
+    expect(nextDueFromReminder(NOW - 600_000, 600_000, NOW + HOUR)).toBe(NOW);
+  });
+
+  it('有提醒但缺 lead → 按 0 处理', () => {
+    expect(nextDueFromReminder(NOW, undefined, NOW + HOUR)).toBe(NOW);
+  });
+
+  it('无提醒 → 用 now 作锚', () => {
+    expect(nextDueFromReminder(undefined, undefined, NOW + HOUR)).toBe(NOW + HOUR);
   });
 });

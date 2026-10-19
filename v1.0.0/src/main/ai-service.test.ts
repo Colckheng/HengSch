@@ -1,7 +1,8 @@
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt } from './ai-service';
+import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings } from './ai-service';
 import type { Todo, Group } from '@hengsch/shared-types';
+import type Store from 'electron-store';
 
 it('SSE feed survives arbitrary chunk boundaries and keeps partial lines buffered', () => {
   const feed = createSseFeed();
@@ -72,4 +73,21 @@ it('promptLevel picks exactly one detail rule', () => {
   assert.ok(level2.includes('详细程度档2'));
   assert.ok(level2.includes('编号列表集中提问'));
   assert.equal(level2.includes('详细程度档1'), false);
+});
+
+it('writeAiSettings rejects invalid promptLevel and keeps current when omitted', () => {
+  const data: Record<string, unknown> = {};
+  const fake = {
+    get: (key: string) => data[key],
+    set: (key: string, value: unknown) => {
+      data[key] = value;
+    }
+  } as unknown as Store;
+  const saved = writeAiSettings(fake, { promptLevel: 2 });
+  assert.equal(saved.promptLevel, 2);
+  assert.throws(() => writeAiSettings(fake, { promptLevel: 3 as unknown as 1 }), /详细程度只能是 1 或 2/);
+  assert.throws(() => writeAiSettings(fake, { promptLevel: '2' as unknown as 1 }), /详细程度只能是 1 或 2/);
+  const kept = writeAiSettings(fake, { monitorVerdictEnabled: true });
+  assert.equal(kept.promptLevel, 2);
+  assert.equal(kept.monitorVerdictEnabled, true);
 });

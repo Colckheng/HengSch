@@ -18,6 +18,8 @@ interface AiProposalCardProps {
   proposal: AiProposal;
   status: AiCardStatus;
   errorText?: string;
+  /** 提交进行中：确认按钮禁用并显示「确认中…」，防双击重复落盘 */
+  busy?: boolean;
   todos: Todo[];
   groups: Group[];
   onConfirm: (id: string, patch?: unknown) => void;
@@ -57,7 +59,7 @@ function monitorToConfig(draft: MonitorDraft): MonitorConfig | undefined {
   };
 }
 
-export function AiProposalCard({ proposal, status, errorText, todos, groups, onConfirm, onReject }: AiProposalCardProps): JSX.Element {
+export function AiProposalCard({ proposal, status, errorText, busy = false, todos, groups, onConfirm, onReject }: AiProposalCardProps): JSX.Element {
   const uid = useId();
   const isCreate = proposal.kind === 'create';
 
@@ -216,15 +218,15 @@ export function AiProposalCard({ proposal, status, errorText, todos, groups, onC
           </div>
         )}
         <div className="modal-footer ai-card-footer">
-          <button type="button" className="button button-secondary" onClick={handleReject} disabled={settled}>
+          <button type="button" className="button button-secondary" onClick={handleReject} disabled={settled || busy}>
             取消
           </button>
           {armed ? (
-            <button type="button" className="button ai-card-danger" onClick={() => onConfirm(proposal.id)} disabled={settled || isStale}>
-              确认删除
+            <button type="button" className="button ai-card-danger" onClick={() => onConfirm(proposal.id)} disabled={settled || isStale || busy}>
+              {busy ? '确认中…' : '确认删除'}
             </button>
           ) : (
-            <button type="button" className="button button-primary" onClick={() => setArmed(true)} disabled={settled || isStale}>
+            <button type="button" className="button button-primary" onClick={() => setArmed(true)} disabled={settled || isStale || busy}>
               删除
             </button>
           )}
@@ -397,11 +399,11 @@ export function AiProposalCard({ proposal, status, errorText, todos, groups, onC
         </div>
       )}
       <div className="modal-footer ai-card-footer">
-        <button type="button" className="button button-secondary" onClick={handleReject} disabled={settled}>
+        <button type="button" className="button button-secondary" onClick={handleReject} disabled={settled || busy}>
           取消
         </button>
-        <button type="submit" className="button button-primary" disabled={settled || isStale}>
-          {isCreate ? '创建' : '确认'}
+        <button type="submit" className="button button-primary" disabled={settled || isStale || busy}>
+          {busy ? '确认中…' : isCreate ? '创建' : '确认'}
         </button>
       </div>
     </form>

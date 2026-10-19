@@ -123,12 +123,15 @@ export function replaceAfterCancel(state: FlowState, anchorCardId: string, propo
   return { ...state, entries: next };
 }
 
+/** 仅 pending/error 可被标注；committed/rejected 终态不覆写（防双击/竞态误翻） */
 export function markCard(state: FlowState, cardEntryId: string, status: CardStatus, errorText?: string): FlowState {
   return {
     ...state,
-    entries: state.entries.map((entry) =>
-      entry.kind === 'card' && entry.id === cardEntryId ? { ...entry, status, errorText } : entry
-    )
+    entries: state.entries.map((entry) => {
+      if (entry.kind !== 'card' || entry.id !== cardEntryId) return entry;
+      if (entry.status === 'committed' || entry.status === 'rejected') return entry;
+      return { ...entry, status, errorText };
+    })
   };
 }
 

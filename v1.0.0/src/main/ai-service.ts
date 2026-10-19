@@ -58,12 +58,15 @@ export function maskedAiSettings(store: Store): Omit<AiSettings, 'apiKey'> & { a
 }
 
 export function writeAiSettings(store: Store, patch: Partial<AiSettings>): AiSettings {
+  if (patch.promptLevel !== undefined && patch.promptLevel !== 1 && patch.promptLevel !== 2) {
+    throw new Error('详细程度只能是 1 或 2');
+  }
   const current = readAiSettings(store);
   const next: AiSettings = {
     apiKey: patch.apiKey !== undefined ? (patch.apiKey || undefined) : current.apiKey,
     model: patch.model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : patch.model === 'deepseek-flash' ? 'deepseek-flash' : current.model,
     monitorVerdictEnabled: patch.monitorVerdictEnabled !== undefined ? patch.monitorVerdictEnabled === true : current.monitorVerdictEnabled,
-    promptLevel: patch.promptLevel === 2 ? 2 : patch.promptLevel === 1 ? 1 : current.promptLevel
+    promptLevel: patch.promptLevel ?? current.promptLevel
   };
   store.set('aiSettings', next);
   return next;
@@ -498,6 +501,7 @@ export async function runAiChat(options: { messages: AiChatMessage[]; processNam
   if (!settings.apiKey) return { proposals: [], error: '未配置 AI：请先在设置里填入 DeepSeek API key' };
   const processNames = options.processNames ?? lastProcessNames;
   lastProcessNames = processNames;
+  if (activeRun) return { proposals: [], error: 'AI 正在生成中，请先停止或等待完成' };
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -517,7 +521,7 @@ export async function runAiChat(options: { messages: AiChatMessage[]; processNam
     return { proposals: staged, error: message };
   } finally {
     clearTimeout(timer);
-    activeRun = null;
+    if (activeRun === controller) activeRun = null;
   }
 }
 

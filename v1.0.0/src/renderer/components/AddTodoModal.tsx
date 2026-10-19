@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { TodoType, CycleType, MonitorConfig } from '../types';
+import { nextDueFromReminder } from '@hengsch/shared-logic';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import { IconClose } from './Icons';
@@ -73,7 +74,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
         status: 'pending',
         cycleType,
         customCycleDays: cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined,
-        nextDueDate: Date.now(),
+        nextDueDate: nextDueFromReminder(reminder?.remindAt, reminder?.remindLeadMs, Date.now()),
         groupId: selectedGroupId,
         monitor,
         remindAt: reminder?.remindAt,

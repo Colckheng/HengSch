@@ -223,7 +223,9 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
       if (!mounted.current) return;
       setError('操作未保存，请重试。');
       onActive('操作未保存，提醒仍保留，可以重试。');
-      busy.current = false; setPending(false);
+    } finally {
+      busy.current = false;
+      setPending(false);
     }
   };
   const end = (event: React.PointerEvent<HTMLButtonElement>): void => {

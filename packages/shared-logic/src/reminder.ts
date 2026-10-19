@@ -44,3 +44,12 @@ export function advanceRecurringRemind(
     remindedAt: undefined
   };
 }
+
+/**
+ * 循环待办创建/改期时的到期锚点：
+ * 等于用户选的"目标时刻"（remindAt 已扣提前量，加回即 HH:MM）；未配置提醒时用 now 作锚。
+ * 推进语义见 calculateNextDueDate（保时刻逐轮推进）。
+ */
+export function nextDueFromReminder(remindAt: number | undefined, leadMs: number | undefined, now: number): number {
+  return typeof remindAt === 'number' ? remindAt + (leadMs ?? 0) : now;
+}

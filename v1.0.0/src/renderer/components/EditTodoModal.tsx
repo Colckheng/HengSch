@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Todo, TodoType, CycleType, RecurringTodo, MonitorConfig } from '../types';
+import { nextDueFromReminder } from '@hengsch/shared-logic';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import { IconClose } from './Icons';
@@ -107,6 +108,10 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
       recurringUpdateData.cycleType = cycleType;
       const parsedDays = parseInt(customCycleDays);
       recurringUpdateData.customCycleDays = cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined;
+      // 锚点跟随提醒目标时刻；清除提醒保持原锚（与 AI 提案语义一致）
+      recurringUpdateData.nextDueDate = reminder?.remindAt !== undefined
+        ? nextDueFromReminder(reminder.remindAt, reminder.remindLeadMs ?? 0, Date.now())
+        : (todo as RecurringTodo).nextDueDate;
       updateTodo(todo.id, recurringUpdateData);
     } else {
       updateTodo(todo.id, updateData);

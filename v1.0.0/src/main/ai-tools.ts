@@ -1,5 +1,5 @@
 import type { Todo, Group, MonitorConfig, CycleType, AiProposal, AiProposalKind, AiCreateDraft, AiUpdateDraft, AiDeleteDraft } from '@hengsch/shared-types';
-import { toggleTodoStatus, generateTodoId } from '@hengsch/shared-logic';
+import { toggleTodoStatus, generateTodoId, nextDueFromReminder } from '@hengsch/shared-logic';
 import { randomUUID } from 'crypto';
 
 export interface AiDataContext {
@@ -199,7 +199,7 @@ function applyCreate(draft: AiCreateDraft, ctx: AiDataContext): Todo {
     recurring.cycleType = draft.cycleType!;
     if (draft.customCycleDays !== undefined) recurring.customCycleDays = draft.customCycleDays;
     // 到期锚定目标时刻（remindAt 已扣提前量，加回 = 用户选的 HH:MM），推进时才保时刻
-    recurring.nextDueDate = draft.remindAt !== undefined ? draft.remindAt + (draft.remindLeadMs ?? 0) : ctx.now;
+    recurring.nextDueDate = nextDueFromReminder(draft.remindAt, draft.remindLeadMs, ctx.now);
   }
   return base;
 }
@@ -240,7 +240,7 @@ export function applyProposal(proposal: AiProposal, ctx: AiDataContext, patch?: 
   if (next.type === 'recurring' && (draft.remindAt !== undefined || draft.remindLeadMs !== undefined)) {
     const target = next.remindAt;
     if (target !== undefined) {
-      (next as Todo & { nextDueDate?: number }).nextDueDate = target + (next.remindLeadMs ?? 0);
+      (next as Todo & { nextDueDate?: number }).nextDueDate = nextDueFromReminder(target, next.remindLeadMs, ctx.now);
     }
   }
   if (draft.toggleStatus) next = toggleTodoStatus(next);
