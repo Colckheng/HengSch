@@ -699,6 +699,50 @@ button {
   color: var(--signal);
 }
 
+.foot-ai {
+  position: relative;
+}
+
+.foot-ai-dot {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--paper);
+}
+
+.foot-ai-dot.busy {
+  width: 8px;
+  min-width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--signal);
+  animation: foot-ai-pulse 1s ease-in-out infinite;
+}
+
+.foot-ai-dot.pending {
+  background: var(--signal);
+  color: #fff;
+  border-radius: 6px;
+}
+
+@keyframes foot-ai-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .app-body {
   flex: 1;
   display: flex;
@@ -718,17 +762,26 @@ button {
 }
 
 .ai-drawer {
-  display: none;
-  flex: 0 0 360px;
+  display: flex;
+  flex: 0 0 0;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   flex-direction: column;
   background: var(--paper);
   border-left: 1px solid var(--hairline);
+  visibility: hidden;
+  pointer-events: none;
+  transition: flex-basis 0.24s ease, opacity 0.24s ease, visibility 0s linear 0.24s;
+  opacity: 0;
 }
 
 .ai-drawer.open {
-  display: flex;
+  flex-basis: 360px;
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+  transition: flex-basis 0.24s ease, opacity 0.24s ease, visibility 0s linear 0s;
 }
 
 @media (max-width: 860px) {
@@ -1119,6 +1172,140 @@ button {
   color: var(--signal);
 }
 
+/* F-2 确认中卡片脉冲边框 */
+.ai-card.is-busy {
+  border-color: var(--signal);
+  animation: ai-busy-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes ai-busy-pulse {
+  50% {
+    border-color: var(--hairline-strong);
+  }
+}
+
+/* F-4 首 token 前骨架气泡 */
+.ai-skeleton i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  animation: ai-skeleton-blink 1s ease-in-out infinite;
+}
+
+.ai-skeleton i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ai-skeleton i:nth-child(3) {
+  animation-delay: 0.3s;
+  margin-right: 0;
+}
+
+@keyframes ai-skeleton-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* F-5 改要求模式条 */
+.ai-amend-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s1);
+  padding: 7px var(--s2);
+  border-top: 1px solid var(--hairline-strong);
+  background: var(--paper-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.ai-amend-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-amend-exit {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.ai-amend-exit:hover {
+  color: var(--signal);
+}
+
+/* F-1 回到底部浮标 */
+.ai-jump {
+  position: sticky;
+  bottom: 8px;
+  align-self: center;
+  z-index: 5;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ai-jump:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+/* F-9 消息/卡片入场 */
+.ai-card,
+.ai-msg-me,
+.ai-msg-ai,
+.ai-sys {
+  animation: ai-in 0.18s ease both;
+}
+
+@keyframes ai-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-card,
+  .ai-msg-me,
+  .ai-msg-ai,
+  .ai-sys,
+  .ai-card.is-busy,
+  .ai-skeleton i,
+  .foot-ai-dot.busy {
+    animation: none;
+  }
+
+  .ai-drawer {
+    transition: none;
+  }
+}
+
 .ai-delete-title {
   font-size: 13.5px;
   font-weight: 700;
@@ -1178,6 +1365,11 @@ button {
   font-size: 10.5px;
 }
 
+.ai-ask-actions .button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .ai-input {
   flex: 0 0 auto;
   border-top: 1px solid var(--hairline);
@@ -1197,6 +1389,8 @@ button {
   font-family: var(--font);
   font-size: 13px;
   line-height: 1.5;
+  max-height: 130px;
+  overflow-y: auto;
 }
 
 .ai-input textarea::placeholder {
@@ -1240,6 +1434,32 @@ button {
 .ai-stop:hover {
   background: var(--signal);
   color: #fff;
+}
+
+/* F-6 发送/停止/关闭按钮过渡与 active */
+.ai-send,
+.ai-stop,
+.ai-drawer-close {
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ai-send:active:not(:disabled),
+.ai-stop:active:not(:disabled),
+.ai-drawer-close:active {
+  transform: translateY(1px);
+}
+
+.ai-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--hairline-strong);
+  border-color: var(--hairline-strong);
+  color: var(--ink-3);
+}
+
+.ai-send:disabled:hover {
+  background: var(--hairline-strong);
+  border-color: var(--hairline-strong);
 }
 
 /* ---------------- sync settings modal ---------------- */

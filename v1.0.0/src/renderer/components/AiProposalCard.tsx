@@ -211,7 +211,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
 
   if (proposal.kind === 'delete') {
     return (
-      <section className={`ai-card ai-card-delete ${statusClass}`} aria-label="删除确认卡">
+      <section className={`ai-card ai-card-delete ${statusClass}${busy ? ' is-busy' : ''}`} aria-label="删除确认卡">
         <div className="ai-card-line">
           <span className="ai-card-kind danger">删除</span>
           <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
@@ -258,7 +258,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
   const beforeChip = proposal.kind === 'update' ? proposal.before : null;
 
   return (
-    <form className={`ai-card ${statusClass}`} onSubmit={handleSubmit} aria-label={isCreate ? '新建确认卡' : '修改确认卡'}>
+    <form className={`ai-card ${statusClass}${busy ? ' is-busy' : ''}`} onSubmit={handleSubmit} aria-label={isCreate ? '新建确认卡' : '修改确认卡'}>
       <div className="ai-card-line">
         <span className="ai-card-kind">{isCreate ? '新建' : '修改'}</span>
         <span className="ai-card-chip">{chip}</span>

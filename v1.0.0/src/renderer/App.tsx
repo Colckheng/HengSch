@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { TodoProvider, useTodos } from './context/TodoContext';
 import { WindowProvider, useWindow } from './context/WindowContext';
 import { GroupProvider, useGroups } from './context/GroupContext';
@@ -37,6 +37,10 @@ function AppContent(): JSX.Element {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
   const [isAiOpen, setIsAiOpen] = useState(false);
+  const [aiActivity, setAiActivity] = useState<{ busy: boolean; pendingCount: number }>({ busy: false, pendingCount: 0 });
+  const handleAiActivityChange = useCallback((info: { busy: boolean; pendingCount: number }) => {
+    setAiActivity(info);
+  }, []);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
@@ -257,6 +261,12 @@ function AppContent(): JSX.Element {
                 aria-pressed={isAiOpen}
               >
                 <IconAI size={14} />
+                {!isAiOpen && aiActivity.busy && <i className="foot-ai-dot busy" aria-hidden="true" />}
+                {!isAiOpen && !aiActivity.busy && aiActivity.pendingCount > 0 && (
+                  <i className="foot-ai-dot pending" aria-hidden="true">
+                    {aiActivity.pendingCount}
+                  </i>
+                )}
               </button>
               <button className="foot-reminder" onClick={() => setIsReminderSettingsOpen(true)} aria-label="提醒设置" title="提醒设置">
                 <IconBell size={14} />
@@ -267,7 +277,7 @@ function AppContent(): JSX.Element {
             </footer>
           )}
         </div>
-        <AiDrawer open={isAiOpen} onClose={() => setIsAiOpen(false)} />
+        <AiDrawer open={isAiOpen} onClose={() => setIsAiOpen(false)} onActivityChange={handleAiActivityChange} />
       </div>
       {isCompactMode && (
         <form className="compact-add" onSubmit={handleQuickAdd}>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { AiChatMessage } from '@hengsch/shared-types';
 import { IconClose, IconGear, IconSend, IconStop } from './Icons';
@@ -35,7 +35,15 @@ interface ReplaceTarget {
   proposalId: string;
 }
 
-export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void }): JSX.Element {
+export function AiDrawer({
+  open,
+  onClose,
+  onActivityChange
+}: {
+  open: boolean;
+  onClose: () => void;
+  onActivityChange?: (info: { busy: boolean; pendingCount: number }) => void;
+}): JSX.Element {
   const [flow, setFlow] = useState<FlowState>(emptyFlow);
   const [stream, setStream] = useState('');
   const [busy, setBusy] = useState(false);
@@ -43,11 +51,14 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const [notice, setNotice] = useState<DrawerNotice | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [amending, setAmending] = useState(false);
+  const [showJump, setShowJump] = useState(false);
   const streamRef = useRef('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const replaceRef = useRef<ReplaceTarget | null>(null);
   const restoredRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const atBottomRef = useRef(true);
+  const justSentRef = useRef(false);
   const { state: todoState } = useTodos();
   const { state: groupState } = useGroups();
   const flowRef = useRef(flow);
@@ -55,6 +66,15 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const committingRef = useRef<Set<string>>(new Set());
   const [committingIds, setCommittingIds] = useState<ReadonlySet<string>>(() => new Set());
   const lastSentRef = useRef<AiChatMessage[] | null>(null);
+
+  const pendingCount = useMemo(
+    () => flow.entries.filter((entry) => entry.kind === 'card' && entry.status === 'pending').length,
+    [flow]
+  );
+
+  useEffect(() => {
+    onActivityChange?.({ busy, pendingCount });
+  }, [busy, pendingCount, onActivityChange]);
 
   useEffect(() => {
     const off = window.electronAPI.ai.onChunk(({ delta }) => {
@@ -94,8 +114,40 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   useEffect(() => {
     const element = scrollRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [flow, stream, notice]);
+    if (!element) return;
+    // F-3 打开即聚焦 + 定位到底部
+    if (open) {
+      atBottomRef.current = true;
+      element.scrollTop = element.scrollHeight;
+      inputRef.current?.focus();
+      return;
+    }
+    // F-1 仅在原本就在底部（或刚发送）时吸底；上翻回看不被拽回
+    if (atBottomRef.current || justSentRef.current) {
+      element.scrollTop = element.scrollHeight;
+    }
+    if (!stream) {
+      justSentRef.current = false;
+      if (atBottomRef.current) setShowJump(false);
+    }
+  }, [flow, stream, notice, open]);
+
+  const handleMsgScroll = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const nearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
+    atBottomRef.current = nearBottom;
+    if (nearBottom) setShowJump(false);
+    else if (flowRef.current.entries.length > 0) setShowJump(true);
+  };
+
+  const jumpToLatest = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    atBottomRef.current = true;
+    element.scrollTop = element.scrollHeight;
+    setShowJump(false);
+  };
 
   /** 轮到显示的 pending 卡续 TTL（每个提案只 touch 一次） */
   const touchedRef = useRef<string | undefined>(undefined);
@@ -145,13 +197,19 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   const submitText = () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if (busy) {
+      setNotice({ kind: 'info', text: '正在生成中，先停止或等本次完成' });
+      return;
+    }
+    if (!text) return;
     setInput('');
+    if (inputRef.current) inputRef.current.style.height = '';
     const target = replaceRef.current;
     const content = target ? `[流程] 重新暂存这条待办（原：${target.label}）。新要求：${text}` : text;
     setAmending(false);
     const next = appendText(flow, 'user', content, target ? text : undefined);
     setFlow(next);
+    justSentRef.current = true;
     void sendMessages(toChatMessages(next.entries));
   };
 
@@ -206,6 +264,30 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
     inputRef.current?.focus();
   };
 
+  const exitAmend = () => {
+    replaceRef.current = null;
+    setAmending(false);
+    inputRef.current?.focus();
+  };
+
+  const handleNewSession = () => {
+    replaceRef.current = null;
+    setAmending(false);
+    setNotice(null);
+    setFlow((previous) => ({
+      ...previous,
+      entries: previous.entries.filter((entry) => entry.kind !== 'text' && entry.kind !== 'summary')
+    }));
+  };
+
+  const handleInputAutoGrow = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value);
+    const element = event.target;
+    element.style.height = 'auto';
+    const max = 6 * 1.5 * 13 + 16;
+    element.style.height = `${Math.min(element.scrollHeight, max)}px`;
+  };
+
   const refreshKeyNotice = () => {
     window.electronAPI.ai
       .settingsGet()
@@ -256,10 +338,10 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         <div key={entry.id} className="ai-ask">
           <span className="ai-ask-text">这条怎么办？</span>
           <div className="ai-ask-actions">
-            <button type="button" className="button" onClick={() => handleAmend(card.id, card.proposal.id, summary)}>
+            <button type="button" className="button" onClick={() => handleAmend(card.id, card.proposal.id, summary)} disabled={busy}>
               改要求
             </button>
-            <button type="button" className="button button-secondary" onClick={() => handleSkip(card.id, card.proposal.id)}>
+            <button type="button" className="button button-secondary" onClick={() => handleSkip(card.id, card.proposal.id)} disabled={busy}>
               跳过
             </button>
           </div>
@@ -286,6 +368,9 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
       <div className="ai-drawer-head">
         <span className="ai-drawer-title">AI 管家</span>
         <div className="ai-drawer-head-actions">
+          <button type="button" className="ai-drawer-close" onClick={handleNewSession} aria-label="新会话" title="新会话（清空对话，保留待确认卡片）">
+            ＋
+          </button>
           <button type="button" className="ai-drawer-close" onClick={() => setSettingsOpen(true)} aria-label="AI 设置" title="设置">
             <IconGear size={14} />
           </button>
@@ -310,8 +395,8 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
           </span>
         </div>
       )}
-      <div className="ai-msgs" ref={scrollRef}>
-        {flow.entries.length === 0 && !stream && (
+      <div className="ai-msgs" ref={scrollRef} onScroll={handleMsgScroll}>
+        {flow.entries.length === 0 && !stream && !busy && (
           <div className="ai-empty">READY · 例如「加一条明天 9 点报销」</div>
         )}
         {flow.entries.map(renderEntry)}
@@ -321,7 +406,28 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
             <div className="ai-msg-body ai-stream">{stream}</div>
           </div>
         )}
+        {busy && !stream && (
+          <div className="ai-msg-ai">
+            <span className="ai-msg-role">AI</span>
+            <div className="ai-msg-body ai-skeleton" aria-label="正在生成">
+              <i /> <i /> <i />
+            </div>
+          </div>
+        )}
+        {showJump && (
+          <button type="button" className="ai-jump" onClick={jumpToLatest}>
+            ↓ 回到最新
+          </button>
+        )}
       </div>
+      {amending && replaceRef.current && (
+        <div className="ai-amend-bar" role="status">
+          <span className="ai-amend-text">正在改要求：{replaceRef.current.label}</span>
+          <button type="button" className="ai-amend-exit" onClick={exitAmend} aria-label="退出改要求" title="退出改要求">
+            ✕
+          </button>
+        </div>
+      )}
       <form
         className="ai-input"
         onSubmit={(event: FormEvent) => {
@@ -332,7 +438,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         <textarea
           ref={inputRef}
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={handleInputAutoGrow}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
@@ -349,7 +455,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
               <IconStop size={11} /> 停止
             </button>
           ) : (
-            <button type="submit" className="ai-send" title="发送">
+            <button type="submit" className="ai-send" title="发送" disabled={!input.trim()}>
               <IconSend size={11} /> 发送
             </button>
           )}
