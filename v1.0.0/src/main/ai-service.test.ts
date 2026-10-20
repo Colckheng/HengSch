@@ -1,6 +1,6 @@
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings } from './ai-service';
+import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings, initAiService, runAiChat, cancelAiChat } from './ai-service';
 import type { Todo, Group } from '@hengsch/shared-types';
 import type Store from 'electron-store';
 
@@ -90,4 +90,38 @@ it('writeAiSettings rejects invalid promptLevel and keeps current when omitted',
   const kept = writeAiSettings(fake, { monitorVerdictEnabled: true });
   assert.equal(kept.promptLevel, 2);
   assert.equal(kept.monitorVerdictEnabled, true);
+});
+
+it('runAiChat concurrency gate rejects second call while first is active', async () => {
+  const data: Record<string, unknown> = {
+    aiSettings: { apiKey: 'sk-test', model: 'deepseek-flash', monitorVerdictEnabled: false, promptLevel: 1 },
+    todos: [],
+    groups: []
+  };
+  const fake = {
+    get: (key: string) => data[key],
+    set: (key: string, value: unknown) => {
+      data[key] = value;
+    }
+  } as unknown as Store;
+  initAiService(fake, () => undefined);
+  const originalFetch = globalThis.fetch;
+  const gate: { release?: () => void } = {};
+  globalThis.fetch = (() =>
+    new Promise<Response>((resolve) => {
+      gate.release = () => resolve(new Response('data: [DONE]\n', { status: 200 }));
+    })) as typeof fetch;
+  try {
+    const first = runAiChat({ messages: [{ role: 'user', content: 'hi' }], processNames: [] });
+    // 让第一轮进入 fetch 挂起后再发第二轮
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const second = await runAiChat({ messages: [{ role: 'user', content: 'again' }], processNames: [] });
+    assert.equal(second.proposals.length, 0);
+    assert.equal(second.error, 'AI 正在生成中，请先停止或等待完成');
+    gate.release?.();
+    await first;
+  } finally {
+    cancelAiChat();
+    globalThis.fetch = originalFetch;
+  }
 });

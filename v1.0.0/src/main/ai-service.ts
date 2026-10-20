@@ -470,14 +470,22 @@ async function runToolLoop(
           }
           content = listTodosContent(includeCompleted, ctx);
         } else {
-          const batch = parseToolStaging(call.name, call.args, ctx);
-          for (const item of batch) {
-            staged.push(item.proposal);
-            proposals.set(item.proposal.id, { proposal: item.proposal, expires: Date.now() + PROPOSAL_TTL_MS });
+          // D-2 重入门禁：已有未决提案时不再静默排队，把明确信息回给模型
+          const pendingCount = [...proposals.values()].filter((entry) => entry.expires > Date.now()).length;
+          if (pendingCount > 0) {
+            content = JSON.stringify({
+              error: `已有 ${pendingCount} 条待确认提案，请先让用户确认或跳过现有卡片后再暂存新提案`
+            });
+          } else {
+            const batch = parseToolStaging(call.name, call.args, ctx);
+            for (const item of batch) {
+              staged.push(item.proposal);
+              proposals.set(item.proposal.id, { proposal: item.proposal, expires: Date.now() + PROPOSAL_TTL_MS });
+            }
+            content = batch.length > 1 || call.name === 'stage_batch'
+              ? JSON.stringify({ staged: true, count: batch.length, proposalIds: batch.map((item) => item.proposal.id), note: `已生成 ${batch.length} 张预览卡，按顺序等用户确认` })
+              : JSON.stringify({ staged: true, proposalId: batch[0].proposal.id, note: '已生成预览卡，等待用户确认' });
           }
-          content = batch.length > 1 || call.name === 'stage_batch'
-            ? JSON.stringify({ staged: true, count: batch.length, proposalIds: batch.map((item) => item.proposal.id), note: `已生成 ${batch.length} 张预览卡，按顺序等用户确认` })
-            : JSON.stringify({ staged: true, proposalId: batch[0].proposal.id, note: '已生成预览卡，等待用户确认' });
         }
       } catch (error) {
         content = JSON.stringify({ error: error instanceof Error ? error.message : '参数错误' });

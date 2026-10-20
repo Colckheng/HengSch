@@ -46,23 +46,26 @@
 
 ## 4. IPC 契约（均校验 `event.sender === mainWindow.webContents`）
 
+> 2026-10-19 按实现回写：暂存（stage）内嵌在 `ai:chat` 的工具循环里，没有独立的 `ai:stage` / `ai:done` / `ai:proposal` 通道；提案列表随 `ai:chat` 的 invoke 返回值 `{ proposals, error? }` 一次带回。语音与监测判定通道为规划项，尚未实现。
+
 | 通道 | 方向 | 载荷 |
 | --- | --- | --- |
-| `ai:chat` | invoke | `{ messages: {role:'user'\|'assistant', content:string}[] }`，主进程流式应答 |
+| `ai:chat` | invoke | `{ messages: {role:'user'\|'assistant', content:string}[] }` → `{ proposals: Proposal[], error?: string }`；内部流式回推 chunk，工具循环内暂存提案 |
 | `ai:chunk` | main→renderer | `{ delta }` 逐字增量 |
-| `ai:done` | main→renderer | `{ proposals: Proposal[], error?: string, usage? }` |
-| `ai:stop` | renderer→main | 中断当前请求（AbortController） |
-| `ai:proposal` | main→renderer | 写动作暂存结果（通常随 `ai:done` 一起到） |
-| `ai:commit` | invoke | `{ proposalId, patch }` → `{ ok, error? }`，编辑后的字段为最终数据 |
-| `ai:reject` | invoke | `{ proposalId }` → `{ ok }` |
-| `ai:queue:list` | invoke | 主进程未决队列 `[{id, summary, proposal}]`（抽屉挂载/重启重建用，见 §13.2） |
-| `ai:voice` | invoke | `Uint8Array` 音频 → `{ text }` / `{ error }` |
-| `ai:settings:get` / `ai:settings:set` | invoke | key、模型、监测开关（掩码读回） |
-| `ai:voice-model` | invoke | `{ status: 'missing'\|'downloading'\|'ready', progress?, error? }`；`{ action:'start'\|'retry' }` 触发下载 |
-| `ai:monitor-verdict` | main→renderer | 监测事件请求 AI 判定，**8 秒超时**，回 `{ verdict:'complete'\|'ask'\|'keep', reason }` |
-| `ai:monitor-answer` | renderer→main | 用户在抽屉的裁决 `{ todoId, answer:'complete'\|'keep' }` |
+| `ai:stop` | invoke | 中断当前请求（AbortController） |
+| `ai:commit` | invoke | `(proposalId, patch?)` → `true`，编辑后的字段为最终数据；过期/不存在抛错 |
+| `ai:reject` | invoke | `(proposalId)` → `boolean`（是否出队） |
+| `ai:queue:list` | invoke | 主进程未决队列 `AiProposal[]`（抽屉挂载/重启重建用，见 §13.2） |
+| `ai:queue:touch` | invoke | `(proposalId)` → `boolean`，卡片轮到显示时续 TTL |
+| `ai:settings:get` | invoke | 掩码设置 `{ apiKeySet, apiKeyMasked, model, monitorVerdictEnabled, promptLevel }` |
+| `ai:settings:set` | invoke | 部分 patch → 全量设置（掩码读回） |
+| `ai:settings:test` | invoke | `(overrideKey?)` → `{ ok, message }` 连通性探测 |
+| `ai:voice` | invoke | **规划中，未实现**：`Uint8Array` 音频 → `{ text }` / `{ error }` |
+| `ai:voice-model` | invoke | **规划中，未实现**：`{ status: 'missing'\|'downloading'\|'ready', progress?, error? }`；`{ action:'start'\|'retry' }` 触发下载 |
+| `ai:monitor-verdict` | main→renderer | **规划中，未实现**：监测事件请求 AI 判定，**8 秒超时**，回 `{ verdict:'complete'\|'ask'\|'keep', reason }` |
+| `ai:monitor-answer` | renderer→main | **规划中，未实现**：用户在抽屉的裁决 `{ todoId, answer:'complete'\|'keep' }` |
 
-无 key、断网、超时：主进程回 `ai:done { error }`，抽屉顶部一条提示，**输入框仍可手打建待办**。
+无 key、断网、超时：`ai:chat` 返回 `{ proposals: [], error }`，抽屉顶部一条提示，**输入框仍可手打建待办**。
 
 ## 5. AI 动作与工具
 
@@ -77,7 +80,7 @@
 | （无独立进程工具） | `create/update_todo` 参数含 `monitor {exeName, auto, askOnExit, thresholdMinutes}`；运行进程展示名列表直接进系统上下文，主进程校验 exeName 必须在当前列表内 | 同卡片确认 |
 
 - 每轮最多暂存 1 个写动作（系统提示约束），保持确认语义清晰；**增补例外**：总览轮可用 `stage_batch` 一次暂存 N≤10 条（见 §13.2），仅改变"暂存"数量，确认边界不变
-- 校验失败（时间在过去、分组不存在、exeName 不在列表）→ 作为工具错误结果回填模型**自动重试，最多 2 次**；仍失败 → `ai:done` 带错误行，卡片仍展示可手工改
+- 校验失败（时间在过去、分组不存在、exeName 不在列表）→ 作为工具错误结果回填模型**自动重试，最多 2 次**；仍失败 → `ai:chat` 返回值带 error，卡片仍展示可手工改
 - 上下文：系统提示（角色+字段语义+中文简洁+禁止编造）+ 紧凑待办清单（id/标题/状态/时间/分组/是否有监测，上限 100 条，超出丢最旧已完成）+ 分组列表 + 运行进程展示名（前 60）+ 本地当前时间与时区；历史由渲染层传最近 20 条且 ≤30k 字符
 - 提案在主进程暂存（内存 Map，带过期时间 10 分钟），提交时以提案为基线再次全量校验
 

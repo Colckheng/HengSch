@@ -140,6 +140,27 @@ export function rebuildQueue(proposals: AiProposal[]): FlowState {
   return insertStaged(emptyFlow(), proposals);
 }
 
+/** D-4 恢复合并：本地已有同 id 卡则跳过，缺的补到队尾；无本地卡时等价 rebuild */
+export function mergeRestoredQueue(state: FlowState, proposals: AiProposal[]): FlowState {
+  if (!proposals.length) return state;
+  const known = new Set([
+    ...state.entries.flatMap((entry) => (entry.kind === 'card' ? [entry.proposal.id] : [])),
+    ...state.queue.map((proposal) => proposal.id)
+  ]);
+  const missing = proposals.filter((proposal) => !known.has(proposal.id));
+  if (!missing.length) return state;
+  if (!state.entries.some((entry) => entry.kind === 'card') && !state.queue.length) {
+    return insertStaged(state, missing);
+  }
+  const hasPending = state.entries.some((entry) => entry.kind === 'card' && entry.status === 'pending');
+  const next: FlowState = {
+    ...state,
+    queue: [...state.queue, ...missing],
+    awaitingEndLine: state.awaitingEndLine || missing.length > 0
+  };
+  return hasPending ? next : showNext(next);
+}
+
 /** 回传给模型的历史：只含真实对话文本（summary/system/ask 不回传） */
 export function toChatMessages(entries: FlowEntry[]): AiChatMessage[] {
   return entries

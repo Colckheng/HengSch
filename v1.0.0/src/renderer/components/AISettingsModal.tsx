@@ -83,37 +83,49 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
   };
 
   const updateModel = async (value: string) => {
+    if (busy) return;
     const nextModel: 'deepseek-flash' | 'deepseek-v4-pro' = value === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-flash';
     setModel(nextModel);
+    setBusy('save');
     try {
       const next = await window.electronAPI.ai.settingsSet({ model: nextModel });
       setSettings(next);
       setNotice('已保存');
-    } catch {
-      setNotice('保存失败');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '保存失败');
+    } finally {
+      setBusy(null);
     }
   };
 
   const updateVerdict = async (enabled: boolean) => {
+    if (busy) return;
     setVerdict(enabled);
+    setBusy('save');
     try {
       const next = await window.electronAPI.ai.settingsSet({ monitorVerdictEnabled: enabled });
       setSettings(next);
       setNotice('已保存');
-    } catch {
-      setNotice('保存失败');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '保存失败');
+    } finally {
+      setBusy(null);
     }
   };
 
   const updatePromptLevel = async (value: string) => {
+    if (busy) return;
     const level: 1 | 2 = value === '2' ? 2 : 1;
     setPromptLevel(level);
+    setBusy('save');
     try {
       const next = await window.electronAPI.ai.settingsSet({ promptLevel: level });
       setSettings(next);
       setNotice('已保存');
-    } catch {
-      setNotice('保存失败');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '保存失败');
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -153,6 +165,7 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
                 <SwissSelect
                   value={model}
                   onChange={(value) => void updateModel(value)}
+                  disabled={busy !== null}
                   options={[
                     { value: 'deepseek-flash', label: 'deepseek-flash' },
                     { value: 'deepseek-v4-pro', label: 'deepseek-v4-pro' }
@@ -164,6 +177,7 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
                 <SwissSelect
                   value={String(promptLevel)}
                   onChange={(value) => void updatePromptLevel(value)}
+                  disabled={busy !== null}
                   options={[
                     { value: '1', label: '只按我说的（默认）' },
                     { value: '2', label: '缺的先问我' }
@@ -185,7 +199,7 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
           <div className="sync-key-block">
             <h3>监测</h3>
             <label className="sync-enable">
-              <input type="checkbox" checked={verdict} onChange={(event) => void updateVerdict(event.target.checked)} />
+              <input type="checkbox" checked={verdict} disabled={busy !== null} onChange={(event) => void updateVerdict(event.target.checked)} />
               AI 监测判定
             </label>
           </div>

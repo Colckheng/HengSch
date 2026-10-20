@@ -15,7 +15,7 @@ import {
   skipCard,
   replaceAfterCancel,
   markCard,
-  rebuildQueue,
+  mergeRestoredQueue,
   toChatMessages,
   type FlowState,
   type FlowEntry
@@ -93,17 +93,14 @@ export function AiDrawer({
         if (alive && !settings.apiKeySet) setNotice((current) => current ?? { kind: 'info', text: '未配置 AI：设置里填入 DeepSeek key 后可用' });
       })
       .catch(() => undefined);
-    // 未决队列恢复（仅当本会话还没有卡片时重建，只跑一次）
+    // 未决队列恢复（按 proposal id 合并：本地已有的跳过，缺的补进队尾）
     if (!restoredRef.current) {
       restoredRef.current = true;
       window.electronAPI.ai
         .queueList()
         .then((list) => {
           if (!alive || !list.length) return;
-          setFlow((current) => {
-            if (current.entries.some((entry) => entry.kind === 'card')) return current;
-            return rebuildQueue(list);
-          });
+          setFlow((current) => mergeRestoredQueue(current, list));
         })
         .catch(() => undefined);
     }
@@ -178,7 +175,6 @@ export function AiDrawer({
         if (target) {
           replaceRef.current = null;
           setFlow((previous) => replaceAfterCancel(previous, target.anchorId, result.proposals));
-          window.electronAPI.ai.reject(target.proposalId).catch(() => setNotice({ kind: 'error', text: '原提案移出队列失败，请重试' }));
         } else {
           setFlow((previous) => insertStaged(previous, result.proposals));
         }
@@ -207,6 +203,10 @@ export function AiDrawer({
     const target = replaceRef.current;
     const content = target ? `[流程] 重新暂存这条待办（原：${target.label}）。新要求：${text}` : text;
     setAmending(false);
+    if (target) {
+      // 改要求：旧提案先出队，避免主进程重入门禁拦下新一轮 stage
+      window.electronAPI.ai.reject(target.proposalId).catch(() => setNotice({ kind: 'error', text: '原提案移出队列失败，请重试' }));
+    }
     const next = appendText(flow, 'user', content, target ? text : undefined);
     setFlow(next);
     justSentRef.current = true;

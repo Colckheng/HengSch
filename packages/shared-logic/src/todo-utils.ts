@@ -33,6 +33,8 @@ function stepCycle(cycleType: CycleType, customCycleDays: number | undefined, fr
  * @param anchor 上一轮 nextDueDate（保 HH:MM 不漂移）；缺省视为"当前时刻"
  * - anchor 尚未到期（提前完成后又取消完成）→ 维持本周期，不跳轮
  * - anchor 已过期 → 按周期逐轮推进到严格晚于 now 的最近一轮
+ * - 步进上限 500 轮：耗尽后**返回最后一步**（可能是过去时刻），交由调用方/用户修正锚点；
+ *   daily/weekly/custom 用绝对毫秒步进，跨 DST 本地 HH:MM 可能漂移 ±1h（monthly 走日历步进不受影响）
  */
 export function calculateNextDueDate(
   cycleType: CycleType,

@@ -66,6 +66,63 @@ describe('calculateNextDueDate · 保时刻推进', () => {
     const next = calculateNextDueDate('daily', undefined)!;
     expect(next).toBeGreaterThan(Date.now() + 23 * HOUR);
   });
+
+  it('500 轮上限耗尽 → 返回最后一步（可能是过去时刻）', () => {
+    const now = at('2026-10-14T10:00:00');
+    const anchor = now - 501 * 24 * HOUR;
+    const result = calculateNextDueDate('daily', undefined, anchor, now)!;
+    // 循环恰好转满 500 步：anchor + 500 天，仍早于 now
+    expect(result).toBe(anchor + 500 * 24 * HOUR);
+    expect(result).toBeLessThan(now);
+  });
+});
+
+// D-3 DST：daily/weekly 为绝对毫秒步进（跨切换日本地 HH:MM 漂移 ±1h），
+// monthly 走日历步进保时刻。TZ 在文件顶层设置，覆盖后续 Date 行为。
+process.env.TZ = 'America/New_York';
+
+describe('calculateNextDueDate · DST（America/New_York）', () => {
+  const ny = (iso: string): number => Date.parse(iso);
+
+  it('daily 跨春令时（2026-03-08 2:00→3:00）：绝对 +24h，本地时刻 +1h', () => {
+    // 2026-03-07 09:00 EST，+24h 后为 2026-03-08 10:00 EDT
+    const anchor = ny('2026-03-07T09:00:00');
+    const now = ny('2026-03-07T10:00:00');
+    const next = calculateNextDueDate('daily', undefined, anchor, now)!;
+    expect(next).toBe(anchor + 24 * HOUR);
+    expect(new Date(next).getHours()).toBe(10);
+    expect(new Date(next).getDate()).toBe(8);
+  });
+
+  it('daily 跨冬令时（2026-11-01 2:00→1:00）：绝对 +24h，本地时刻 -1h', () => {
+    // 2026-10-31 09:00 EDT，+24h 后为 2026-11-01 08:00 EST
+    const anchor = ny('2026-10-31T09:00:00');
+    const now = ny('2026-10-31T12:00:00');
+    const next = calculateNextDueDate('daily', undefined, anchor, now)!;
+    expect(next).toBe(anchor + 24 * HOUR);
+    expect(new Date(next).getHours()).toBe(8);
+    expect(new Date(next).getDate()).toBe(1);
+  });
+
+  it('monthly 跨 DST：日历步进保本地 HH:MM', () => {
+    // 2026-03-01 09:00 EST → 2026-04-01 09:00 EDT（时刻不变）
+    const anchor = ny('2026-03-01T09:00:00');
+    const now = ny('2026-03-15T00:00:00');
+    const next = calculateNextDueDate('monthly', undefined, anchor, now)!;
+    const d = new Date(next);
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(3);
+    expect(d.getDate()).toBe(1);
+    expect(d.getHours()).toBe(9);
+  });
+
+  it('weekly 跨冬令时：绝对 7×24h，本地时刻 -1h', () => {
+    const anchor = ny('2026-10-25T09:00:00'); // 周日 EDT
+    const now = ny('2026-10-26T00:00:00');
+    const next = calculateNextDueDate('weekly', undefined, anchor, now)!;
+    expect(next).toBe(anchor + 7 * 24 * HOUR);
+    expect(new Date(next).getHours()).toBe(8);
+  });
 });
 
 describe('toggleTodoStatus · 锚定 nextDueDate', () => {
