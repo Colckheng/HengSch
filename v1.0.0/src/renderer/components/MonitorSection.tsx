@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import type { MonitorConfig } from '../types';
 import { SwissSelect } from './SwissSelect';
 
@@ -8,6 +8,7 @@ interface MonitorSectionProps {
 }
 
 export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.Element {
+  const uid = useId();
   const [auto, setAuto] = useState(monitor ? monitor.auto !== false : false);
   const [askOnExit, setAskOnExit] = useState(monitor?.askOnExit === true);
   const [exeName, setExeName] = useState(monitor?.exeName ?? '');
@@ -88,9 +89,9 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
 
   return (
     <div className="monitor-section">
-      <label className="monitor-toggle" htmlFor="monitor-auto">
+      <label className="monitor-toggle" htmlFor={`${uid}-auto`}>
         <input
-          id="monitor-auto"
+          id={`${uid}-auto`}
           type="checkbox"
           checked={auto}
           onChange={(e) => handleAuto(e.target.checked)}
@@ -99,9 +100,9 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
         <span className="monitor-hint">进程运行达阈值即自动完成</span>
       </label>
 
-      <label className="monitor-toggle" htmlFor="monitor-ask-on-exit">
+      <label className="monitor-toggle" htmlFor={`${uid}-ask-on-exit`}>
         <input
-          id="monitor-ask-on-exit"
+          id={`${uid}-ask-on-exit`}
           type="checkbox"
           checked={askOnExit}
           onChange={(e) => handleAskOnExit(e.target.checked)}
@@ -113,9 +114,9 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
       {enabled && (
         <>
           <div className="form-group">
-            <label htmlFor="monitor-exe">运行进程</label>
+            <label htmlFor={`${uid}-exe`}>运行进程</label>
             <SwissSelect
-              id="monitor-exe"
+              id={`${uid}-exe`}
               options={[
                 { value: '', label: '选择正在运行的进程…' },
                 ...exeOptions.map((name) => ({ value: name, label: name }))
@@ -137,9 +138,9 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
 
           {auto && (
             <div className="form-group">
-              <label htmlFor="monitor-threshold">阈值（分钟）</label>
+              <label htmlFor={`${uid}-threshold`}>阈值（分钟）</label>
               <input
-                id="monitor-threshold"
+                id={`${uid}-threshold`}
                 type="number"
                 min="1"
                 value={threshold}
@@ -150,9 +151,9 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
             </div>
           )}
 
-          <label className="monitor-journal" htmlFor="monitor-journal">
+          <label className="monitor-journal" htmlFor={`${uid}-journal`}>
             <input
-              id="monitor-journal"
+              id={`${uid}-journal`}
               type="checkbox"
               checked={journal}
               onChange={(e) => handleJournal(e.target.checked)}

@@ -54,6 +54,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
   flowRef.current = flow;
   const committingRef = useRef<Set<string>>(new Set());
   const [committingIds, setCommittingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const lastSentRef = useRef<AiChatMessage[] | null>(null);
 
   useEffect(() => {
     const off = window.electronAPI.ai.onChunk(({ delta }) => {
@@ -113,6 +114,7 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
     setStream('');
     streamRef.current = '';
     setNotice(null);
+    lastSentRef.current = next;
     try {
       const result = await window.electronAPI.ai.chat(next);
       const streamed = streamRef.current;
@@ -148,9 +150,15 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
     const target = replaceRef.current;
     const content = target ? `[流程] 重新暂存这条待办（原：${target.label}）。新要求：${text}` : text;
     setAmending(false);
-    const next = appendText(flow, 'user', content);
+    const next = appendText(flow, 'user', content, target ? text : undefined);
     setFlow(next);
     void sendMessages(toChatMessages(next.entries));
+  };
+
+  const retryLast = () => {
+    const last = lastSentRef.current;
+    if (!last || busy) return;
+    void sendMessages(last);
   };
 
   const handleStop = () => {
@@ -209,10 +217,14 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   const renderEntry = (entry: FlowEntry): JSX.Element | null => {
     if (entry.kind === 'text') {
+      const time = entry.at ? new Date(entry.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
       return (
         <div key={entry.id} className={entry.role === 'user' ? 'ai-msg-me' : 'ai-msg-ai'}>
-          <span className="ai-msg-role">{entry.role === 'user' ? 'YOU' : 'AI'}</span>
-          <div className="ai-msg-body">{entry.content}</div>
+          <span className="ai-msg-role">
+            {entry.role === 'user' ? 'YOU' : 'AI'}
+            {time && <span className="ai-msg-time">{time}</span>}
+          </span>
+          <div className="ai-msg-body">{entry.display ?? entry.content}</div>
         </div>
       );
     }
@@ -283,7 +295,21 @@ export function AiDrawer({ open, onClose }: { open: boolean; onClose: () => void
         </div>
       </div>
       <AISettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={refreshKeyNotice} />
-      {notice && <div className={notice.kind === 'error' ? 'ai-err' : 'ai-notice'}>{notice.text}</div>}
+      {notice && (
+        <div className={notice.kind === 'error' ? 'ai-err' : 'ai-notice'} role={notice.kind === 'error' ? 'alert' : 'status'}>
+          <span className="ai-notice-text">{notice.text}</span>
+          <span className="ai-notice-actions">
+            {notice.kind === 'error' && lastSentRef.current && (
+              <button type="button" className="ai-notice-btn" onClick={retryLast} disabled={busy}>
+                重试
+              </button>
+            )}
+            <button type="button" className="ai-notice-btn" onClick={() => setNotice(null)} aria-label="关闭提示">
+              ✕
+            </button>
+          </span>
+        </div>
+      )}
       <div className="ai-msgs" ref={scrollRef}>
         {flow.entries.length === 0 && !stream && (
           <div className="ai-empty">READY · 例如「加一条明天 9 点报销」</div>

@@ -735,6 +735,10 @@ button {
   .ai-drawer.open {
     flex-basis: 300px;
   }
+
+  .app-container:has(.ai-drawer.open) .modal-overlay {
+    padding-right: 300px;
+  }
 }
 
 .ai-drawer-head {
@@ -778,6 +782,10 @@ button {
 .ai-notice,
 .ai-err {
   flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s1);
   padding: 9px var(--s2);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -785,6 +793,41 @@ button {
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--hairline);
   color: var(--ink-2);
+}
+
+.ai-notice-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ai-notice-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ai-notice-btn {
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ai-notice-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.ai-notice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .ai-err {
@@ -839,6 +882,33 @@ button {
   overflow-wrap: anywhere;
 }
 
+/* U-1 流式光标：尾部 2px 方块闪烁 */
+.ai-stream::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--signal);
+  animation: ai-caret-blink 1s steps(1) infinite;
+}
+
+@keyframes ai-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ai-msg-time {
+  margin-left: 6px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  opacity: 0.8;
+}
+
 .ai-msg-me .ai-msg-body {
   background: var(--ink);
   border-color: var(--ink);
@@ -847,11 +917,48 @@ button {
 
 .ai-card {
   border: 1px solid var(--hairline-strong);
-  background: var(--paper);
+  background: var(--paper-2);
+  border-left: 2px solid var(--ink);
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* U-2 终态卡微弱底色/边线区分（不抢内容） */
+.ai-card.ok {
+  border-left-color: var(--ink-3);
+}
+
+.ai-card.muted {
+  opacity: 0.72;
+  border-left-color: var(--hairline-strong);
+}
+
+.ai-card.bad {
+  border-left-color: var(--signal);
+}
+
+.ai-card-status.muted {
+  color: var(--ink-3);
+}
+
+/* U-3 终态表单：禁用输入可见的灰化 */
+.ai-card input:disabled,
+.ai-card textarea:disabled {
+  opacity: 0.55;
+  background: var(--paper);
+  cursor: not-allowed;
+}
+
+.group-select-trigger:disabled {
+  opacity: 0.55;
+  background: var(--paper);
+  cursor: not-allowed;
+}
+
+.group-select-trigger:disabled .gs-caret {
+  opacity: 0.5;
 }
 
 .ai-card-line {
@@ -999,6 +1106,19 @@ button {
   padding: 10px;
 }
 
+/* U-12 周期提醒下次触发提示 / 自定义分钟校验错误 */
+.reminder-next {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.reminder-next-error {
+  color: var(--signal);
+}
+
 .ai-delete-title {
   font-size: 13.5px;
   font-weight: 700;
@@ -1020,7 +1140,14 @@ button {
   text-transform: uppercase;
   color: var(--ink-3);
   text-align: center;
-  padding: 2px 0;
+  padding: 6px 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* U-7 AI 气泡左 2px signal 竖线 */
+.ai-msg-ai .ai-msg-body {
+  border-left: 2px solid var(--signal);
 }
 
 .ai-ask {
@@ -1277,6 +1404,11 @@ button {
   animation: fade-in 0.16s ease both;
 }
 
+/* U-7.4 AI 抽屉展开时弹窗居中偏移（不被抽屉压住） */
+.app-container:has(.ai-drawer.open) .modal-overlay {
+  padding-right: 360px;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -1466,6 +1598,12 @@ button {
   z-index: 30;
   max-height: 220px;
   overflow-y: auto;
+}
+
+/* U-8 空间不足时菜单向上翻 */
+.group-select.up .group-select-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .group-select-option {
@@ -1900,23 +2038,27 @@ button {
 /* ---------------- scrollbars ---------------- */
 
 .todo-list::-webkit-scrollbar,
-.modal-content::-webkit-scrollbar {
+.modal-content::-webkit-scrollbar,
+.ai-msgs::-webkit-scrollbar {
   width: 8px;
 }
 
 .todo-list::-webkit-scrollbar-track,
-.modal-content::-webkit-scrollbar-track {
+.modal-content::-webkit-scrollbar-track,
+.ai-msgs::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .todo-list::-webkit-scrollbar-thumb,
-.modal-content::-webkit-scrollbar-thumb {
+.modal-content::-webkit-scrollbar-thumb,
+.ai-msgs::-webkit-scrollbar-thumb {
   background: var(--hairline-strong);
   border: 2px solid var(--paper);
 }
 
 .todo-list::-webkit-scrollbar-thumb:hover,
-.modal-content::-webkit-scrollbar-thumb:hover {
+.modal-content::-webkit-scrollbar-thumb:hover,
+.ai-msgs::-webkit-scrollbar-thumb:hover {
   background: var(--ink-2);
 }
 

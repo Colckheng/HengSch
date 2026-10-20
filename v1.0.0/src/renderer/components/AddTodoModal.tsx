@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { TodoType, CycleType, MonitorConfig } from '../types';
 import { nextDueFromReminder } from '@hengsch/shared-logic';
 import { useTodos } from '../context/TodoContext';
@@ -27,6 +27,12 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   const [monitor, setMonitor] = useState<MonitorConfig | undefined>(undefined);
   const [reminder, setReminder] = useState<ReminderValue | undefined>(undefined);
   const [titleError, setTitleError] = useState(false);
+  /** 时间面板刚被外点关闭的时刻——同一次交互的后续 click 不再关整个弹窗 */
+  const panelClosedAtRef = useRef(0);
+
+  const handlePanelOpenChange = (open: boolean): void => {
+    if (!open) panelClosedAtRef.current = Date.now();
+  };
 
   const handleClose = useCallback(() => {
     setTitle('');
@@ -99,7 +105,17 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   if (!isOpen) return <></>;
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
+    <div
+      className="modal-overlay"
+      onClick={() => {
+        // 面板外点刚关掉面板（SwissTimePicker capture pointerdown 先行）→ 这次 click 不关弹窗
+        if (Date.now() - panelClosedAtRef.current < 300) {
+          panelClosedAtRef.current = 0;
+          return;
+        }
+        handleClose();
+      }}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>添加待办事项</h2>
@@ -193,7 +209,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
             </>
           )}
 
-          <ReminderSection value={reminder} onChange={setReminder} recurring={type === 'recurring'} />
+          <ReminderSection value={reminder} onChange={setReminder} recurring={type === 'recurring'} onOpenChange={handlePanelOpenChange} />
 
           <MonitorSection monitor={monitor} onChange={setMonitor} />
 

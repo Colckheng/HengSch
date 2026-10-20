@@ -167,3 +167,19 @@ it('toChatMessages keeps only real conversation text', () => {
     { role: 'assistant', content: '好的' }
   ]);
 });
+
+it('appendText stamps at and keeps display out of model messages', () => {
+  const before = Date.now();
+  let state = appendText(emptyFlow(), 'user', '流程原文', '[流程] 流程原文');
+  const entry = state.entries[0] as { kind: string; content: string; display?: string; at?: number };
+  assert.equal(entry.kind, 'text');
+  assert.equal(entry.content, '流程原文');
+  assert.equal(entry.display, '[流程] 流程原文');
+  assert.ok(typeof entry.at === 'number' && entry.at >= before);
+  const chat = toChatMessages(state.entries);
+  assert.deepEqual(chat, [{ role: 'user', content: '流程原文' }]);
+  state = appendText(state, 'assistant', '已处理');
+  const plain = state.entries[1] as { display?: string; at?: number };
+  assert.equal(plain.display, undefined);
+  assert.ok(typeof plain.at === 'number');
+});

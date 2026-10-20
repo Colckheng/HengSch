@@ -11,10 +11,13 @@ interface SwissSelectProps {
   onChange: (value: string) => void;
   id?: string;
   placeholder?: string;
+  /** 终态卡/不可编辑场景：触发器与菜单禁用 */
+  disabled?: boolean;
 }
 
-export function SwissSelect({ options, value, onChange, id, placeholder }: SwissSelectProps): JSX.Element {
+export function SwissSelect({ options, value, onChange, id, placeholder, disabled = false }: SwissSelectProps): JSX.Element {
   const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,15 +33,25 @@ export function SwissSelect({ options, value, onChange, id, placeholder }: Swiss
 
   const selected = options.find((option) => option.value === value);
 
+  const toggle = (): void => {
+    if (disabled) return;
+    if (!open) {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (rect) setUp(window.innerHeight - rect.bottom < 240 && rect.top > 240);
+    }
+    setOpen((prev) => !prev);
+  };
+
   return (
-    <div className={`group-select ${open ? 'open' : ''}`} ref={rootRef}>
+    <div className={`group-select ${open ? 'open' : ''} ${up ? 'up' : ''}`} ref={rootRef}>
       <button
         type="button"
         id={id}
         className="group-select-trigger"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
       >
         <span className={`gs-name ${selected ? '' : 'placeholder'}`}>{selected?.label ?? placeholder ?? '请选择'}</span>
         <svg className="gs-caret" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>

@@ -129,10 +129,20 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
   const isStale = status === 'stale' || staleByData;
   const settled = status === 'committed' || status === 'rejected';
   const shownError = localError ?? (status === 'error' ? errorText : undefined);
-  const committedLabel = proposal.kind === 'create' ? '已创建' : proposal.kind === 'update' ? '已更新' : '已删除';
+  const committedLabel = proposal.kind === 'create' ? '✓ 已创建' : proposal.kind === 'update' ? '✓ 已更新' : '✓ 已删除';
   const statusLabel =
-    status === 'committed' ? committedLabel : status === 'rejected' ? '已取消' : isStale ? '数据已变化' : '待确认';
-  const statusClass = status === 'committed' || status === 'rejected' ? 'ok' : isStale ? 'bad' : '';
+    status === 'committed'
+      ? committedLabel
+      : status === 'rejected'
+        ? '✕ 已取消'
+        : status === 'error'
+          ? '确认失败'
+          : isStale
+            ? '数据已变化'
+            : '待确认';
+  const statusClass = status === 'committed' ? 'ok' : status === 'rejected' ? 'muted' : status === 'error' || isStale ? 'bad' : '';
+  /** 终态/过期/提交中：所有可点控件一并锁死 */
+  const locked = settled || isStale || busy;
   const isRecurring =
     proposal.kind === 'create'
       ? proposal.draft.type === 'recurring'
@@ -201,7 +211,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
 
   if (proposal.kind === 'delete') {
     return (
-      <section className="ai-card ai-card-delete" aria-label="删除确认卡">
+      <section className={`ai-card ai-card-delete ${statusClass}`} aria-label="删除确认卡">
         <div className="ai-card-line">
           <span className="ai-card-kind danger">删除</span>
           <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
@@ -218,15 +228,15 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
           </div>
         )}
         <div className="modal-footer ai-card-footer">
-          <button type="button" className="button button-secondary" onClick={handleReject} disabled={settled || busy}>
+          <button type="button" className="button button-secondary" onClick={handleReject} disabled={locked}>
             取消
           </button>
           {armed ? (
-            <button type="button" className="button ai-card-danger" onClick={() => onConfirm(proposal.id)} disabled={settled || isStale || busy}>
+            <button type="button" className="button ai-card-danger" onClick={() => onConfirm(proposal.id)} disabled={locked}>
               {busy ? '确认中…' : '确认删除'}
             </button>
           ) : (
-            <button type="button" className="button button-primary" onClick={() => setArmed(true)} disabled={settled || isStale || busy}>
+            <button type="button" className="button button-primary" onClick={() => setArmed(true)} disabled={locked}>
               删除
             </button>
           )}
@@ -248,7 +258,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
   const beforeChip = proposal.kind === 'update' ? proposal.before : null;
 
   return (
-    <form className="ai-card" onSubmit={handleSubmit} aria-label={isCreate ? '新建确认卡' : '修改确认卡'}>
+    <form className={`ai-card ${statusClass}`} onSubmit={handleSubmit} aria-label={isCreate ? '新建确认卡' : '修改确认卡'}>
       <div className="ai-card-line">
         <span className="ai-card-kind">{isCreate ? '新建' : '修改'}</span>
         <span className="ai-card-chip">{chip}</span>
@@ -284,7 +294,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
           }}
           placeholder="待办标题"
           autoComplete="off"
-          disabled={settled}
+          disabled={locked}
           aria-invalid={Boolean(shownError && !title.trim())}
         />
       </div>
@@ -300,16 +310,17 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
           placeholder="留空即不写描述"
           rows={2}
           autoComplete="off"
-          disabled={settled}
+          disabled={locked}
         />
       </div>
       <div className="form-group">
         <label htmlFor={`${uid}-group`}>分组</label>
-        <GroupSelect id={`${uid}-group`} groups={groups} value={groupId} onChange={setGroupId} />
+        <GroupSelect id={`${uid}-group`} groups={groups} value={groupId} onChange={setGroupId} disabled={locked} />
       </div>
       <ReminderSection
         value={reminder}
         recurring={isRecurring}
+        disabled={locked}
         onChange={(value) => {
           setReminder(value);
           setLocalError(null);
@@ -326,7 +337,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
                 setLocalError(null);
                 setMonitor({ ...monitor, auto: event.target.checked });
               }}
-              disabled={settled}
+              disabled={locked}
             />
             <span className="monitor-toggle-label">自动监测</span>
           </label>
@@ -339,7 +350,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
                 setLocalError(null);
                 setMonitor({ ...monitor, askOnExit: event.target.checked });
               }}
-              disabled={settled}
+              disabled={locked}
             />
             <span className="monitor-toggle-label">进程结束询问</span>
           </label>
@@ -356,6 +367,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
                     setMonitor({ ...monitor, exeName: value });
                   }}
                   placeholder="选择正在运行的进程…"
+                  disabled={locked}
                 />
                 <input
                   type="text"
@@ -368,7 +380,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
                   placeholder="或手动输入 exe 名，例：game.exe"
                   autoComplete="off"
                   aria-label="手动输入进程名"
-                  disabled={settled}
+                  disabled={locked}
                 />
               </div>
               {monitor.auto && (
@@ -385,7 +397,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
                     }}
                     placeholder="10"
                     autoComplete="off"
-                    disabled={settled}
+                    disabled={locked}
                   />
                 </div>
               )}
@@ -399,10 +411,10 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
         </div>
       )}
       <div className="modal-footer ai-card-footer">
-        <button type="button" className="button button-secondary" onClick={handleReject} disabled={settled || busy}>
+        <button type="button" className="button button-secondary" onClick={handleReject} disabled={locked}>
           取消
         </button>
-        <button type="submit" className="button button-primary" disabled={settled || isStale || busy}>
+        <button type="submit" className="button button-primary" disabled={locked}>
           {busy ? '确认中…' : isCreate ? '创建' : '确认'}
         </button>
       </div>

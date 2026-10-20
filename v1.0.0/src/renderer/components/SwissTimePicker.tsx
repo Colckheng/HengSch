@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useId } from 'react';
 import {
   dayChipOf,
   dayStartOffset,
@@ -20,6 +21,9 @@ interface SwissTimePickerProps {
    * 确认时自动落到"下一次发生的该时刻"：今天已过 → 明天）
    */
   mode?: 'datetime' | 'time';
+  disabled?: boolean;
+  /** 面板开合上提：弹窗层 Esc/遮罩先关面板 */
+  onOpenChange?: (open: boolean) => void;
 }
 
 const MIN_QUICK = [0, 15, 30, 45];
@@ -33,9 +37,11 @@ function nextOccurrenceOf(h: number, m: number, now: number = Date.now()): numbe
 }
 
 /** Swiss 时间弹层（纯点选）：日期芯片翻天 + 24h 网格 + 分钟步进/快捷 */
-export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime' }: SwissTimePickerProps): JSX.Element {
+export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime', disabled = false, onOpenChange }: SwissTimePickerProps): JSX.Element {
+  const fallbackId = useId();
   const timeOnly = mode === 'time';
   const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const [dayStart, setDayStart] = useState(() => startOfLocalDay(value));
@@ -51,14 +57,42 @@ export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime' 
     setError('');
   }, [value]);
 
+  const setOpenNotified = (next: boolean): void => {
+    if (next === open) return;
+    setOpen(next);
+    onOpenChange?.(next);
+  };
+
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent): void => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!wrapRef.current?.contains(e.target as Node)) setOpenNotified(false);
+    };
+    // 面板开着时 Esc 只关面板：拦在 document 冒泡前，弹窗层收不到
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpenNotified(false);
+      }
     };
     document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const toggleOpen = (): void => {
+    if (disabled) return;
+    if (!open) {
+      // 下方空间不足则向上翻（面板约 400px 高）
+      const rect = wrapRef.current?.getBoundingClientRect();
+      if (rect) setUp(window.innerHeight - rect.bottom < 420 && rect.top > 420);
+    }
+    setOpenNotified(!open);
+  };
 
   const draftTs = dayStart + h * 3_600_000 + m * 60_000;
 
@@ -92,7 +126,7 @@ export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime' 
   const handleConfirm = (): void => {
     if (timeOnly) {
       onChange(nextOccurrenceOf(h, m));
-      setOpen(false);
+      setOpenNotified(false);
       setError('');
       return;
     }
@@ -102,21 +136,22 @@ export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime' 
       return;
     }
     onChange(ts);
-    setOpen(false);
+    setOpenNotified(false);
     setError('');
   };
 
   const chip = dayChipOf(draftTs);
 
   return (
-    <div className="tp-wrap" ref={wrapRef}>
+    <div className={`tp-wrap ${up ? 'up' : ''}`} ref={wrapRef}>
       <button
-        id={id}
+        id={id ?? fallbackId}
         type="button"
         className="tp-trigger"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="dialog"
+        disabled={disabled}
       >
         <span className="tp-trigger-value">{timeOnly ? formatHM(value) : formatFull(value)}</span>
         <svg className="tp-trigger-caret" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
@@ -196,7 +231,7 @@ export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime' 
             <button type="button" className="button button-primary" onClick={handleConfirm}>
               确定
             </button>
-            <button type="button" className="button" onClick={() => setOpen(false)}>
+            <button type="button" className="button" onClick={() => setOpenNotified(false)}>
               取消
             </button>
           </div>

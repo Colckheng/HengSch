@@ -3,7 +3,7 @@
 export type CardStatus = 'pending' | 'committed' | 'rejected' | 'stale' | 'error';
 
 export type FlowEntry =
-  | { id: string; kind: 'text'; role: 'user' | 'assistant'; content: string }
+  | { id: string; kind: 'text'; role: 'user' | 'assistant'; content: string; /** 气泡展示文案（如 [流程] 脚手架只显原话）；入库/发模型仍用 content */ display?: string; /** 发送时刻（毫秒）；恢复的老数据可空 */ at?: number }
   /** AI 的逐条描述（stage_batch 的 summary）：展示但不回传给模型 */
   | { id: string; kind: 'summary'; content: string }
   | { id: string; kind: 'card'; proposal: AiProposal; status: CardStatus; errorText?: string }
@@ -60,8 +60,8 @@ function finalizeIfDone(state: FlowState): FlowState {
   };
 }
 
-export function appendText(state: FlowState, role: 'user' | 'assistant', content: string): FlowState {
-  return { ...state, entries: [...state.entries, { id: nextEntryId(), kind: 'text', role, content }] };
+export function appendText(state: FlowState, role: 'user' | 'assistant', content: string, display?: string): FlowState {
+  return { ...state, entries: [...state.entries, { id: nextEntryId(), kind: 'text', role, content, display, at: Date.now() }] };
 }
 
 /** 新暂存落地：第一条（连描述）立即显示，其余入队 */
