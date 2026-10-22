@@ -444,7 +444,8 @@ function createWindow(): void {
     icon: getAppIcon() ?? undefined
   });
 
-  if (!app.isPackaged) {
+  // HENG_SCH_BUILT=1：验收 harness 用构建产物跑（同 paper-window 的 REMINDER_BUILT 先例）
+  if (!app.isPackaged && process.env.HENG_SCH_BUILT !== '1') {
     mainWindow.loadURL('http://localhost:5175');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
