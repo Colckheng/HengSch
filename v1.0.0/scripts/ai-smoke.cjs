@@ -49,6 +49,9 @@ const finalRound = [sse({ choices: [{ delta: { content: '已生成预览卡，�
 async function main() {
   buildSync({ stdin: { contents: `export * from './src/main/ai-service';`, resolveDir: path.join(__dirname, '..') }, outfile, bundle: true, platform: 'node' });
   const ai = require(outfile);
+  const flowFile = path.join(temporary, 'ai-flow.cjs');
+  buildSync({ stdin: { contents: `export * from './src/renderer/ai-flow';`, resolveDir: path.join(__dirname, '..') }, outfile: flowFile, bundle: true, platform: 'node' });
+  const flow = require(flowFile);
   const data = {
     todos: [],
     groups: [{ id: 'default', name: '未分类', color: '#999', createdAt: 1, updatedAt: 1 }],
@@ -68,7 +71,7 @@ async function main() {
     return;
   }
 
-  const queue = [toolRound('买牛奶'), finalRound, toolRound('买面包'), finalRound, { ok: false, status: 401, text: async () => 'invalid api key' }];
+  const queue = [toolRound('买牛奶'), finalRound, toolRound('买面包'), finalRound, toolRound('加湿器'), finalRound, toolRound('电风扇'), finalRound, { ok: false, status: 401, text: async () => 'invalid api key' }];
   let calls = 0;
   globalThis.fetch = async (url, init) => {
     calls += 1;
@@ -107,10 +110,36 @@ async function main() {
   try { ai.commitProposal(second.proposals[0].id); } catch (error) { commitAfterReject = /过期/.test(error.message); }
   assert(commitAfterReject, 'commit after reject must be rejected');
 
+  // D-2 重入门禁：队列有未决提案时再请求暂存，不新增卡且模型收到门禁错误
+  const third = await ai.runAiChat({ messages: [{ role: 'user', content: '加个待办：加湿器' }], processNames: ['chrome.exe'] });
+  assert(!third.error, `third run failed: ${third.error}`);
+  assert(third.proposals.length === 1, 'third run must stage one proposal');
+  assert(ai.listQueuedProposals().length === 1, 'queue must hold one pending proposal');
+  const blocked = await ai.runAiChat({ messages: [{ role: 'user', content: '再加个待办：电风扇' }], processNames: ['chrome.exe'] });
+  assert(!blocked.error, `gated run must not fail hard: ${blocked.error}`);
+  assert(blocked.proposals.length === 0, 'gate must block second staging');
+  assert(ai.listQueuedProposals().length === 1, 'gate must not grow the queue');
+
+  // D-4 队列恢复合并：本地已有同 id 卡不重复，缺的补队尾
+  const restoreA = third.proposals[0];
+  const restoreB = { ...restoreA, id: 'staged-restore-b', draft: { ...restoreA.draft, title: '烘干机' } };
+  const withPendingA = { ...flow.emptyFlow(), entries: [{ id: 'entry-a', kind: 'card', proposal: restoreA, status: 'pending' }] };
+  const merged = flow.mergeRestoredQueue(withPendingA, [restoreA, restoreB]);
+  assert(merged.entries.filter((entry) => entry.kind === 'card').length === 1, 'existing card must not duplicate');
+  assert(merged.queue.length === 1 && merged.queue[0].id === 'staged-restore-b', 'missing proposal must append to queue');
+  const settledA = { ...flow.emptyFlow(), entries: [{ id: 'entry-a', kind: 'card', proposal: restoreA, status: 'committed' }] };
+  const merged2 = flow.mergeRestoredQueue(settledA, [restoreA, restoreB]);
+  assert(merged2.entries.some((entry) => entry.kind === 'card' && entry.proposal.id === 'staged-restore-b' && entry.status === 'pending'), 'no pending card must surface the restored head');
+  assert(merged2.queue.length === 0, 'shown head must leave the queue');
+  const merged3 = flow.mergeRestoredQueue(flow.emptyFlow(), [restoreA, restoreB]);
+  assert(merged3.entries.some((entry) => entry.kind === 'card' && entry.proposal.id === restoreA.id), 'empty local state must show first restored card');
+  assert(merged3.queue.length === 1 && merged3.queue[0].id === 'staged-restore-b', 'second restored must queue');
+  assert(flow.mergeRestoredQueue(flow.emptyFlow(), []).entries.length === 0, 'empty restore list must be a no-op');
+
   ai.writeAiSettings(store, { apiKey: '' });
   const noKey = await ai.runAiChat({ messages: [{ role: 'user', content: 'hi' }], processNames: ['chrome.exe'] });
   assert(noKey.error && noKey.error.includes('未配置 AI'), 'missing key must surface as error value');
-  assert(calls === 4, `no-key run must not fetch, calls=${calls}`);
+  assert(calls === 8, `no-key run must not fetch, calls=${calls}`);
 
   ai.writeAiSettings(store, { apiKey: 'sk-test' });
   const unauthorized = await ai.runAiChat({ messages: [{ role: 'user', content: 'hi' }], processNames: ['chrome.exe'] });
@@ -123,7 +152,8 @@ main()
     console.error(`ai-smoke FAILED: ${error.message}`);
     process.exitCode = 1;
   })
-  .finally(() => {
+    .finally(() => {
     try { unlinkSync(outfile); } catch { /* build may have failed */ }
+    try { unlinkSync(path.join(temporary, 'ai-flow.cjs')); } catch { /* build may have failed */ }
     rmdirSync(temporary);
   });
