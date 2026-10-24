@@ -97,7 +97,11 @@ export interface ElectronAPI {
     voice: (data: ArrayBuffer | Uint8Array) => Promise<{ text: string }>;
     voiceModelStatus: () => Promise<VoiceModelStatus>;
     voiceModelDownload: () => Promise<VoiceModelStatus>;
+    drawerStatus: (open: boolean) => Promise<boolean>;
+    monitorAnswer: (todoId: string, answer: 'complete' | 'keep') => Promise<boolean>;
     onVoiceModel: (cb: (payload: VoiceModelStatus) => void) => () => void;
+    onMonitorAsk: (cb: (payload: { todoId: string; title: string; message: string; reason: string }) => void) => () => void;
+    onMonitorVerdict: (cb: (payload: { todoId: string; title: string; verdict: 'complete' | 'ask' | 'keep'; reason: string; trigger: 'threshold' | 'exit' }) => void) => () => void;
     onChunk: (cb: (payload: { delta: string }) => void) => () => void;
   };
 }

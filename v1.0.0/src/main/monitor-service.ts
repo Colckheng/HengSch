@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { app, Notification, dialog } from 'electron';
 import type Store from 'electron-store';
 import { presentAskWindow } from './ask-window';
+import { isDrawerOpen, isMonitorVerdictActive, requestMonitorVerdict, type MonitorVerdict } from './ai-service';
 import {
   MonitorProgress,
   creditPresence,
@@ -69,9 +70,35 @@ const askedToday = new Set<string>();
 const ANSWERED_STORE_KEY = 'monitorAsked';
 let answeredDay = '';
 let answeredToday = new Set<string>();
-/** 弹窗串行队列 */
-const askQueue: MonitorEntry[] = [];
+/** 弹窗串行队列（trigger=exit 走退出询问原路径；threshold=达标后 AI 拿不准转人工） */
+interface AskJob {
+  entry: MonitorEntry;
+  trigger: 'exit' | 'threshold';
+  /** AI 判定理由（有值时跳过退出触发点的二次判定，文案直接带理由） */
+  reason?: string;
+}
+const askQueue: AskJob[] = [];
 let askBusy = false;
+/** 抽屉内询问挂起表：todoId → resolver（关抽屉/超时 → null → 降级小窗） */
+const drawerAskPending = new Map<string, (answer: 'complete' | 'keep' | null) => void>();
+const DRAWER_ASK_TIMEOUT_MS = 120_000;
+
+/** 渲染层点按钮答复抽屉内询问 */
+export function resolveDrawerAsk(todoId: string, answer: 'complete' | 'keep'): void {
+  const resolve = drawerAskPending.get(todoId);
+  if (resolve) {
+    drawerAskPending.delete(todoId);
+    resolve(answer);
+  }
+}
+
+/** 抽屉关闭：挂起的询问立即放行（null → 降级小窗） */
+export function onDrawerClosed(): void {
+  for (const [todoId, resolve] of [...drawerAskPending]) {
+    drawerAskPending.delete(todoId);
+    resolve(null);
+  }
+}
 
 function askKey(todoId: string, now: number): string {
   return `${dayKey(now)}:${todoId}`;
@@ -104,7 +131,7 @@ function enqueueAsk(entry: MonitorEntry): void {
   const key = askKey(entry.todoId, now);
   if (askedToday.has(key) || answeredToday.has(entry.todoId)) return;
   askedToday.add(key); // 入队即标记，防排队期间重复触发
-  askQueue.push(entry);
+  askQueue.push({ entry, trigger: 'exit' });
   void drainAskQueue();
 }
 
@@ -113,9 +140,9 @@ async function drainAskQueue(): Promise<void> {
   askBusy = true;
   try {
     while (askQueue.length > 0) {
-      const entry = askQueue.shift()!;
+      const job = askQueue.shift()!;
       try {
-        await runAskDialog(entry);
+        await runAskDialog(job);
       } catch {
         // 弹窗失败不阻塞队列
       }
@@ -137,7 +164,46 @@ function findTodoStatus(todoId: string): 'pending' | 'completed' | null {
   }
 }
 
-async function runAskDialog(entry: MonitorEntry): Promise<void> {
+/** E 监测判定：开关关/无 key/异常一律 null → 调用方按原规则执行 */
+async function requestVerdict(entry: MonitorEntry, prog: MonitorProgress | undefined): Promise<MonitorVerdict | null> {
+  if (!isMonitorVerdictActive()) return null;
+  const status = findTodoStatus(entry.todoId);
+  return requestMonitorVerdict({
+    title: entry.title,
+    exeName: entry.exeName,
+    runtimeMinutes: Math.round((prog?.ms ?? 0) / 60_000),
+    status: status ?? 'pending'
+  });
+}
+
+/** 判定与理由写入对话历史（渲染层系统行；抽屉没开则事件自然丢失，消息流本就不持久化） */
+function sendVerdictLine(entry: MonitorEntry, verdict: MonitorVerdict, trigger: 'threshold' | 'exit'): void {
+  send('ai:monitor-verdict', {
+    todoId: entry.todoId,
+    title: entry.title,
+    verdict: verdict.verdict,
+    reason: verdict.reason,
+    trigger
+  });
+}
+
+/** 抽屉内询问：2 分钟无答复或抽屉关闭 → null（降级小窗） */
+function askViaDrawer(entry: MonitorEntry, message: string, reason: string): Promise<'complete' | 'keep' | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      drawerAskPending.delete(entry.todoId);
+      resolve(null);
+    }, DRAWER_ASK_TIMEOUT_MS);
+    drawerAskPending.set(entry.todoId, (answer) => {
+      clearTimeout(timer);
+      resolve(answer);
+    });
+    send('ai:monitor-ask', { todoId: entry.todoId, title: entry.title, message, reason });
+  });
+}
+
+async function runAskDialog(job: AskJob): Promise<void> {
+  const entry = job.entry;
   const now = Date.now();
   const status = findTodoStatus(entry.todoId);
   if (!status) return;
@@ -145,37 +211,78 @@ async function runAskDialog(entry: MonitorEntry): Promise<void> {
   const autoNotified = prog?.notified ?? false;
   if (!shouldAskOnExit({ status, autoNotified })) return;
 
-  const message = `「${entry.title}」的进程已结束`;
-  const detail =
-    status === 'completed' && autoNotified
-      ? '该任务之前已自动标记完成，它真的完成了吗？'
-      : '该任务完成了吗？';
+  const fromThreshold = job.trigger === 'threshold';
+  const message = fromThreshold
+    ? `「${entry.title}」已运行 ${entry.thresholdMinutes} 分钟`
+    : `「${entry.title}」的进程已结束`;
+  let reason = job.reason ?? '';
 
-  let answer: 'complete' | 'not-done';
-  try {
-    // 独立询问小窗（Swiss 风格）；cancel（ESC/关闭）按「还没做」语义
-    const result = await presentAskWindow({ todoId: entry.todoId, message, detail });
-    answer = result === 'complete' ? 'complete' : 'not-done';
-  } catch {
-    // 小窗创建失败 → 回退原生弹窗，保证功能不挂
-    const result = await dialog.showMessageBox({
-      type: 'question',
-      title: 'HengSch · 进程结束',
-      message,
-      detail,
-      buttons: ['完成', '还没做'],
-      defaultId: 1,
-      cancelId: 1,
-      noLink: true
-    });
-    answer = result.response === 0 ? 'complete' : 'not-done';
+  // 退出触发点：先问 AI；complete 直接按完成收尾、keep 什么都不做、ask 带理由转人工
+  if (!reason && !fromThreshold) {
+    const verdict = await requestVerdict(entry, prog);
+    if (verdict) {
+      sendVerdictLine(entry, verdict, 'exit');
+      if (verdict.verdict === 'keep') return;
+      if (verdict.verdict === 'complete') {
+        answeredToday.add(entry.todoId);
+        persistAnswered();
+        const action = resolveAskAction({ answer: 'complete', status, autoNotified });
+        if (action !== 'none') send('monitor:ask-resolved', { todoId: entry.todoId, action });
+        return;
+      }
+      reason = verdict.reason;
+    }
+  }
+
+  const detail = reason
+    ? reason
+    : fromThreshold
+      ? '算完成吗？'
+      : status === 'completed' && autoNotified
+        ? '该任务之前已自动标记完成，它真的完成了吗？'
+        : '该任务完成了吗？';
+
+  let answer: 'complete' | 'keep' = 'keep';
+  let answered = false;
+  if (isDrawerOpen()) {
+    const drawerAnswer = await askViaDrawer(entry, message, reason);
+    if (drawerAnswer) {
+      answer = drawerAnswer;
+      answered = true;
+    }
+  }
+  if (!answered) {
+    try {
+      // 独立询问小窗（Swiss 风格）；cancel（ESC/关闭）按「还没做」语义
+      const result = await presentAskWindow({ todoId: entry.todoId, message, detail });
+      answer = result === 'complete' ? 'complete' : 'keep';
+    } catch {
+      // 小窗创建失败 → 回退原生弹窗，保证功能不挂
+      const result = await dialog.showMessageBox({
+        type: 'question',
+        title: 'HengSch · 进程结束',
+        message,
+        detail,
+        buttons: ['完成', '还没做'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true
+      });
+      answer = result.response === 0 ? 'complete' : 'keep';
+    }
+  }
+
+  if (fromThreshold) {
+    // 达标转人工：complete → 通知完成；keep → 什么都不做（当日进度已记 notified，不重复触发）
+    if (answer === 'complete') send('monitor:completed', { todoId: entry.todoId });
+    return;
   }
 
   // 任何答复（含 ESC/关闭小窗）都记入当天并落盘：同任务当天不再重复弹，重启也不弹
   answeredToday.add(entry.todoId);
   persistAnswered();
 
-  const action = resolveAskAction({ answer, status, autoNotified });
+  const action = resolveAskAction({ answer: answer === 'complete' ? 'complete' : 'not-done', status, autoNotified });
   if (action === 'revert') {
     // 撤销 = 用户说「没做」：当日进度重置，监测周期从现在重新开始
     // （不再解除当天只问一次：答复已持久化，同任务当天不重复弹，跨天自然恢复）
@@ -407,14 +514,24 @@ function notifyCompleted(entry: MonitorEntry): void {
   }
 }
 
-function checkThreshold(entry: MonitorEntry, prog: MonitorProgress): MonitorProgress {
+async function checkThreshold(entry: MonitorEntry, prog: MonitorProgress): Promise<MonitorProgress> {
   if (!entry.auto) return prog; // ask-only：只记进度不自动完成
   const after = markThresholdReached(prog, entry.thresholdMinutes * 60_000);
-  if (after.notified !== prog.notified) {
-    notifyCompleted(entry);
-    return after;
+  if (after.notified === prog.notified) return prog;
+  // E 监测判定：开关开时先问 AI（8s 超时/异常一律降级原路径）
+  const verdict = await requestVerdict(entry, prog);
+  if (verdict) {
+    sendVerdictLine(entry, verdict, 'threshold');
+    if (verdict.verdict === 'keep') return after; // 什么都不做：不自动完成、不再重复触发
+    if (verdict.verdict === 'ask') {
+      // 拿不准 → 转人工（抽屉内问或小窗）；不占当天防骚扰配额，后续退出询问不受影响
+      askQueue.push({ entry, trigger: 'threshold', reason: verdict.reason });
+      void drainAskQueue();
+      return after;
+    }
   }
-  return prog;
+  notifyCompleted(entry);
+  return after;
 }
 
 /** 首次 configure：③ journal 冷启动补空档 + ② 仍在运行进程回溯 + 离线退出补问 */
@@ -465,7 +582,7 @@ async function bootstrap(entries: MonitorEntry[]): Promise<void> {
         }
       }
 
-      prog = checkThreshold(entry, prog);
+      prog = await checkThreshold(entry, prog);
       progressStore[key] = prog;
       changed = true;
     }
@@ -496,7 +613,7 @@ async function tick(): Promise<void> {
       let prog = before ?? createDayProgress(dayStartMs(now));
       const present = running.has(exeLower(entry.exeName));
       prog = creditPresence(prog, { t: now, present });
-      prog = checkThreshold(entry, prog);
+      prog = await checkThreshold(entry, prog);
       if (!before || before.ms !== prog.ms || before.checkpointAt !== prog.checkpointAt || before.notified !== prog.notified) {
         progressStore[key] = prog;
         changed = true;

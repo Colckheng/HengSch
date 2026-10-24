@@ -1,6 +1,6 @@
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings, initAiService, runAiChat, cancelAiChat } from './ai-service';
+import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings, initAiService, runAiChat, cancelAiChat, parseMonitorVerdict, requestMonitorVerdict } from './ai-service';
 import type { Todo, Group } from '@hengsch/shared-types';
 import type Store from 'electron-store';
 
@@ -124,4 +124,48 @@ it('runAiChat concurrency gate rejects second call while first is active', async
     cancelAiChat();
     globalThis.fetch = originalFetch;
   }
+});
+
+it('parseMonitorVerdict tolerates junk/code fences, slices reason, rejects invalid verdicts', () => {
+  assert.deepEqual(parseMonitorVerdict('{"verdict":"complete","reason":"运行足够久"}'), { verdict: 'complete', reason: '运行足够久' });
+  assert.deepEqual(parseMonitorVerdict('好的。\n```json\n{"verdict":"keep","reason":"与任务无关"}\n```'), { verdict: 'keep', reason: '与任务无关' });
+  assert.deepEqual(parseMonitorVerdict('{"verdict":"ask","reason":""}'), { verdict: 'ask', reason: '' });
+  assert.equal(parseMonitorVerdict('{"verdict":"done","reason":"x"}'), null);
+  assert.equal(parseMonitorVerdict('没有 JSON'), null);
+  assert.equal(parseMonitorVerdict('{"verdict":'), null);
+  const long = parseMonitorVerdict(`{"verdict":"keep","reason":"${'啊'.repeat(300)}"}`);
+  assert.equal(long?.reason.length, 120);
+});
+
+it('requestMonitorVerdict: 开关关/无 key → null；200 解析；HTTP 错 → null', async () => {
+  const data: Record<string, unknown> = {
+    aiSettings: { apiKey: 'sk-test', model: 'deepseek-flash', monitorVerdictEnabled: true, promptLevel: 1 },
+    todos: [],
+    groups: []
+  };
+  const fake = {
+    get: (key: string) => data[key],
+    set: (key: string, value: unknown) => {
+      data[key] = value;
+    }
+  } as unknown as Store;
+  initAiService(fake, () => undefined);
+  const input = { title: '写周报', exeName: 'chrome.exe', runtimeMinutes: 45, status: 'pending' as const };
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: '{"verdict":"complete","reason":"已写完"}' } }] })
+    })) as unknown as typeof fetch;
+    assert.deepEqual(await requestMonitorVerdict(input), { verdict: 'complete', reason: '已写完' });
+    globalThis.fetch = (async () => ({ ok: false, status: 500, json: async () => ({}) })) as unknown as typeof fetch;
+    assert.equal(await requestMonitorVerdict(input), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  writeAiSettings(fake, { monitorVerdictEnabled: false });
+  assert.equal(await requestMonitorVerdict(input), null);
+  writeAiSettings(fake, { monitorVerdictEnabled: true, apiKey: '' });
+  assert.equal(await requestMonitorVerdict(input), null);
 });

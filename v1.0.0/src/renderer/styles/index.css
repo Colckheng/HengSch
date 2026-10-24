@@ -1354,6 +1354,12 @@ button {
   overflow-wrap: anywhere;
 }
 
+.ai-ask-reason {
+  display: block;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
 .ai-ask-actions {
   display: flex;
   gap: 8px;

@@ -142,7 +142,10 @@ Provider 嵌套：**GroupProvider → TodoProvider → SyncProvider → UI**
 |---|---|
 | `index.ts` | 窗口生命周期、小窗/贴边/缩入状态机（吸附 16px、窄边 4px、悬停弹出 6px、动画 180ms、多显示器 workArea）、单实例锁、关闭=隐藏托盘、before-quit 统一收尾、IPC |
 | `sync-service.ts` | SFTP 同步 (ssh2、密钥对生成、原子写+回读校验、周期调度) |
-| `monitor-service.ts` | 30s 轮询 tasklist、达标自动完成、进程退出沿询问、撤销回滚、僵死态自愈、计划任务日志、7天日志保留 |
+| `monitor-service.ts` | 30s 轮询 tasklist、达标自动完成、进程退出沿询问、撤销回滚、僵死态自愈、计划任务日志、7天日志保留；AI 监测判定（开关、8s 超时降级、抽屉内问/小窗） |
+| `ai-service.ts` | DeepSeek 网关：系统提示装配、SSE 流式工具循环、提案暂存队列（TTL/续期）、设置读写与连通测试、监测判定请求 |
+| `ai-tools.ts` | 提案校验与落盘纯函数（create/update/delete、批量原子入队、commit 二次校验、墓碑） |
+| `voice-service.ts` | 本地 whisper：模型状态/下载（sha256 校验+进度）、spawn 识别、超时控制 |
 | `ask-window.ts` | 独立询问小窗（无边框置顶、串行队列、IPC、退出强结算 cancel） |
 | `reminder-service.ts` | 每秒到点扫描、提醒队列与 `openPaperReminders` 本机持久化、重启/跨日补弹、动作执行入口 `runReminderAction` |
 | `reminder-command.ts` | 动作纯函数：校验实例与时间后同步写 electron-store，先写盘后应答，幂等 |

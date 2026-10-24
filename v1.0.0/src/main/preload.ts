@@ -81,10 +81,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     voice: (data: ArrayBuffer | Uint8Array) => ipcRenderer.invoke('ai:voice', data),
     voiceModelStatus: () => ipcRenderer.invoke('ai:voice-model:get'),
     voiceModelDownload: () => ipcRenderer.invoke('ai:voice-model:download'),
+    drawerStatus: (open: boolean) => ipcRenderer.invoke('ai:drawer:status', open),
+    monitorAnswer: (todoId: string, answer: 'complete' | 'keep') => ipcRenderer.invoke('ai:monitor-answer', { todoId, answer }),
     onVoiceModel: (cb: (payload: unknown) => void) => {
       const handler = (_: unknown, payload: unknown) => cb(payload);
       ipcRenderer.on('ai:voice-model:progress', handler);
       return () => ipcRenderer.removeListener('ai:voice-model:progress', handler);
+    },
+    onMonitorAsk: (cb: (payload: { todoId: string; title: string; message: string; reason: string }) => void) => {
+      const handler = (_: unknown, payload: { todoId: string; title: string; message: string; reason: string }) => cb(payload);
+      ipcRenderer.on('ai:monitor-ask', handler);
+      return () => ipcRenderer.removeListener('ai:monitor-ask', handler);
+    },
+    onMonitorVerdict: (cb: (payload: { todoId: string; title: string; verdict: 'complete' | 'ask' | 'keep'; reason: string; trigger: 'threshold' | 'exit' }) => void) => {
+      const handler = (_: unknown, payload: { todoId: string; title: string; verdict: 'complete' | 'ask' | 'keep'; reason: string; trigger: 'threshold' | 'exit' }) => cb(payload);
+      ipcRenderer.on('ai:monitor-verdict', handler);
+      return () => ipcRenderer.removeListener('ai:monitor-verdict', handler);
     },
     onChunk: (cb: (payload: { delta: string }) => void) => {
       const handler = (_: unknown, payload: { delta: string }) => cb(payload);

@@ -15,6 +15,8 @@ import {
   getJournalEnabled,
   stopMonitorService,
   cancelAskQueue,
+  resolveDrawerAsk,
+  onDrawerClosed,
   type MonitorEntry
 } from './monitor-service';
 import {
@@ -27,7 +29,7 @@ import {
   stopSyncService
 } from './sync-service';
 import { initReminderService, stopReminderService, listOpenReminders, runReminderAction } from './reminder-service';
-import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, refreshProposalExpiry, listQueuedProposals, maskedAiSettings, writeAiSettings, testAiConnection, type AiChatMessage, type AiSettings } from './ai-service';
+import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, refreshProposalExpiry, listQueuedProposals, maskedAiSettings, writeAiSettings, testAiConnection, setDrawerOpen, type AiChatMessage, type AiSettings } from './ai-service';
 import { initVoiceService, getVoiceModelStatus, startVoiceModelDownload, transcribe } from './voice-service';
 import { previewPaper } from './paper-window';
 import { mergeSyncStates } from '@hengsch/shared-logic';
@@ -945,4 +947,21 @@ ipcMain.handle('ai:voice-model:get', event => {
 ipcMain.handle('ai:voice-model:download', async event => {
   assertTrustedSender(event);
   return startVoiceModelDownload();
+});
+
+ipcMain.handle('ai:drawer:status', (event, open: unknown) => {
+  assertTrustedSender(event);
+  const isOpen = open === true;
+  setDrawerOpen(isOpen);
+  if (!isOpen) onDrawerClosed(); // 关抽屉：挂起的抽屉内询问降级小窗
+  return isOpen;
+});
+
+ipcMain.handle('ai:monitor-answer', (event, payload: unknown) => {
+  assertTrustedSender(event);
+  const body = payload as { todoId?: unknown; answer?: unknown } | null;
+  if (!body || typeof body.todoId !== 'string' || !body.todoId || body.todoId.length > 200) throw new Error('Invalid monitor answer');
+  if (body.answer !== 'complete' && body.answer !== 'keep') throw new Error('Invalid monitor answer');
+  resolveDrawerAsk(body.todoId, body.answer);
+  return true;
 });

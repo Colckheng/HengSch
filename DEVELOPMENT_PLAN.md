@@ -148,3 +148,4 @@
   - 仓库文件清理（日志 / tsbuildinfo / docs 旧稿 / vercel·netlify 配置）；
   - 文档体系补齐：根 README、docs/{architecture,sync,deployment}.md、三端 + 桥 + packages README、本文档状态刷新（该批工作于 2026-10-18 随本轮提交入库）。
 - 2026-10-18：桌面端到点纸片提醒上线（新增 remindAt / remindLeadMs / reminderSettings 字段、每秒到点扫描与补弹队列、全屏透明 overlay 纸片手势「完成/稍后/丢纸篓」、提醒设置「当前提醒」面板、npm run reminder:integration 15 项集成检查）；界面文案精简、置顶提级 screen-saver、静止纸片 14px/s 游走（修复边缘死锁与 reduce-motion 短路）；README 与 docs/architecture.md 同步，docs/evidence/paper-reminder-rebuild/ 证据入库，五项门禁全绿。
+- 2026-10-24：桌面端 AI 待办管家全量落地（任务书阶段 A–G）——DeepSeek 工具循环 + 提案确认卡（批量串行确认、取消改要求/跳过、两档详细程度）、串行对话流与循环提醒时刻选择（推进保时刻）、本地 whisper 语音转文字（官方 v1.9.2 exe + ggml-small-q5_1 模型，hf-mirror 下载带 sha256 校验，打包只含 exe 不含模型）、AI 监测判定（开关默认关，8s 超时降级，抽屉内问/小窗双路径）；§8 手工剧本自动化验收 39 项断言（scripts/ai-acceptance.cjs），ai-smoke 增语音场景；五项门禁 + ai:smoke + ai:acceptance 全绿。

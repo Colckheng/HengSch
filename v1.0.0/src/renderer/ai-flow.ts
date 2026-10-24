@@ -64,6 +64,11 @@ export function appendText(state: FlowState, role: 'user' | 'assistant', content
   return { ...state, entries: [...state.entries, { id: nextEntryId(), kind: 'text', role, content, display, at: Date.now() }] };
 }
 
+/** 系统行（mono 小字）：批次收尾、监测判定理由等 */
+export function appendSystem(state: FlowState, content: string): FlowState {
+  return { ...state, entries: [...state.entries, { id: nextEntryId(), kind: 'system', content }] };
+}
+
 /** 新暂存落地：第一条（连描述）立即显示，其余入队 */
 export function insertStaged(state: FlowState, proposals: AiProposal[]): FlowState {
   if (!proposals.length) return state;

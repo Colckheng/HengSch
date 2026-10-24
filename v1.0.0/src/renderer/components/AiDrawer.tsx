@@ -11,6 +11,7 @@ import { useGroups } from '../context/GroupContext';
 import {
   emptyFlow,
   appendText,
+  appendSystem,
   insertStaged,
   commitCard,
   cancelCard,
@@ -56,6 +57,7 @@ export function AiDrawer({
   const [showJump, setShowJump] = useState(false);
   const [micState, setMicState] = useState<'idle' | 'recording' | 'busy'>('idle');
   const [voiceModel, setVoiceModel] = useState<VoiceModelStatus | null>(null);
+  const [monitorAsk, setMonitorAsk] = useState<{ todoId: string; message: string; reason: string } | null>(null);
   const recordingRef = useRef<VoiceRecording | null>(null);
   const micTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamRef = useRef('');
@@ -95,6 +97,27 @@ export function AiDrawer({
     const off = window.electronAPI.ai.onVoiceModel((status) => setVoiceModel(status));
     window.electronAPI.ai.voiceModelStatus().then((status) => setVoiceModel(status)).catch(() => undefined);
     return off;
+  }, []);
+
+  // E 监测判定：开合状态上报主进程（ask 决定抽屉内问还是小窗）；判定理由落系统行
+  useEffect(() => {
+    window.electronAPI.ai.drawerStatus(open).catch(() => undefined);
+    if (!open) setMonitorAsk(null);
+  }, [open]);
+
+  useEffect(() => {
+    const offVerdict = window.electronAPI.ai.onMonitorVerdict((payload) => {
+      const label = payload.verdict === 'complete' ? '算完成' : payload.verdict === 'keep' ? '保留' : '拿不准';
+      const trigger = payload.trigger === 'threshold' ? '达标' : '退出';
+      setFlow((previous) => appendSystem(previous, `监测判定 · ${trigger}：${label}${payload.reason ? ` · ${payload.reason}` : ''}`));
+    });
+    const offAsk = window.electronAPI.ai.onMonitorAsk((payload) => {
+      setMonitorAsk({ todoId: payload.todoId, message: payload.message, reason: payload.reason });
+    });
+    return () => {
+      offVerdict();
+      offAsk();
+    };
   }, []);
 
   // 抽屉关闭/卸载时放弃未送识别的录音
@@ -311,6 +334,14 @@ export function AiDrawer({
     }));
   };
 
+  const answerMonitorAsk = (answer: 'complete' | 'keep') => {
+    if (!monitorAsk) return;
+    const { todoId } = monitorAsk;
+    setMonitorAsk(null);
+    setFlow((previous) => appendSystem(previous, answer === 'complete' ? '监测询问：已选择算完成' : '监测询问：已选择保留'));
+    window.electronAPI.ai.monitorAnswer(todoId, answer).catch(() => undefined);
+  };
+
   const growInput = (element: HTMLTextAreaElement) => {
     element.style.height = 'auto';
     const max = 6 * 1.5 * 13 + 16;
@@ -518,6 +549,22 @@ export function AiDrawer({
           <button type="button" className="ai-amend-exit" onClick={exitAmend} aria-label="退出改要求" title="退出改要求">
             ✕
           </button>
+        </div>
+      )}
+      {monitorAsk && (
+        <div className="ai-ask" role="status">
+          <span className="ai-ask-text">
+            {monitorAsk.message}
+            {monitorAsk.reason && <span className="ai-ask-reason">{monitorAsk.reason}</span>}
+          </span>
+          <div className="ai-ask-actions">
+            <button type="button" className="button" onClick={() => answerMonitorAsk('complete')}>
+              算完成
+            </button>
+            <button type="button" className="button button-secondary" onClick={() => answerMonitorAsk('keep')}>
+              保留
+            </button>
+          </div>
         </div>
       )}
       <form

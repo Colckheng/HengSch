@@ -28,6 +28,7 @@ let storeRef: Store | null = null;
 let push: (channel: string, payload: unknown) => void = () => undefined;
 let activeRun: AbortController | null = null;
 let lastProcessNames: string[] = [];
+let drawerOpen = false;
 const proposals = new Map<string, { proposal: AiProposal; expires: number }>();
 
 export function initAiService(store: Store, pushToRenderer: (channel: string, payload: unknown) => void): void {
@@ -83,6 +84,95 @@ export async function testAiConnection(store: Store, overrideKey?: string): Prom
     return { ok: false, message: `请求失败（${response.status}）` };
   } catch {
     return { ok: false, message: '网络不可用，无法连接 DeepSeek' };
+  }
+}
+
+// ---------------- E 监测判定 ----------------
+
+export interface MonitorVerdict {
+  verdict: 'complete' | 'ask' | 'keep';
+  reason: string;
+}
+
+export interface MonitorVerdictInput {
+  title: string;
+  exeName: string;
+  runtimeMinutes: number;
+  status: 'pending' | 'completed';
+}
+
+/** 设计 §8：8s 独立超时，AI 绝不阻塞监测 */
+const MONITOR_VERDICT_TIMEOUT_MS = 8_000;
+const MONITOR_REASON_LIMIT = 120;
+
+/** 渲染层开合状态：ask 抽屉内问 / 关则降级小窗 */
+export function setDrawerOpen(open: boolean): void {
+  drawerOpen = open;
+}
+
+export function isDrawerOpen(): boolean {
+  return drawerOpen;
+}
+
+export function isMonitorVerdictActive(): boolean {
+  if (!storeRef) return false;
+  const settings = readAiSettings(storeRef);
+  return settings.monitorVerdictEnabled && Boolean(settings.apiKey);
+}
+
+/** 纯函数：容忍 JSON/代码块/前后杂文，verdict 非法或无 JSON → null（按原规则降级） */
+export function parseMonitorVerdict(text: string): MonitorVerdict | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  let parsed: { verdict?: unknown; reason?: unknown };
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1)) as { verdict?: unknown; reason?: unknown };
+  } catch {
+    return null;
+  }
+  if (parsed.verdict !== 'complete' && parsed.verdict !== 'ask' && parsed.verdict !== 'keep') return null;
+  const reason = typeof parsed.reason === 'string' ? parsed.reason.trim().slice(0, MONITOR_REASON_LIMIT) : '';
+  return { verdict: parsed.verdict, reason };
+}
+
+/** 非流式小请求；开关关/无 key/任何异常 → null（调用方按原规则执行） */
+export async function requestMonitorVerdict(input: MonitorVerdictInput): Promise<MonitorVerdict | null> {
+  if (!isMonitorVerdictActive() || !storeRef) return null;
+  const settings = readAiSettings(storeRef);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MONITOR_VERDICT_TIMEOUT_MS);
+  try {
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
+      body: JSON.stringify({
+        model: settings.model,
+        messages: [
+          {
+            role: 'system',
+            content:
+              '你是进程监测判定器。根据待办与进程运行情况判断是否算完成，只输出一行 JSON：{"verdict":"complete|ask|keep","reason":"不超过40字的简短理由"}。complete=运行情况足以判定任务完成；keep=明显不够格或与任务无关；拿不准输出 ask。'
+          },
+          {
+            role: 'user',
+            content: `待办：${input.title}\n进程：${input.exeName}\n本次已运行：${input.runtimeMinutes} 分钟\n任务当前状态：${input.status === 'completed' ? '已完成（可能被自动标记）' : '待办'}`
+          }
+        ],
+        max_tokens: 100,
+        temperature: 0.1,
+        stream: false,
+        thinking: { type: 'disabled' }
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    return parseMonitorVerdict(data.choices?.[0]?.message?.content ?? '');
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

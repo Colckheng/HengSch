@@ -46,7 +46,7 @@
 
 ## 4. IPC 契约（均校验 `event.sender === mainWindow.webContents`）
 
-> 2026-10-19 按实现回写：暂存（stage）内嵌在 `ai:chat` 的工具循环里，没有独立的 `ai:stage` / `ai:done` / `ai:proposal` 通道；提案列表随 `ai:chat` 的 invoke 返回值 `{ proposals, error? }` 一次带回。语音与监测判定通道为规划项，尚未实现。
+> 2026-10-19 按实现回写：暂存（stage）内嵌在 `ai:chat` 的工具循环里，没有独立的 `ai:stage` / `ai:done` / `ai:proposal` 通道；提案列表随 `ai:chat` 的 invoke 返回值 `{ proposals, error? }` 一次带回。2026-10-24 回写：语音与监测判定通道已实现（实际通道与规划有出入，以下表为准）。
 
 | 通道 | 方向 | 载荷 |
 | --- | --- | --- |
@@ -60,10 +60,14 @@
 | `ai:settings:get` | invoke | 掩码设置 `{ apiKeySet, apiKeyMasked, model, monitorVerdictEnabled, promptLevel }` |
 | `ai:settings:set` | invoke | 部分 patch → 全量设置（掩码读回） |
 | `ai:settings:test` | invoke | `(overrideKey?)` → `{ ok, message }` 连通性探测 |
-| `ai:voice` | invoke | **规划中，未实现**：`Uint8Array` 音频 → `{ text }` / `{ error }` |
-| `ai:voice-model` | invoke | **规划中，未实现**：`{ status: 'missing'\|'downloading'\|'ready', progress?, error? }`；`{ action:'start'\|'retry' }` 触发下载 |
-| `ai:monitor-verdict` | main→renderer | **规划中，未实现**：监测事件请求 AI 判定，**8 秒超时**，回 `{ verdict:'complete'\|'ask'\|'keep', reason }` |
-| `ai:monitor-answer` | renderer→main | **规划中，未实现**：用户在抽屉的裁决 `{ todoId, answer:'complete'\|'keep' }` |
+| `ai:voice` | invoke | `(Uint8Array/ArrayBuffer wav)` → `{ text }`；超时/非零退出抛中文错误 |
+| `ai:voice-model:get` | invoke | → `{ state:'ready'\|'missing'\|'downloading'\|'error', progress, exeReady, error? }` |
+| `ai:voice-model:download` | invoke | 触发下载 → 同上状态；下载中进度经 `ai:voice-model:progress` 推送 |
+| `ai:voice-model:progress` | main→renderer | 下载/状态变更推送，载荷同 `ai:voice-model:get` |
+| `ai:drawer:status` | invoke | `(open: boolean)` 抽屉开合上报；关闭时挂起的抽屉内询问降级小窗 |
+| `ai:monitor-verdict` | main→renderer | 判定与理由落对话系统行：`{ todoId, title, verdict:'complete'\|'ask'\|'keep', reason, trigger:'threshold'\|'exit' }` |
+| `ai:monitor-ask` | main→renderer | 拿不准转抽屉内问：`{ todoId, title, message, reason }` |
+| `ai:monitor-answer` | renderer→main | 用户裁决 `{ todoId, answer:'complete'\|'keep' }` |
 
 无 key、断网、超时：`ai:chat` 返回 `{ proposals: [], error }`，抽屉顶部一条提示，**输入框仍可手打建待办**。
 
@@ -97,15 +101,15 @@
 
 1. 渲染层 `getUserMedia` 采 16kHz 单声道 Float32 → 停止后转 16-bit PCM WAV（渲染层本地拼 44 字节头，不引 ffmpeg），上限 60 秒
 2. `ai:voice` 传 Buffer → 主进程写临时文件 → spawn `whisper-cli.exe -l auto -np -f <wav>` → stdout 文字 → 删临时文件
-3. 模型：`ggml-small-q5_0`（约 187MB），首启从 **hf-mirror.com**（国内镜像）下载到 `%APPDATA%\hengsch\whisper\`，下载前写死 URL 与 **sha256**（实现时确认并固化，见 §12）；抽屉显示进度与重试
+3. 模型：`ggml-small-q5_1`（约 190MB；设计原写 q5_0，实测 HF 仓库不存在该文件后改 q5_1），首启从 **hf-mirror.com**（国内镜像）下载到 `%APPDATA%\hengsch\whisper\`，下载前写死 URL 与 **sha256**（已固化进 `voice-service.ts`，见 §12）；抽屉显示进度与重试
 4. 未就绪/下载失败：麦克风按钮置灰 + tooltip“模型未下载”，打字不受影响；识别 1~3 秒转圈，超时/非零退出 → 错误行可重试
 5. dev 与打包路径：打包 `process.resourcesPath/whisper/`，dev 用仓库 `resources/whisper/`（gitignore 模型文件，只入库 exe 下载脚本）
 
 ## 8. AI 监测判定（设置开关，默认关）
 
 - 现有规则触发点（达标 N 分钟 / 进程退出询问）改为：开关开 → 组包 {待办摘要、进程名、本次运行时长} 请求 `ai:monitor-verdict`，**8 秒超时**
-- `complete` → 走现有自动完成路径；`ask` → **抽屉开着在抽屉内问**（AI 理由 + “算完成/保留”两按钮），**抽屉关着降级到现有 ask-window 小窗**（复用壳，文案带 AI 理由）；`keep` → 什么都不做
-- `keep`、超时、断网、无 key、解析失败 → **完全按原规则执行**，AI 绝不阻塞监测
+- `complete` → 走现有自动完成路径；`ask` → **抽屉开着在抽屉内问**（AI 理由 + “算完成/保留”两按钮），**抽屉关着降级到现有 ask-window 小窗**（复用壳，文案带 AI 理由）；`keep` → 什么都不做（2026-10-24 用户拍板：以本行为准，下一行的 keep 为笔误）
+- 超时、断网、无 key、解析失败 → **完全按原规则执行**，AI 绝不阻塞监测
 - 判定与理由写入对话历史（渲染层系统行），事后可问“刚才为什么算我完成”
 
 ## 9. 设置与安全
@@ -136,7 +140,7 @@
 
 ## 12. 开放事项（实现时确认后固化）
 
-- whisper.cpp Windows 可执行文件版本与模型下载 URL、sha256（写死进 `voice-service.ts`，附校验）
+- ~~whisper.cpp Windows 可执行文件版本与模型下载 URL、sha256~~ **已固化（2026-10-24）**：exe = 官方 v1.9.2 `whisper-bin-x64.zip`（sha256 `49dcc16d…`），模型 = `ggml-small-q5_1.bin`（sha256 `ae85e4a9…`），均写死进 `voice-service.ts` / `scripts/fetch-whisper*.ps1` 并带校验
 - `deepseek-flash` 工具调用与流式工具调用的实测行为（失败则回退非流式单请求）
 - 录音在 125%/150% DPI 下的采样不受影响（纯 Web Audio，预期无问题，列验收项）
 
