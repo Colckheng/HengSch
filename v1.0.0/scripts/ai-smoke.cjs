@@ -1,5 +1,5 @@
 const { buildSync } = require('esbuild');
-const { mkdtempSync, unlinkSync, rmdirSync } = require('node:fs');
+const { mkdtempSync, unlinkSync, rmdirSync, readFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 
@@ -70,6 +70,23 @@ async function main() {
     assert(!result.error, `live 调用失败：${result.error}`);
     return;
   }
+
+  // D 语音：本地 whisper 全链路（状态 → spawn 识别 jfk.wav）
+  const voiceFile = path.join(temporary, 'voice-service.cjs');
+  buildSync({ stdin: { contents: `export * from './src/main/voice-service';`, resolveDir: path.join(__dirname, '..') }, outfile: voiceFile, bundle: true, platform: 'node' });
+  const voice = require(voiceFile);
+  const voicePushes = [];
+  voice.initVoiceService({
+    bundledDir: path.join(__dirname, '..', 'resources', 'whisper'),
+    userDataDir: path.join(temporary, 'whisper-user'),
+    push: (channel, payload) => voicePushes.push({ channel, payload })
+  });
+  const status = await voice.getVoiceModelStatus();
+  assert(status.state === 'ready', `voice model must be ready: ${JSON.stringify(status)}`);
+  assert(status.exeReady === true, 'whisper exe must be present');
+  const { text: transcript } = await voice.transcribe(readFileSync(path.join(__dirname, 'fixtures', 'jfk.wav')));
+  assert(/fellow|Americans/i.test(transcript), `transcribe mismatch: ${transcript}`);
+  console.log(`voice ok: ${JSON.stringify(transcript.slice(0, 80))}`);
 
   const queue = [toolRound('买牛奶'), finalRound, toolRound('买面包'), finalRound, toolRound('加湿器'), finalRound, toolRound('电风扇'), finalRound, { ok: false, status: 401, text: async () => 'invalid api key' }];
   let calls = 0;
@@ -155,5 +172,6 @@ main()
     .finally(() => {
     try { unlinkSync(outfile); } catch { /* build may have failed */ }
     try { unlinkSync(path.join(temporary, 'ai-flow.cjs')); } catch { /* build may have failed */ }
+    try { unlinkSync(path.join(temporary, 'voice-service.cjs')); } catch { /* build may have failed */ }
     rmdirSync(temporary);
   });

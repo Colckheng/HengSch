@@ -78,6 +78,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     settingsGet: () => ipcRenderer.invoke('ai:settings:get'),
     settingsSet: (patch: unknown) => ipcRenderer.invoke('ai:settings:set', patch),
     settingsTest: (key?: string) => ipcRenderer.invoke('ai:settings:test', key),
+    voice: (data: ArrayBuffer | Uint8Array) => ipcRenderer.invoke('ai:voice', data),
+    voiceModelStatus: () => ipcRenderer.invoke('ai:voice-model:get'),
+    voiceModelDownload: () => ipcRenderer.invoke('ai:voice-model:download'),
+    onVoiceModel: (cb: (payload: unknown) => void) => {
+      const handler = (_: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on('ai:voice-model:progress', handler);
+      return () => ipcRenderer.removeListener('ai:voice-model:progress', handler);
+    },
     onChunk: (cb: (payload: { delta: string }) => void) => {
       const handler = (_: unknown, payload: { delta: string }) => cb(payload);
       ipcRenderer.on('ai:chunk', handler);

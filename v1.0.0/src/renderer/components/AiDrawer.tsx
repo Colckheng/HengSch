@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { AiChatMessage } from '@hengsch/shared-types';
-import { IconClose, IconGear, IconSend, IconStop } from './Icons';
+import { IconClose, IconGear, IconMic, IconSend, IconStop } from './Icons';
 import { AiProposalCard, type AiCardStatus } from './AiProposalCard';
 import { AISettingsModal } from './AISettingsModal';
+import { startVoiceRecording, type VoiceRecording } from '../voice-recorder';
+import type { VoiceModelStatus } from '../types/electron';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import {
@@ -52,6 +54,10 @@ export function AiDrawer({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [amending, setAmending] = useState(false);
   const [showJump, setShowJump] = useState(false);
+  const [micState, setMicState] = useState<'idle' | 'recording' | 'busy'>('idle');
+  const [voiceModel, setVoiceModel] = useState<VoiceModelStatus | null>(null);
+  const recordingRef = useRef<VoiceRecording | null>(null);
+  const micTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamRef = useRef('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const replaceRef = useRef<ReplaceTarget | null>(null);
@@ -82,6 +88,31 @@ export function AiDrawer({
       setStream(streamRef.current);
     });
     return off;
+  }, []);
+
+  // 语音模型状态：挂载即订阅（设置里下载的进度抽屉也收得到），打开时刷新一次
+  useEffect(() => {
+    const off = window.electronAPI.ai.onVoiceModel((status) => setVoiceModel(status));
+    window.electronAPI.ai.voiceModelStatus().then((status) => setVoiceModel(status)).catch(() => undefined);
+    return off;
+  }, []);
+
+  // 抽屉关闭/卸载时放弃未送识别的录音
+  useEffect(() => {
+    if (open) return;
+    recordingRef.current?.discard();
+    recordingRef.current = null;
+    if (micTimerRef.current) {
+      clearTimeout(micTimerRef.current);
+      micTimerRef.current = null;
+    }
+    setMicState((current) => (current === 'busy' ? current : 'idle'));
+  }, [open]);
+
+  useEffect(() => () => {
+    recordingRef.current?.discard();
+    recordingRef.current = null;
+    if (micTimerRef.current) clearTimeout(micTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -280,12 +311,73 @@ export function AiDrawer({
     }));
   };
 
-  const handleInputAutoGrow = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(event.target.value);
-    const element = event.target;
+  const growInput = (element: HTMLTextAreaElement) => {
     element.style.height = 'auto';
     const max = 6 * 1.5 * 13 + 16;
     element.style.height = `${Math.min(element.scrollHeight, max)}px`;
+  };
+
+  const handleInputAutoGrow = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value);
+    growInput(event.target);
+  };
+
+  /** 识别完成/失败统一收口：文本进输入框可改，错误走 notice */
+  const stopVoice = async (rec: VoiceRecording) => {
+    setMicState('busy');
+    try {
+      const { wav, seconds } = await rec.stop();
+      if (seconds < 0.4) {
+        setNotice({ kind: 'error', text: '录音太短，请重试' });
+        return;
+      }
+      const { text } = await window.electronAPI.ai.voice(wav);
+      if (!text) {
+        setNotice({ kind: 'error', text: '未识别到内容，请重试' });
+        return;
+      }
+      setNotice(null);
+      setInput((current) => (current ? current + text : text));
+      requestAnimationFrame(() => {
+        const element = inputRef.current;
+        if (!element) return;
+        growInput(element);
+        element.focus();
+      });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : '语音识别失败' });
+    } finally {
+      setMicState('idle');
+    }
+  };
+
+  const handleMic = () => {
+    if (micState === 'recording') {
+      const rec = recordingRef.current;
+      recordingRef.current = null;
+      if (micTimerRef.current) {
+        clearTimeout(micTimerRef.current);
+        micTimerRef.current = null;
+      }
+      if (rec) void stopVoice(rec);
+      return;
+    }
+    if (micState !== 'idle' || voiceModel?.state !== 'ready' || !voiceModel.exeReady) return;
+    startVoiceRecording()
+      .then((rec) => {
+        recordingRef.current = rec;
+        setMicState('recording');
+        micTimerRef.current = setTimeout(() => {
+          const active = recordingRef.current;
+          recordingRef.current = null;
+          micTimerRef.current = null;
+          if (active) void stopVoice(active);
+        }, 60_000);
+      })
+      .catch((error: unknown) => {
+        const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
+        setNotice({ kind: 'error', text: denied ? '麦克风权限被拒绝' : error instanceof Error ? error.message : '无法开始录音' });
+      });
   };
 
   const refreshKeyNotice = () => {
@@ -450,6 +542,22 @@ export function AiDrawer({
           aria-label="AI 对话输入"
         />
         <div className="ai-input-actions">
+          <button
+            type="button"
+            className={`ai-mic${micState === 'recording' ? ' recording' : ''}`}
+            aria-label={micState === 'recording' ? '停止录音' : '语音输入'}
+            title={
+              voiceModel?.state !== 'ready' || !voiceModel.exeReady
+                ? '模型未下载'
+                : micState === 'recording'
+                  ? '停止录音'
+                  : '语音输入'
+            }
+            disabled={micState === 'busy' || (micState === 'idle' && (voiceModel?.state !== 'ready' || !voiceModel.exeReady))}
+            onClick={handleMic}
+          >
+            {micState === 'busy' ? <span className="ai-mic-busy" /> : <IconMic size={12} />}
+          </button>
           {busy ? (
             <button type="button" className="ai-stop" onClick={handleStop} title="停止生成">
               <IconStop size={11} /> 停止

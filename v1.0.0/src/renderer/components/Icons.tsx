@@ -165,6 +165,16 @@ export function IconStop({ size = 16 }: IconProps): JSX.Element {
   );
 }
 
+export function IconMic({ size = 16 }: IconProps): JSX.Element {
+  return (
+    <svg {...base(size)}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3M9 21h6" />
+    </svg>
+  );
+}
+
 export function IconGear({ size = 16 }: IconProps): JSX.Element {
   return (
     <svg {...base(size)}>

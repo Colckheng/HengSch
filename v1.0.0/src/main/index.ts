@@ -28,6 +28,7 @@ import {
 } from './sync-service';
 import { initReminderService, stopReminderService, listOpenReminders, runReminderAction } from './reminder-service';
 import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, refreshProposalExpiry, listQueuedProposals, maskedAiSettings, writeAiSettings, testAiConnection, type AiChatMessage, type AiSettings } from './ai-service';
+import { initVoiceService, getVoiceModelStatus, startVoiceModelDownload, transcribe } from './voice-service';
 import { previewPaper } from './paper-window';
 import { mergeSyncStates } from '@hengsch/shared-logic';
 import type { Todo, Group } from '@hengsch/shared-types';
@@ -561,6 +562,11 @@ app.whenReady().then(() => {
   initSyncService(store, pushToRenderer);
   initReminderService(store, pushToRenderer);
   initAiService(store, pushToRenderer);
+  initVoiceService({
+    bundledDir: app.isPackaged ? path.join(process.resourcesPath, 'whisper') : path.join(__dirname, '..', '..', 'resources', 'whisper'),
+    userDataDir: path.join(app.getPath('userData'), 'whisper'),
+    push: pushToRenderer
+  });
   createWindow();
   createTray(showMainWindow);
 
@@ -916,4 +922,27 @@ ipcMain.handle('ai:settings:test', async (event, key: unknown) => {
   assertTrustedSender(event);
   if (key !== undefined && (typeof key !== 'string' || key.length > 300)) throw new Error('Invalid key');
   return testAiConnection(store, key as string | undefined);
+});
+
+ipcMain.handle('ai:voice', async (event, data: unknown) => {
+  assertTrustedSender(event);
+  const buffer = Buffer.isBuffer(data)
+    ? data
+    : data instanceof ArrayBuffer
+      ? Buffer.from(data)
+      : ArrayBuffer.isView(data)
+        ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+        : null;
+  if (!buffer) throw new Error('Invalid audio data');
+  return transcribe(buffer);
+});
+
+ipcMain.handle('ai:voice-model:get', event => {
+  assertTrustedSender(event);
+  return getVoiceModelStatus();
+});
+
+ipcMain.handle('ai:voice-model:download', async event => {
+  assertTrustedSender(event);
+  return startVoiceModelDownload();
 });

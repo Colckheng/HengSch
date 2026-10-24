@@ -18,6 +18,15 @@ export interface OpenReminderItem {
   color?: string;
 }
 
+export interface VoiceModelStatus {
+  state: 'ready' | 'missing' | 'downloading' | 'error';
+  /** 0..1，downloading 时有效 */
+  progress: number;
+  /** whisper-cli.exe 是否就位 */
+  exeReady: boolean;
+  error?: string;
+}
+
 export interface ElectronAPI {
   window: {
     minimize: () => Promise<void>;
@@ -85,6 +94,10 @@ export interface ElectronAPI {
     settingsGet: () => Promise<AiMaskedSettings>;
     settingsSet: (patch: { apiKey?: string; model?: 'deepseek-flash' | 'deepseek-v4-pro'; monitorVerdictEnabled?: boolean; promptLevel?: 1 | 2 }) => Promise<AiMaskedSettings>;
     settingsTest: (key?: string) => Promise<{ ok: boolean; message: string }>;
+    voice: (data: ArrayBuffer | Uint8Array) => Promise<{ text: string }>;
+    voiceModelStatus: () => Promise<VoiceModelStatus>;
+    voiceModelDownload: () => Promise<VoiceModelStatus>;
+    onVoiceModel: (cb: (payload: VoiceModelStatus) => void) => () => void;
     onChunk: (cb: (payload: { delta: string }) => void) => () => void;
   };
 }

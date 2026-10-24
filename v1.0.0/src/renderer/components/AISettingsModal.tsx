@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { IconClose } from './Icons';
 import { SwissSelect } from './SwissSelect';
-import type { AiMaskedSettings } from '../types/electron';
+import type { AiMaskedSettings, VoiceModelStatus } from '../types/electron';
 
 interface AISettingsModalProps {
   isOpen: boolean;
@@ -19,6 +19,18 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
   const [notice, setNotice] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [busy, setBusy] = useState<'test' | 'save' | null>(null);
+  const [voice, setVoice] = useState<VoiceModelStatus | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const off = window.electronAPI.ai.onVoiceModel((status) => setVoice(status));
+    window.electronAPI.ai
+      .voiceModelStatus()
+      .then((status) => setVoice(status))
+      .catch(() => undefined);
+    return off;
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -129,6 +141,34 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
     }
   };
 
+  const handleVoiceDownload = async () => {
+    if (voiceBusy) return;
+    setVoiceBusy(true);
+    setNotice(null);
+    try {
+      const status = await window.electronAPI.ai.voiceModelDownload();
+      setVoice(status);
+      if (status.state === 'ready') setNotice('语音模型已就绪');
+      else if (status.state === 'error') setNotice(status.error ?? '下载失败');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '下载失败');
+    } finally {
+      setVoiceBusy(false);
+    }
+  };
+
+  const voiceChip = !voice
+    ? '…'
+    : !voice.exeReady
+      ? '组件缺失'
+      : voice.state === 'ready'
+        ? '模型就绪'
+        : voice.state === 'downloading'
+          ? `下载中 ${Math.round(voice.progress * 100)}%`
+          : voice.state === 'error'
+            ? '失败'
+            : '未下载';
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content sync-modal" onClick={(event) => event.stopPropagation()}>
@@ -202,6 +242,29 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
               <input type="checkbox" checked={verdict} disabled={busy !== null} onChange={(event) => void updateVerdict(event.target.checked)} />
               AI 监测判定
             </label>
+          </div>
+
+          <div className="sync-key-block">
+            <h3>语音模型</h3>
+            <div className="sync-status-row">
+              <span className={`sync-status-chip ${voice && (voice.state === 'error' || !voice.exeReady) ? 'error' : ''}`}>{voiceChip}</span>
+              {voice?.state === 'error' && <span className="sync-notice">{voice.error}</span>}
+            </div>
+            {voice?.state === 'downloading' && (
+              <div className="ai-voice-model">
+                <span className="ai-voice-model-bar">
+                  <i style={{ width: `${Math.round(voice.progress * 100)}%` }} />
+                </span>
+                <span>{Math.round(voice.progress * 100)}%</span>
+              </div>
+            )}
+            {voice && voice.state !== 'ready' && voice.state !== 'downloading' && (
+              <div className="sync-actions">
+                <button type="button" className="button button-secondary" onClick={() => void handleVoiceDownload()} disabled={voiceBusy}>
+                  {voiceBusy ? '下载中…' : voice.state === 'error' ? '重试' : '下载模型'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

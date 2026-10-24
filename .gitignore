@@ -21,3 +21,7 @@ npm-debug.log*
 .env
 .env.local
 *.local
+
+# whisper 运行时（exe/DLL/模型不入库，npm run whisper:fetch[ -model] 获取）
+v1.0.0/resources/whisper/*
+!v1.0.0/resources/whisper/.gitkeep

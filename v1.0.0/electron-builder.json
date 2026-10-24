@@ -8,6 +8,13 @@
     "dist/**/*",
     "package.json"
   ],
+  "extraResources": [
+    {
+      "from": "resources/whisper",
+      "to": "whisper",
+      "filter": ["*.exe", "*.dll"]
+    }
+  ],
   "win": {
     "target": [
       {
