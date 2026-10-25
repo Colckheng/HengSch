@@ -27,6 +27,12 @@ export interface VoiceModelStatus {
   error?: string;
 }
 
+export interface VoiceTranscribeProgress {
+  phase: 'load' | 'decode' | 'progress' | 'done';
+  /** 0..99，phase=progress 时有效 */
+  percent?: number;
+}
+
 export interface ElectronAPI {
   window: {
     minimize: () => Promise<void>;
@@ -100,6 +106,7 @@ export interface ElectronAPI {
     drawerStatus: (open: boolean) => Promise<boolean>;
     monitorAnswer: (todoId: string, answer: 'complete' | 'keep') => Promise<boolean>;
     onVoiceModel: (cb: (payload: VoiceModelStatus) => void) => () => void;
+    onVoiceTranscribeProgress: (cb: (payload: VoiceTranscribeProgress) => void) => () => void;
     onMonitorAsk: (cb: (payload: { todoId: string; title: string; message: string; reason: string }) => void) => () => void;
     onMonitorVerdict: (cb: (payload: { todoId: string; title: string; verdict: 'complete' | 'ask' | 'keep'; reason: string; trigger: 'threshold' | 'exit' }) => void) => () => void;
     onChunk: (cb: (payload: { delta: string }) => void) => () => void;

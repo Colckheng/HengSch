@@ -126,6 +126,8 @@
 | 进程上下文 | 展示名前 60 | `ai-service.ts` |
 | 语音模型 | `ggml-small-q5_1` ≈190MB（HF 无 q5_0，已改 q5_1；URL+sha256 固化） | `voice-service.ts` |
 | whisper 超时 | 音频时长×3，下限 10 s（模型加载）、封顶 30 s | `voice-service.ts` |
+| whisper 线程 | `max(4, 逻辑核/2)`（本机 8，实测 11s 夹具 8s→5s） | `voice-service.ts` |
+| 识别进度 | `-pp` 解析 stderr 三阶段，percent 钳 0–99（whisper 有 >100 bug） | `voice-service.ts` |
 
 ## 已知风险
 

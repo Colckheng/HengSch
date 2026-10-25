@@ -256,8 +256,8 @@ function AppContent(): JSX.Element {
               <button
                 className={`foot-ai ${isAiOpen ? 'on' : ''}`}
                 onClick={() => setIsAiOpen((value) => !value)}
-                aria-label="AI 管家"
-                title="AI 管家"
+                aria-label="小SOU"
+                title="小SOU"
                 aria-pressed={isAiOpen}
               >
                 <IconAI size={14} />

@@ -88,6 +88,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('ai:voice-model:progress', handler);
       return () => ipcRenderer.removeListener('ai:voice-model:progress', handler);
     },
+    onVoiceTranscribeProgress: (cb: (payload: { phase: 'load' | 'decode' | 'progress' | 'done'; percent?: number }) => void) => {
+      const handler = (_: unknown, payload: { phase: 'load' | 'decode' | 'progress' | 'done'; percent?: number }) => cb(payload);
+      ipcRenderer.on('ai:voice-transcribe-progress', handler);
+      return () => ipcRenderer.removeListener('ai:voice-transcribe-progress', handler);
+    },
     onMonitorAsk: (cb: (payload: { todoId: string; title: string; message: string; reason: string }) => void) => {
       const handler = (_: unknown, payload: { todoId: string; title: string; message: string; reason: string }) => cb(payload);
       ipcRenderer.on('ai:monitor-ask', handler);

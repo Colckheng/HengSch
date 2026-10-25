@@ -64,6 +64,23 @@ export function appendText(state: FlowState, role: 'user' | 'assistant', content
   return { ...state, entries: [...state.entries, { id: nextEntryId(), kind: 'text', role, content, display, at: Date.now() }] };
 }
 
+/**
+ * 应答后迟到的流式尾部 chunk：并入本轮 assistant 文本气泡（从末尾回退找最近一条
+ * text，可能被后插的暂存卡/描述行隔开）；最近一条 text 是用户消息则丢弃，
+ * 避免开出第二个带光标的残留气泡。
+ */
+export function mergeIntoLastAssistant(state: FlowState, delta: string): FlowState {
+  for (let i = state.entries.length - 1; i >= 0; i -= 1) {
+    const entry = state.entries[i];
+    if (entry.kind !== 'text') continue;
+    if (entry.role !== 'assistant') return state;
+    const entries = state.entries.slice();
+    entries[i] = { ...entry, content: entry.content + delta };
+    return { ...state, entries };
+  }
+  return state;
+}
+
 /** 系统行（mono 小字）：批次收尾、监测判定理由等 */
 export function appendSystem(state: FlowState, content: string): FlowState {
   return { ...state, entries: [...state.entries, { id: nextEntryId(), kind: 'system', content }] };

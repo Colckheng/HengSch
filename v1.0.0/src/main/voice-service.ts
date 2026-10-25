@@ -34,6 +34,9 @@ const MAX_VOICE_BYTES = 10 * 1024 * 1024;
 const MIN_TIMEOUT_S = 10;
 const MAX_TIMEOUT_S = 30;
 const PROGRESS_CHANNEL = 'ai:voice-model:progress';
+const TRANSCRIBE_CHANNEL = 'ai:voice-transcribe-progress';
+/** whisper 默认仅 4 线程；逻辑核一半（本机 8）实测 11s 夹具 8s→5s */
+const WHISPER_THREADS = Math.max(4, Math.floor(os.cpus().length / 2));
 
 let deps: VoiceServiceDeps | null = null;
 let downloadActive = false;
@@ -175,17 +178,38 @@ function wavSeconds(data: Buffer): number {
 
 function runWhisper(exe: string, model: string, wav: string, timeoutMs: number): Promise<{ text: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(exe, ['-m', model, '-f', wav, '-l', 'auto', '-np', '-nt'], {
+    const child = spawn(exe, ['-m', model, '-f', wav, '-l', 'auto', '-np', '-nt', '-pp', '-t', String(WHISPER_THREADS)], {
       cwd: path.dirname(exe),
       windowsHide: true
     });
     let stdout = '';
     let stderr = '';
+    let parseBuf = '';
     let settled = false;
+    let lastPhase = '';
+    let lastPercent = -1;
+    let lastEmitAt = 0;
+    // -pp 的 progress 有 >100 的已知 bug（实测 272%），钳到 99；阶段按出现顺序取最高
+    const emitProgress = () => {
+      const re = /progress\s*=\s*(\d+)%/g;
+      let match: RegExpExecArray | null;
+      let raw: number | null = null;
+      while ((match = re.exec(parseBuf)) !== null) raw = Number(match[1]);
+      const percent = raw === null ? null : Math.min(99, Math.max(0, raw));
+      const phase = percent !== null ? 'progress' : parseBuf.includes('read_audio_data') ? 'decode' : parseBuf.includes('load_backend') ? 'load' : '';
+      if (!phase || (phase === lastPhase && percent === lastPercent)) return;
+      const now = Date.now();
+      if (phase === 'progress' && now - lastEmitAt < 150) return;
+      lastPhase = phase;
+      lastPercent = percent ?? -1;
+      lastEmitAt = now;
+      deps?.push(TRANSCRIBE_CHANNEL, percent !== null ? { phase, percent } : { phase });
+    };
     const settle = (error?: Error, text?: string) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      deps?.push(TRANSCRIBE_CHANNEL, { phase: 'done' });
       if (error) reject(error);
       else resolve({ text: text ?? '' });
     };
@@ -197,7 +221,10 @@ function runWhisper(exe: string, model: string, wav: string, timeoutMs: number):
       if (stdout.length < 1_000_000) stdout += chunk.toString('utf8');
     });
     child.stderr.on('data', (chunk: Buffer) => {
-      if (stderr.length < 8192) stderr += chunk.toString('utf8');
+      const text = chunk.toString('utf8');
+      if (stderr.length < 8192) stderr += text;
+      if (parseBuf.length < 65536) parseBuf += text;
+      emitProgress();
     });
     child.on('error', (error) => settle(error));
     child.on('close', (code) => {

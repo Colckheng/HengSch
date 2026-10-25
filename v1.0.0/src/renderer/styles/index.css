@@ -1283,11 +1283,15 @@ button {
 }
 
 /* F-9 消息/卡片入场 */
-.ai-card,
 .ai-msg-me,
 .ai-msg-ai,
 .ai-sys {
   animation: ai-in 0.18s ease both;
+}
+
+.ai-card,
+.ai-ask {
+  animation: ai-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 
 @keyframes ai-in {
@@ -1301,8 +1305,20 @@ button {
   }
 }
 
+@keyframes ai-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ai-card,
+  .ai-ask,
   .ai-msg-me,
   .ai-msg-ai,
   .ai-sys,
@@ -1522,6 +1538,16 @@ button {
   border-top-color: var(--ink);
   border-radius: 50%;
   animation: ai-mic-spin 0.7s linear infinite;
+}
+
+.ai-mic-progress {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 
 @keyframes ai-mic-spin {

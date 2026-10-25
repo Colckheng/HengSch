@@ -10,6 +10,7 @@ import {
   replaceAfterCancel,
   markCard,
   rebuildQueue,
+  mergeIntoLastAssistant,
   toChatMessages,
   type FlowState,
   type FlowEntry
@@ -182,4 +183,28 @@ it('appendText stamps at and keeps display out of model messages', () => {
   const plain = state.entries[1] as { display?: string; at?: number };
   assert.equal(plain.display, undefined);
   assert.ok(typeof plain.at === 'number');
+});
+
+it('mergeIntoLastAssistant folds late tail chunk into the assistant bubble', () => {
+  let state = appendText(emptyFlow(), 'user', '你是谁');
+  state = appendText(state, 'assistant', '小SOU，HengSch Todo 的 AI 助手。');
+  state = mergeIntoLastAssistant(state, '办？');
+  const entry = last(state);
+  assert.equal(entry.kind === 'text' && entry.content, '小SOU，HengSch Todo 的 AI 助手。办？');
+  assert.equal(state.entries.length, 2);
+});
+
+it('mergeIntoLastAssistant skips over staged summary/card entries after the text', () => {
+  let state = appendText(emptyFlow(), 'assistant', '已暂存 1 条');
+  state = insertStaged(state, [proposal('描述', 'x')]);
+  const length = state.entries.length;
+  state = mergeIntoLastAssistant(state, '。');
+  const entry = state.entries[length - 3] as { kind: string; role?: string; content: string };
+  assert.equal(entry.content, '已暂存 1 条。');
+  assert.equal(state.entries.length, length);
+});
+
+it('mergeIntoLastAssistant drops the tail when latest text is the user message', () => {
+  const state = appendText(emptyFlow(), 'user', 'hi');
+  assert.equal(mergeIntoLastAssistant(state, '。'), state);
 });

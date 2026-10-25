@@ -5,7 +5,7 @@ import { IconClose, IconGear, IconMic, IconSend, IconStop } from './Icons';
 import { AiProposalCard, type AiCardStatus } from './AiProposalCard';
 import { AISettingsModal } from './AISettingsModal';
 import { startVoiceRecording, type VoiceRecording } from '../voice-recorder';
-import type { VoiceModelStatus } from '../types/electron';
+import type { VoiceModelStatus, VoiceTranscribeProgress } from '../types/electron';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import {
@@ -19,6 +19,7 @@ import {
   replaceAfterCancel,
   markCard,
   mergeRestoredQueue,
+  mergeIntoLastAssistant,
   toChatMessages,
   type FlowState,
   type FlowEntry
@@ -56,11 +57,15 @@ export function AiDrawer({
   const [amending, setAmending] = useState(false);
   const [showJump, setShowJump] = useState(false);
   const [micState, setMicState] = useState<'idle' | 'recording' | 'busy'>('idle');
+  const [voiceProgress, setVoiceProgress] = useState<VoiceTranscribeProgress | null>(null);
   const [voiceModel, setVoiceModel] = useState<VoiceModelStatus | null>(null);
   const [monitorAsk, setMonitorAsk] = useState<{ todoId: string; message: string; reason: string } | null>(null);
   const recordingRef = useRef<VoiceRecording | null>(null);
   const micTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamRef = useRef('');
+  // chat() 已应答：invoke 应答与 ai:chunk send 走不同 IPC 通道、无顺序保证，
+  // 之后到达的尾部 chunk 走合并分支，不再写 stream（否则残留第二个带光标的气泡）
+  const settledRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const replaceRef = useRef<ReplaceTarget | null>(null);
   const restoredRef = useRef(false);
@@ -86,6 +91,10 @@ export function AiDrawer({
 
   useEffect(() => {
     const off = window.electronAPI.ai.onChunk(({ delta }) => {
+      if (settledRef.current) {
+        setFlow((previous) => mergeIntoLastAssistant(previous, delta));
+        return;
+      }
       streamRef.current += delta;
       setStream(streamRef.current);
     });
@@ -96,6 +105,14 @@ export function AiDrawer({
   useEffect(() => {
     const off = window.electronAPI.ai.onVoiceModel((status) => setVoiceModel(status));
     window.electronAPI.ai.voiceModelStatus().then((status) => setVoiceModel(status)).catch(() => undefined);
+    return off;
+  }, []);
+
+  // 识别进度：whisper stderr 阶段/百分比，done 复位
+  useEffect(() => {
+    const off = window.electronAPI.ai.onVoiceTranscribeProgress((payload) => {
+      setVoiceProgress(payload.phase === 'done' ? null : payload);
+    });
     return off;
   }, []);
 
@@ -214,12 +231,14 @@ export function AiDrawer({
 
   async function sendMessages(next: AiChatMessage[]): Promise<void> {
     setBusy(true);
+    settledRef.current = false;
     setStream('');
     streamRef.current = '';
     setNotice(null);
     lastSentRef.current = next;
     try {
       const result = await window.electronAPI.ai.chat(next);
+      settledRef.current = true;
       const streamed = streamRef.current;
       streamRef.current = '';
       setStream('');
@@ -235,6 +254,7 @@ export function AiDrawer({
       }
       if (result.error) setNotice({ kind: result.error === '已停止生成' ? 'info' : 'error', text: result.error });
     } catch (error) {
+      settledRef.current = true;
       streamRef.current = '';
       setStream('');
       replaceRef.current = null;
@@ -378,6 +398,7 @@ export function AiDrawer({
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : '语音识别失败' });
     } finally {
+      setVoiceProgress(null);
       setMicState('idle');
     }
   };
@@ -426,7 +447,7 @@ export function AiDrawer({
       return (
         <div key={entry.id} className={entry.role === 'user' ? 'ai-msg-me' : 'ai-msg-ai'}>
           <span className="ai-msg-role">
-            {entry.role === 'user' ? 'YOU' : 'AI'}
+            {entry.role === 'user' ? 'YOU' : '小SOU'}
             {time && <span className="ai-msg-time">{time}</span>}
           </span>
           <div className="ai-msg-body">{entry.display ?? entry.content}</div>
@@ -436,7 +457,7 @@ export function AiDrawer({
     if (entry.kind === 'summary') {
       return (
         <div key={entry.id} className="ai-msg-ai">
-          <span className="ai-msg-role">AI</span>
+          <span className="ai-msg-role">小SOU</span>
           <div className="ai-msg-body">{entry.content}</div>
         </div>
       );
@@ -489,7 +510,7 @@ export function AiDrawer({
   return (
     <aside className={`ai-drawer ${open ? 'open' : ''}`} aria-hidden={!open}>
       <div className="ai-drawer-head">
-        <span className="ai-drawer-title">AI 管家</span>
+        <span className="ai-drawer-title">小SOU</span>
         <div className="ai-drawer-head-actions">
           <button type="button" className="ai-drawer-close" onClick={handleNewSession} aria-label="新会话" title="新会话（清空对话，保留待确认卡片）">
             ＋
@@ -525,13 +546,13 @@ export function AiDrawer({
         {flow.entries.map(renderEntry)}
         {stream && (
           <div className="ai-msg-ai">
-            <span className="ai-msg-role">AI</span>
+            <span className="ai-msg-role">小SOU</span>
             <div className="ai-msg-body ai-stream">{stream}</div>
           </div>
         )}
         {busy && !stream && (
           <div className="ai-msg-ai">
-            <span className="ai-msg-role">AI</span>
+            <span className="ai-msg-role">小SOU</span>
             <div className="ai-msg-body ai-skeleton" aria-label="正在生成">
               <i /> <i /> <i />
             </div>
@@ -605,6 +626,15 @@ export function AiDrawer({
           >
             {micState === 'busy' ? <span className="ai-mic-busy" /> : <IconMic size={12} />}
           </button>
+          {micState === 'busy' && (
+            <span className="ai-mic-progress" role="status">
+              {voiceProgress?.phase === 'progress' && voiceProgress.percent !== undefined
+                ? `识别中 ${voiceProgress.percent}%`
+                : voiceProgress?.phase === 'decode'
+                  ? '识别中'
+                  : '加载模型'}
+            </span>
+          )}
           {busy ? (
             <button type="button" className="ai-stop" onClick={handleStop} title="停止生成">
               <IconStop size={11} /> 停止
