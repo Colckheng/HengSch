@@ -82,8 +82,8 @@
 - [ ] 监测三态 + 降级矩阵全绿
 - [ ] 无 key / 断网 / 模型未下载三种降级可用（打字路径完好）
 - [ ] UI 对照 Swiss 规范：直角、发丝线、令牌色、无说明性段落
-- [ ] 门禁五件套：`npx tsc --noEmit` / `npm run lint`（0 警告）/ `npm run build` / 根 `npm test` / `npm run reminder:integration`
-- [ ] 打包 `npx electron-builder --win nsis` 产物内含 whisper exe、不含模型与 key
+- [x] 门禁五件套：`npx tsc --noEmit` / `npm run lint`（0 警告）/ `npm run build` / 根 `npm test` / `npm run reminder:integration` —— 2026-10-24 全绿（另 `ai:smoke` 通过、`ai:acceptance` 39/39），证据 `docs/evidence/ai-assistant/gates-2026-10-24.md`
+- [x] 打包 `npx electron-builder --win nsis` 产物内含 whisper exe、不含模型与 key —— `release/win-unpacked/resources/whisper` 含 exe + 14 DLL、0 个 `.bin`、无 key
 
 ## 阶段 G：串行确认对话流与循环提醒时刻选择（设计 §13）
 

@@ -1,0 +1,164 @@
+{
+  "at": "2026-10-25T04:01:15.334Z",
+  "electron": "30.5.1",
+  "checks": [
+    {
+      "name": "抽屉打开即聚焦输入框",
+      "pass": true
+    },
+    {
+      "name": "空态提示可见",
+      "pass": true
+    },
+    {
+      "name": "等待首包时显示骨架气泡",
+      "pass": true
+    },
+    {
+      "name": "流式光标闪烁（ai-caret-blink）",
+      "pass": true
+    },
+    {
+      "name": "生成中发送按钮变停止",
+      "pass": true
+    },
+    {
+      "name": "生成中回车得到明确反馈且不打断",
+      "pass": true
+    },
+    {
+      "name": "关抽屉时入口 busy 角标脉冲",
+      "pass": true
+    },
+    {
+      "name": "停止后回到可发送态",
+      "pass": true
+    },
+    {
+      "name": "停止得到「已停止生成」提示",
+      "pass": true
+    },
+    {
+      "name": "长回复完成后保持吸底",
+      "pass": true
+    },
+    {
+      "name": "上翻出现「↓ 回到最新」浮标",
+      "pass": true
+    },
+    {
+      "name": "浮标一键回到底部",
+      "pass": true
+    },
+    {
+      "name": "提案卡出现且待确认未锁",
+      "pass": true
+    },
+    {
+      "name": "取消后就地终态+问句行",
+      "pass": true
+    },
+    {
+      "name": "改要求模式条可见并标注原卡",
+      "pass": true
+    },
+    {
+      "name": "改要求模式条可退出",
+      "pass": true
+    },
+    {
+      "name": "生成中 ask 按钮全部禁用",
+      "pass": true
+    },
+    {
+      "name": "[流程] 气泡只显示原话",
+      "pass": true
+    },
+    {
+      "name": "旧卡保留已取消态且 ask 行撤除",
+      "pass": true
+    },
+    {
+      "name": "连点创建只产生一条待办",
+      "pass": true
+    },
+    {
+      "name": "终态卡：✓ 已创建 + 控件锁死 + 无错误条",
+      "pass": true
+    },
+    {
+      "name": "过期卡：数据已变化 + bad 色 + 控件锁死",
+      "pass": true
+    },
+    {
+      "name": "四态状态色齐备（待确认/已创建/已取消/数据已变化）",
+      "pass": true
+    },
+    {
+      "name": "关抽屉入口 pending 角标计数",
+      "pass": true
+    },
+    {
+      "name": "重开自动聚焦",
+      "pass": true
+    },
+    {
+      "name": "重开定位到最新（底部）",
+      "pass": true
+    },
+    {
+      "name": "D-4 队列恢复合并不产生重复卡",
+      "pass": true
+    },
+    {
+      "name": "错误条出现且可重试/可关",
+      "pass": true
+    },
+    {
+      "name": "重试后成功且错误条消失",
+      "pass": true
+    },
+    {
+      "name": "错误条 ✕ 可直接关闭",
+      "pass": true
+    },
+    {
+      "name": "新会话清空对话但保留卡片队列",
+      "pass": true
+    },
+    {
+      "name": "循环+到点提醒显示「下次提醒」提示",
+      "pass": true
+    },
+    {
+      "name": "循环待办落库含 nextDueDate",
+      "pass": true
+    },
+    {
+      "name": "Esc 关闭添加弹窗",
+      "pass": true
+    },
+    {
+      "name": "外点第一下只关时间面板、弹窗保留",
+      "pass": true
+    },
+    {
+      "name": "外点第二下关闭弹窗",
+      "pass": true
+    },
+    {
+      "name": "提醒设置面板可打开",
+      "pass": true
+    },
+    {
+      "name": "提醒设置面板可关闭",
+      "pass": true
+    },
+    {
+      "name": "渲染层无 console 错误",
+      "pass": true
+    }
+  ],
+  "rendererErrors": [],
+  "store": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\hengsch-ai-acceptance-puawZi"
+}
