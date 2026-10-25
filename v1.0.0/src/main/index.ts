@@ -430,6 +430,7 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: savedBounds?.width || 800,
     height: savedBounds?.height || 600,
+    minWidth: 460,
     x: savedBounds?.x,
     y: savedBounds?.y,
     webPreferences: {

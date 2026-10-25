@@ -592,6 +592,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  column-gap: var(--s1);
+  overflow: hidden;
   padding: 0 var(--s2) 0 var(--s3);
   border-top: 1px solid var(--hairline);
   font-size: 10.5px;
@@ -602,12 +604,21 @@ button {
   user-select: none;
 }
 
+.page-footer .foot-count {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .page-footer .foot-count b {
   color: var(--ink);
   font-weight: 800;
 }
 
 .footer-add {
+  flex: 0 0 auto;
   border: none;
   background: var(--ink);
   color: var(--paper);
@@ -633,9 +644,7 @@ button {
 }
 
 .foot-sync {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 0 0 auto;
   border: none;
   background: none;
   cursor: pointer;
@@ -662,6 +671,7 @@ button {
 }
 
 .foot-reminder {
+  flex: 0 0 auto;
   border: none;
   background: none;
   cursor: pointer;
@@ -680,6 +690,7 @@ button {
 /* ---------------- AI 抽屉（底栏开关 · 右侧挤压布局） ---------------- */
 
 .foot-ai {
+  flex: 0 0 auto;
   border: none;
   background: none;
   cursor: pointer;
