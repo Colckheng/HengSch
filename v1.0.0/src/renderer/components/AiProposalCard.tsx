@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { AiProposal, AiCreateDraft, AiUpdateDraft, MonitorConfig, Todo, Group, CycleType } from '@hengsch/shared-types';
+import type { DeleteProposal, DeleteGroupResult } from '../ai-flow';
 import { GroupSelect } from './GroupSelect';
 import { ReminderSection, type ReminderValue } from './ReminderSection';
 import { SwissSelect } from './SwissSelect';
@@ -20,9 +21,15 @@ interface AiProposalCardProps {
   errorText?: string;
   /** 提交进行中：确认按钮禁用并显示「确认中…」，防双击重复落盘 */
   busy?: boolean;
+  /** B-2 删除合并卡：分组全量（含本卡），≥2 条时渲染清单勾选视图 */
+  group?: DeleteProposal[];
+  /** B-2 落定快照：折叠摘要与逐条回看均区分已删除/保留 */
+  groupResults?: DeleteGroupResult[];
   todos: Todo[];
   groups: Group[];
   onConfirm: (id: string, patch?: unknown) => void;
+  /** B-2 合并卡批量落定：checkedIds=确认删除，其余=出队保留；空数组=全部跳过 */
+  onConfirmGroup: (checkedIds: string[]) => void;
   onReject: (id: string) => void;
 }
 
@@ -59,7 +66,12 @@ function monitorToConfig(draft: MonitorDraft): MonitorConfig | undefined {
   };
 }
 
-export function AiProposalCard({ proposal, status, errorText, busy = false, todos, groups, onConfirm, onReject }: AiProposalCardProps): JSX.Element {
+function isTargetStale(proposal: Exclude<AiProposal, { kind: 'create' }>, todos: Todo[]): boolean {
+  const current = todos.find((todo) => todo.id === proposal.draft.todoId);
+  return !current || current.deleted === true || current.updatedAt !== proposal.before.updatedAt;
+}
+
+export function AiProposalCard({ proposal, status, errorText, busy = false, group, groupResults, todos, groups, onConfirm, onConfirmGroup, onReject }: AiProposalCardProps): JSX.Element {
   const uid = useId();
   const isCreate = proposal.kind === 'create';
 
@@ -115,6 +127,11 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
     if (status === 'committed' || status === 'rejected') setExpanded(false);
   }, [status]);
 
+  // B-2 默认全选，仅记录用户取消勾选的 id，失败重试/父级刷新不会重置选择。
+  const [uncheckedIds, setUncheckedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const checkedIds = (group ?? []).filter((member) => !uncheckedIds.has(member.id)).map((member) => member.id);
+  const isGroup = (group?.length ?? 0) >= 2;
+
   useEffect(() => {
     if (!monitorVisible) return;
     let alive = true;
@@ -129,17 +146,22 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
     };
   }, [monitorVisible]);
 
-  const currentTarget = proposal.kind === 'create' ? null : todos.find((todo) => todo.id === proposal.draft.todoId);
-  const staleByData = proposal.kind !== 'create' && (!currentTarget || currentTarget.deleted === true || currentTarget.updatedAt !== proposal.before.updatedAt);
+  const staleGroupIds = new Set((group ?? []).filter((member) => isTargetStale(member, todos)).map((member) => member.id));
+  const staleByData = isGroup
+    ? checkedIds.some((id) => staleGroupIds.has(id))
+    : proposal.kind !== 'create' && isTargetStale(proposal, todos);
   const isStale = status === 'stale' || staleByData;
   const settled = status === 'committed' || status === 'rejected';
-  const shownError = localError ?? (status === 'error' ? errorText : undefined);
+  const shownError = localError ?? (status === 'error' || (isGroup && status === 'stale') ? errorText : undefined);
   const committedLabel = proposal.kind === 'create' ? '✓ 已创建' : proposal.kind === 'update' ? '✓ 已更新' : '✓ 已删除';
+  const deletedCount = groupResults?.filter((result) => result.deleted).length ?? 0;
   const statusLabel =
     status === 'committed'
-      ? committedLabel
+      ? committedLabel + (groupResults?.length ? ` ×${deletedCount}` : '')
       : status === 'rejected'
-        ? '✕ 已取消'
+        ? groupResults?.length
+          ? '✕ 已跳过'
+          : '✕ 已取消'
         : status === 'error'
           ? '确认失败'
           : isStale
@@ -217,12 +239,13 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
   // B-1.2 终态折叠行：整行可点重新展开
   if (settled && !expanded) {
     const miniKind = proposal.kind === 'delete' ? '删除' : isCreate ? '新建' : '修改';
-    const miniTitle = proposal.kind === 'delete' ? proposal.before.title : title;
+    const resultTitles = groupResults?.filter((result) => status === 'rejected' || result.deleted).map((result) => result.title);
+    const miniTitle = resultTitles?.length ? resultTitles.join('、') : proposal.kind === 'delete' ? proposal.before.title : title;
     return (
       <section className={`ai-card ai-card-mini ${statusClass}`} aria-label="已定稿卡片">
         <button type="button" className="ai-card-mini-line" onClick={() => setExpanded(true)} aria-expanded={false}>
           <span className={`ai-card-kind${proposal.kind === 'delete' ? ' danger' : ''}`}>{miniKind}</span>
-          <span className="ai-card-mini-title">{miniTitle || '（无标题）'}</span>
+          <span className="ai-card-mini-title" title={miniTitle}>{miniTitle || '（无标题）'}</span>
           <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
         </button>
       </section>
@@ -230,10 +253,21 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
   }
 
   if (proposal.kind === 'delete') {
+    const toggleRow = (id: string) => {
+      setUncheckedIds((previous) => {
+        const next = new Set(previous);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      setArmed(false);
+      setLocalError(null);
+    };
     return (
       <section className={`ai-card ai-card-delete ${statusClass}${busy ? ' is-busy' : ''}`} aria-label="删除确认卡">
         <div className="ai-card-line">
           <span className="ai-card-kind danger">删除</span>
+          {isGroup && <span className="ai-card-chip">{group?.length} 条</span>}
           <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
           {settled && (
             <button type="button" className="ai-card-fold" onClick={() => setExpanded(false)}>
@@ -241,31 +275,96 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
             </button>
           )}
         </div>
-        <div className="ai-delete-target">
-          <div className="ai-delete-title">{proposal.before.title}</div>
-          <div className="ai-delete-meta">
-            {groupNameOf(groups, proposal.before.groupId)} · {timeLabel(proposal.before.remindAt)}
+        {isGroup ? (
+          <div className="ai-group-list" role="group" aria-label="批量删除清单">
+            {group?.map((member) => {
+              const id = member.id;
+              const memberTitle = member.before.title;
+              return (
+                <label key={id} className="ai-group-row">
+                  <input
+                    type="checkbox"
+                    checked={!uncheckedIds.has(id)}
+                    onChange={() => toggleRow(id)}
+                    disabled={settled || busy}
+                    aria-label={`删除 ${memberTitle}`}
+                  />
+                  <span className="ai-group-title">{memberTitle}</span>
+                  <span className="ai-group-meta" title={groupNameOf(groups, member.before.groupId)}>
+                    {staleGroupIds.has(id) ? '已变化' : groupNameOf(groups, member.before.groupId)}
+                  </span>
+                </label>
+              );
+            })}
           </div>
-        </div>
-        {shownError && status === 'error' && (
+        ) : groupResults?.length ? (
+          <div className="ai-group-list readonly" aria-label="批量删除回看">
+            {groupResults.map((result) => (
+              <div key={result.id} className="ai-group-row">
+                <span className="ai-group-title">{result.title}</span>
+                <span className="ai-group-meta">{result.deleted ? '已删除' : '保留'}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="ai-delete-target">
+            <div className="ai-delete-title">{proposal.before.title}</div>
+            <div className="ai-delete-meta">
+              {groupNameOf(groups, proposal.before.groupId)} · {timeLabel(proposal.before.remindAt)}
+            </div>
+          </div>
+        )}
+        {shownError && (
           <div className="ai-card-error" role="alert">
             {shownError}
           </div>
         )}
-        <div className="modal-footer ai-card-footer">
-          <button type="button" className="button button-secondary" onClick={handleReject} disabled={locked}>
-            取消
-          </button>
-          {armed ? (
-            <button type="button" className="button ai-card-danger" onClick={() => onConfirm(proposal.id)} disabled={locked}>
-              {busy ? '确认中…' : '确认删除'}
+        {isGroup ? (
+          <div className="modal-footer ai-card-footer">
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => onConfirmGroup([])}
+              disabled={settled || busy}
+            >
+              跳过全部
             </button>
-          ) : (
-            <button type="button" className="button button-primary" onClick={() => setArmed(true)} disabled={locked}>
-              删除
+            {armed ? (
+              <button
+                type="button"
+                className="button ai-card-danger"
+                onClick={() => onConfirmGroup(checkedIds)}
+                disabled={locked || checkedIds.length === 0}
+              >
+                {busy ? '确认中…' : `确认删除 ${checkedIds.length} 条`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => setArmed(true)}
+                disabled={locked || checkedIds.length === 0}
+              >
+                {checkedIds.length ? `删除 ${checkedIds.length} 条` : '删除'}
+              </button>
+            )}
+          </div>
+        ) : !groupResults && (
+          <div className="modal-footer ai-card-footer">
+            <button type="button" className="button button-secondary" onClick={handleReject} disabled={locked}>
+              取消
             </button>
-          )}
-        </div>
+            {armed ? (
+              <button type="button" className="button ai-card-danger" onClick={() => onConfirm(proposal.id)} disabled={locked}>
+                {busy ? '确认中…' : '确认删除'}
+              </button>
+            ) : (
+              <button type="button" className="button button-primary" onClick={() => setArmed(true)} disabled={locked}>
+                删除
+              </button>
+            )}
+          </div>
+        )}
       </section>
     );
   }

@@ -94,6 +94,7 @@ export interface ElectronAPI {
     chat: (messages: AiChatMessage[]) => Promise<AiChatResult>;
     stop: () => Promise<void>;
     commit: (id: string, patch?: unknown) => Promise<boolean>;
+    commitBatch: (commit: string[], reject: string[]) => Promise<{ committed: number; rejected: number }>;
     reject: (id: string) => Promise<boolean>;
     queueList: () => Promise<AiProposal[]>;
     queueTouch: (id: string) => Promise<boolean>;

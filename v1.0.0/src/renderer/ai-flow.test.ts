@@ -15,6 +15,9 @@ import {
   toChatMessages,
   persistableFlow,
   restoreFlow,
+  groupedDeletes,
+  resolveDeleteGroup,
+  type DeleteProposal,
   type FlowState,
   type FlowEntry
 } from './ai-flow';
@@ -25,6 +28,12 @@ function proposal(summary?: string, title = `t${uid}`): AiProposal {
   uid += 1;
   const draft: AiCreateDraft = { title, type: 'once' };
   return { id: `p${uid}`, kind: 'create', createdAt: 1, draft, summary };
+}
+
+function deleteProposal(title: string): DeleteProposal {
+  uid += 1;
+  const before = { id: `t${uid}`, title, type: 'once' as const, status: 'pending' as const, createdAt: 1, updatedAt: 1, order: uid };
+  return { id: `p${uid}`, kind: 'delete', createdAt: 1, before, draft: { todoId: before.id } };
 }
 
 type CardEntry = Extract<FlowEntry, { kind: 'card' }>;
@@ -251,4 +260,100 @@ it('restoreFlow round-trips a snapshot with renumbered ids and falls back to emp
   assert.deepEqual(restoreFlow(null).entries, []);
   assert.deepEqual(restoreFlow('not-json').entries, []);
   assert.equal(restoreFlow('{"entries":[]}').committed, 0);
+});
+
+it('delete groups stop at the first non-delete and leave single cards on the original path', () => {
+  const a = deleteProposal('a');
+  const b = deleteProposal('b');
+  const c = proposal(undefined, 'create');
+  const d = deleteProposal('d');
+  const state = insertStaged(emptyFlow(), [a, b, c, d]);
+  assert.deepEqual(groupedDeletes(state, cards(state)[0].id), [a, b]);
+  assert.deepEqual(state.queue, [b, c, d]);
+  assert.deepEqual(groupedDeletes(state, 'missing'), []);
+  const solo = insertStaged(emptyFlow(), [a, c, d]);
+  assert.deepEqual(groupedDeletes(solo, cards(solo)[0].id), []);
+  const createFirst = insertStaged(emptyFlow(), [c, a, b]);
+  assert.deepEqual(groupedDeletes(createFirst, cards(createFirst)[0].id), []);
+});
+
+it('partial delete confirmation records each outcome and resumes a mixed queue exactly once', () => {
+  const group = [deleteProposal('保留首条'), deleteProposal('删除第二条'), deleteProposal('删除第三条')];
+  const create = proposal(undefined, '接续新建');
+  const laterDelete = deleteProposal('后续单条删除');
+  let state = insertStaged(emptyFlow(), [...group, create, laterDelete]);
+  const id = cards(state)[0].id;
+  const options = { group, confirmedIds: [group[1].id, group[2].id], rejectedIds: [group[0].id] };
+  state = resolveDeleteGroup(state, id, options);
+  assert.equal(cards(state)[0].status, 'committed');
+  assert.deepEqual(cards(state)[0].groupResults, group.map((item, index) => ({ id: item.id, title: item.before.title, deleted: index > 0 })));
+  assert.equal(state.committed, 2);
+  assert.equal(state.skipped, 1);
+  assert.equal(cards(state)[1].proposal.id, create.id);
+  assert.equal(cards(state)[1].status, 'pending');
+  assert.deepEqual(state.queue, [laterDelete]);
+  assert.equal(state.awaitingEndLine, true);
+  assert.equal(asks(state).length, 0);
+  assert.ok(state.entries.some((entry) => entry.kind === 'system' && entry.content === '已删除 2 条：删除第二条、删除第三条 · 保留 1 条'));
+  assert.equal(resolveDeleteGroup(state, id, options), state, 'late duplicate completion must not release another card');
+
+  const restored = restoreFlow(JSON.stringify(persistableFlow(state)));
+  assert.deepEqual(cards(restored)[0].groupResults, cards(state)[0].groupResults);
+  state = commitCard(state, cards(state)[1].id);
+  assert.equal(cards(state)[2].proposal.id, laterDelete.id);
+  state = commitCard(state, cards(state)[2].id);
+  assert.equal((last(state) as Extract<FlowEntry, { kind: 'system' }>).content, '完成 4 · 跳过 1');
+});
+
+it('confirming all three deletes closes the batch with one settled card', () => {
+  const group = [deleteProposal('a'), deleteProposal('b'), deleteProposal('c')];
+  const initial = insertStaged(emptyFlow(), group);
+  const state = resolveDeleteGroup(initial, cards(initial)[0].id, { group, confirmedIds: group.map((item) => item.id), rejectedIds: [] });
+  assert.equal(cards(state).length, 1);
+  assert.equal(cards(state)[0].groupResults?.filter((result) => result.deleted).length, 3);
+  assert.equal(state.queue.length, 0);
+  assert.equal(state.awaitingEndLine, false);
+  assert.equal((last(state) as Extract<FlowEntry, { kind: 'system' }>).content, '完成 3 · 跳过 0');
+});
+
+it('failed delete groups can retry; stale groups can skip all and release the following card', () => {
+  const group = [deleteProposal('同名待办'), deleteProposal('同名待办')];
+  const tail = proposal(undefined, '接续');
+  const initial = insertStaged(emptyFlow(), [...group, tail]);
+  const id = cards(initial)[0].id;
+  const failed = markCard(initial, id, 'error', '写入失败');
+  assert.deepEqual(groupedDeletes(failed, id), group);
+  assert.equal(failed.committed, 0);
+  const retried = resolveDeleteGroup(failed, id, { group, confirmedIds: group.map((item) => item.id), rejectedIds: [] });
+  assert.equal(cards(retried)[0].status, 'committed');
+  assert.equal(cards(retried)[0].errorText, undefined);
+  assert.equal(retried.committed, 2);
+
+  const stale = markCard(failed, id, 'stale', '确认卡已过期');
+  assert.deepEqual(groupedDeletes(stale, id), group);
+  let skipped = resolveDeleteGroup(stale, id, { group, confirmedIds: [], rejectedIds: group.map((item) => item.id) });
+  assert.equal(cards(skipped)[0].status, 'rejected');
+  assert.equal(cards(skipped)[0].groupResults?.every((result) => !result.deleted), true);
+  assert.equal(new Set(cards(skipped)[0].groupResults?.map((result) => result.id)).size, 2, 'duplicate titles must keep distinct row ids');
+  assert.equal(skipped.committed, 0);
+  assert.equal(skipped.skipped, 2);
+  assert.equal(asks(skipped).length, 0);
+  assert.equal(cards(skipped)[1].proposal.id, tail.id);
+  skipped = commitCard(skipped, cards(skipped)[1].id);
+  assert.equal((last(skipped) as Extract<FlowEntry, { kind: 'system' }>).content, '完成 1 · 跳过 2');
+});
+
+it('invalid delete results cannot consume unrelated or unaccounted proposals', () => {
+  const group = [deleteProposal('a'), deleteProposal('b')];
+  const initial = insertStaged(emptyFlow(), group);
+  const id = cards(initial)[0].id;
+  for (const result of [
+    { confirmedIds: [group[0].id], rejectedIds: [] },
+    { confirmedIds: [group[0].id, group[0].id], rejectedIds: [] },
+    { confirmedIds: [group[0].id], rejectedIds: [group[0].id] },
+    { confirmedIds: ['unrelated'], rejectedIds: [group[1].id] }
+  ]) {
+    assert.equal(resolveDeleteGroup(initial, id, { group, ...result }), initial);
+  }
+  assert.equal(resolveDeleteGroup(initial, 'missing', { group, confirmedIds: [], rejectedIds: group.map((item) => item.id) }), initial);
 });

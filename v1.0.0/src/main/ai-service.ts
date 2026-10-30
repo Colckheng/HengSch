@@ -250,7 +250,7 @@ export function buildSystemPrompt(todos: Todo[], groups: Group[], processNames: 
     '你是 HengSch Todo 桌面应用内的 AI 助手小SOU，只用简体中文，回答简洁直接，不闲聊、不吹捧、不写客套话。',
     '你可以用工具查询、创建、修改、删除待办。写操作会先生成预览卡等用户确认（删除需二次确认），工具结果会告诉你已生成预览卡——此时只需一句话说明，不要复述字段。',
     '对话流：',
-    '- 用户一次提到多条待办时：先用一段文字给出清单总览（每条一行，只写标题与关键属性），然后同轮调用 stage_batch 把全部条目一次入队（每条 summary 写成可独立展示的一句话描述）；入队后一句话提示“共 N 条，按顺序逐条确认”。',
+    '- 用户一次提到多条待办时：先用一段文字给出清单总览（每条一行，只写标题与关键属性），然后同轮调用 stage_batch 把全部条目一次入队（每条 summary 写成可独立展示的一句话描述）；入队后一句话提示“共 N 条，按卡片顺序确认”。连续删除会合并为一张清单卡，勾选后一次确认，未勾选的保留。',
     `- 单条待办直接用 create_todo/update_todo/delete_todo；除 stage_batch（一次至多 ${STAGE_BATCH_MAX} 条）外，每轮最多一个写操作。`,
     '- 用户消息带 [流程] 前缀时按其指示处理：要求“改”某条 → 只重新暂存那一条（新 summary+draft），不要动队列里其他条目；已由用户确认或跳过的内容不要再提。',
     detailRule,
@@ -350,7 +350,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'stage_batch',
-      description: `总览轮专用：一次暂存多条写操作（≤${STAGE_BATCH_MAX} 条），全部入队后用户按顺序逐条确认`,
+      description: `总览轮专用：一次暂存多条写操作（≤${STAGE_BATCH_MAX} 条），全部入队后用户按顺序确认；连续删除合并清单勾选`,
       parameters: {
         type: 'object',
         properties: {
@@ -573,7 +573,7 @@ async function runToolLoop(
               proposals.set(item.proposal.id, { proposal: item.proposal, expires: Date.now() + PROPOSAL_TTL_MS });
             }
             content = batch.length > 1 || call.name === 'stage_batch'
-              ? JSON.stringify({ staged: true, count: batch.length, proposalIds: batch.map((item) => item.proposal.id), note: `已生成 ${batch.length} 张预览卡，按顺序等用户确认` })
+              ? JSON.stringify({ staged: true, count: batch.length, proposalIds: batch.map((item) => item.proposal.id), note: `已暂存 ${batch.length} 条操作，按卡片顺序等用户确认（连续删除合并清单）` })
               : JSON.stringify({ staged: true, proposalId: batch[0].proposal.id, note: '已生成预览卡，等待用户确认' });
           }
         }
@@ -643,6 +643,45 @@ export function commitProposal(id: string, patch?: unknown): void {
 
 export function rejectProposal(id: string): boolean {
   return proposals.delete(id);
+}
+
+/**
+ * B-2 删除合并卡：勾选项全部校验/计算成功才落盘一次，再消费整组队列。
+ * 校验或落盘失败均保留整组；未勾选项允许已过期/出队，跳过全部不写盘。
+ */
+export function commitProposalBatch(commitIds: string[], rejectIds: string[]): { committed: number; rejected: number } {
+  if (!commitIds.length && !rejectIds.length) throw new Error('批量提交不能为空');
+  const seen = new Set<string>();
+  for (const id of [...commitIds, ...rejectIds]) {
+    if (typeof id !== 'string' || !id) throw new Error('Invalid proposal id');
+    if (seen.has(id)) throw new Error('重复的提案 id');
+    const entry = proposals.get(id);
+    if (entry && entry.proposal.kind !== 'delete') throw new Error('批量确认只支持删除提案');
+    seen.add(id);
+  }
+  const now = Date.now();
+  const selected: Array<Extract<AiProposal, { kind: 'delete' }>> = [];
+  for (const id of commitIds) {
+    const entry = proposals.get(id);
+    if (!entry || now >= entry.expires) throw new Error('确认卡已过期，请重新发送');
+    if (entry.proposal.kind !== 'delete') throw new Error('批量确认只支持删除提案');
+    selected.push(entry.proposal);
+  }
+  if (selected.length) {
+    const ctx = contextFromStore(lastProcessNames);
+    let next = ctx.todos;
+    for (const proposal of selected) {
+      const current = next.find((todo) => todo.id === proposal.draft.todoId && !todo.deleted);
+      if (!current || current.updatedAt !== proposal.before.updatedAt) throw new Error('待办已被删除或已变化，请重新发送');
+      next = applyProposal(proposal, { ...ctx, todos: next });
+    }
+    storeRef!.set('todos', next);
+    for (const id of seen) proposals.delete(id);
+    push('sync:merged', { todos: next, groups: ctx.groups });
+  } else {
+    for (const id of seen) proposals.delete(id);
+  }
+  return { committed: commitIds.length, rejected: rejectIds.length };
 }
 
 /** 卡片轮到显示时续期（长队列不误杀） */

@@ -29,7 +29,7 @@ import {
   stopSyncService
 } from './sync-service';
 import { initReminderService, stopReminderService, listOpenReminders, runReminderAction } from './reminder-service';
-import { initAiService, runAiChat, cancelAiChat, commitProposal, rejectProposal, refreshProposalExpiry, listQueuedProposals, maskedAiSettings, writeAiSettings, testAiConnection, setDrawerOpen, type AiChatMessage, type AiSettings } from './ai-service';
+import { initAiService, runAiChat, cancelAiChat, commitProposal, commitProposalBatch, rejectProposal, refreshProposalExpiry, listQueuedProposals, maskedAiSettings, writeAiSettings, testAiConnection, setDrawerOpen, type AiChatMessage, type AiSettings } from './ai-service';
 import { initVoiceService, getVoiceModelStatus, startVoiceModelDownload, transcribe } from './voice-service';
 import { previewPaper } from './paper-window';
 import { mergeSyncStates } from '@hengsch/shared-logic';
@@ -894,6 +894,22 @@ ipcMain.handle('ai:reject', (event, id: unknown) => {
   assertTrustedSender(event);
   if (typeof id !== 'string' || !id) throw new Error('Invalid proposal id');
   return rejectProposal(id);
+});
+
+// B-2 删除合并卡：一次确认勾选的条目（未勾选的出队=保留）
+ipcMain.handle('ai:commit-batch', (event, payload: unknown) => {
+  assertTrustedSender(event);
+  const body = payload as { commit?: unknown; reject?: unknown } | null;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Invalid batch');
+  const toIds = (value: unknown): string[] => {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) throw new Error('Invalid batch');
+    return value.map((item) => {
+      if (typeof item !== 'string' || !item) throw new Error('Invalid proposal id');
+      return item;
+    });
+  };
+  return commitProposalBatch(toIds(body.commit), toIds(body.reject));
 });
 
 ipcMain.handle('ai:queue:list', event => {

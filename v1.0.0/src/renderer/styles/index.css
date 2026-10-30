@@ -1221,6 +1221,61 @@ button {
   padding: 10px;
 }
 
+/* B-2 删除合并卡清单（勾选=确认删除，未勾=保留） */
+.ai-group-list {
+  border: 1px solid var(--hairline);
+}
+
+.ai-group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+}
+
+.ai-group-row + .ai-group-row {
+  border-top: 1px solid var(--hairline);
+}
+
+.ai-group-row input[type='checkbox'] {
+  flex: 0 0 auto;
+  accent-color: var(--ink);
+}
+
+label.ai-group-row {
+  cursor: pointer;
+}
+
+.ai-group-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.ai-group-meta {
+  flex: 0 1 auto;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.ai-group-list.readonly .ai-group-row {
+  color: var(--ink-2);
+  padding: 5px 10px;
+}
+
+.ai-group-list.readonly .ai-group-title {
+  color: var(--ink-2);
+}
+
+
 /* U-12 周期提醒下次触发提示 / 自定义分钟校验错误 */
 .reminder-next {
   margin: 6px 0 0;

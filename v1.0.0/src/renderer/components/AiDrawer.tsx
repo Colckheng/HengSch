@@ -19,6 +19,8 @@ import {
   markCard,
   mergeRestoredQueue,
   mergeIntoLastAssistant,
+  groupedDeletes,
+  resolveDeleteGroup,
   toChatMessages,
   persistableFlow,
   restoreFlow,
@@ -232,16 +234,20 @@ export function AiDrawer({
     setShowJump(false);
   };
 
-  /** 轮到显示的 pending 卡续 TTL（每个提案只 touch 一次） */
-  const touchedRef = useRef<string | undefined>(undefined);
+  /** 轮到显示的 pending 卡续 TTL（每个提案只 touch 一次；B-2 合并卡全员续期） */
+  const touchedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const pending = flow.entries.find(
       (entry): entry is Extract<FlowEntry, { kind: 'card' }> => entry.kind === 'card' && entry.status === 'pending'
     );
-    const proposalId = pending?.proposal.id;
-    if (!proposalId || proposalId === touchedRef.current) return;
-    touchedRef.current = proposalId;
-    void window.electronAPI.ai.queueTouch(proposalId).catch(() => undefined);
+    if (!pending) return;
+    const group = groupedDeletes(flow, pending.id);
+    const ids = group.length ? group.map((proposal) => proposal.id) : [pending.proposal.id];
+    for (const id of ids) {
+      if (touchedRef.current.has(id)) continue;
+      touchedRef.current.add(id);
+      void window.electronAPI.ai.queueTouch(id).catch(() => undefined);
+    }
   }, [flow]);
 
   async function sendMessages(next: AiChatMessage[]): Promise<void> {
@@ -338,6 +344,34 @@ export function AiDrawer({
     replaceRef.current = null;
     setAmending(false);
     setFlow((previous) => cancelCard(previous, id));
+  };
+
+  /** B-2 删除合并卡：一次批量提交（勾选=确认删除，未勾选=出队保留）；失败整体放弃可重试 */
+  const handleConfirmGroup = async (entryId: string, checkedIds: string[]) => {
+    if (committingRef.current.has(entryId)) return;
+    const group = groupedDeletes(flowRef.current, entryId);
+    if (!group.length) return;
+    const checked = new Set(checkedIds);
+    const commitIds = group.map((proposal) => proposal.id).filter((id) => checked.has(id));
+    const rejectIds = group.map((proposal) => proposal.id).filter((id) => !checked.has(id));
+    if (!commitIds.length && !rejectIds.length) return;
+    committingRef.current.add(entryId);
+    setCommittingIds(new Set(committingRef.current));
+    try {
+      await window.electronAPI.ai.commitBatch(commitIds, rejectIds);
+      setFlow((previous) => resolveDeleteGroup(previous, entryId, { confirmedIds: commitIds, rejectedIds: rejectIds, group }));
+      setNotice(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '确认失败';
+      const stale = /过期|已被删除|不存在|已变化/.test(message);
+      const entry = flowRef.current.entries.find((item) => item.id === entryId);
+      if (entry?.kind === 'card' && entry.status !== 'committed' && entry.status !== 'rejected') {
+        setFlow((previous) => markCard(previous, entryId, stale ? 'stale' : 'error', message));
+      }
+    } finally {
+      committingRef.current.delete(entryId);
+      setCommittingIds(new Set(committingRef.current));
+    }
   };
 
   const handleSkip = (cardEntryId: string, proposalId: string) => {
@@ -507,6 +541,7 @@ export function AiDrawer({
         </div>
       );
     }
+    const group = groupedDeletes(flow, entry.id);
     return (
       <AiProposalCard
         key={entry.id}
@@ -514,9 +549,12 @@ export function AiDrawer({
         status={entry.status as AiCardStatus}
         errorText={entry.errorText}
         busy={committingIds.has(entry.id)}
+        group={group.length ? group : undefined}
+        groupResults={entry.groupResults}
         todos={todoState.todos}
         groups={groupState.groups}
         onConfirm={(_proposalId, patch) => void handleConfirm(entry.id, entry.proposal.id, patch)}
+        onConfirmGroup={(checkedIds) => void handleConfirmGroup(entry.id, checkedIds)}
         onReject={() => handleCancel(entry.id)}
       />
     );

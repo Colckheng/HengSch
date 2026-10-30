@@ -1,6 +1,7 @@
 /* §8.2/§8.3 手工剧本（CDP/真机项的可重复执行版）：
-   隔离 userData + 构建渲染层 + 主进程全局 fetch 拦截为脚本化假 DeepSeek。
-   只放行 api.deepseek.com，其余网络调用直接抛错。用法：npm run ai:acceptance */
+   隔离 userData + 已构建桌面产物 + 主进程全局 fetch 拦截为脚本化假 DeepSeek。
+   只放行 api.deepseek.com，其余网络调用直接抛错。
+   用法：先在桌面 workspace 执行 npm run build，再执行 npm run ai:acceptance。 */
 const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -8,13 +9,14 @@ const os = require('node:os');
 const assert = require('node:assert/strict');
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hengsch-ai-acceptance-'));
+const configPath = path.join(directory, 'config.json');
 app.on('window-all-closed', () => {});
 // 终端等窗口遮挡会让 visibilityState=hidden → CSS 过渡冻结在 0ms → 抽屉永远"开不了"
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.setPath('userData', directory);
 process.env.HENG_SCH_BUILT = '1';
 fs.writeFileSync(
-  path.join(directory, 'config.json'),
+  configPath,
   JSON.stringify({
     aiSettings: { apiKey: 'sk-test', model: 'deepseek-flash', monitorVerdictEnabled: false, promptLevel: 1 },
     todos: [],
@@ -75,6 +77,9 @@ function toolRoundParts(title) {
   ].join('');
   return [joined.slice(0, 61), joined.slice(61, 140), joined.slice(140)];
 }
+function stageBatchParts(entries) {
+  return [sse({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'batch_call', function: { name: 'stage_batch', arguments: JSON.stringify({ entries }) } }] } }] }), 'data: [DONE]\n'];
+}
 function textParts(content, lineCount = 1) {
   const parts = [];
   for (let i = 0; i < lineCount; i += 1) {
@@ -89,6 +94,17 @@ globalThis.fetch = async (url, init) => {
   const step = script.shift();
   if (!step) throw new Error('假 DeepSeek 脚本已耗尽（用例顺序与预期不符）');
   return step({ ...(init || {}) });
+};
+
+// electron-store 已打包进主进程，外部 require 得到另一份类；在加载前拦截真实原子落盘边界。
+// 仅对本次隔离 config 注入失败，其余文件与正常写盘走原实现。
+let failConfigCommit = false;
+const nativeRenameSync = fs.renameSync;
+fs.renameSync = (source, target) => {
+  if (failConfigCommit && path.resolve(String(target)).toLowerCase() === configPath.toLowerCase()) {
+    throw new Error('模拟批量写入失败');
+  }
+  return nativeRenameSync(source, target);
 };
 
 require(path.resolve(__dirname, '../dist/main/index.js'));
@@ -121,6 +137,23 @@ async function click(selector) {
   await wait(80);
 }
 const storeTodos = () => evaluate(`window.electronAPI.store.get('todos')`);
+
+async function stageBatch(entries, message) {
+  script.push((init) => sseResponse(stageBatchParts(entries), { signal: init.signal }));
+  script.push((init) => sseResponse(textParts('已暂存，请在卡片中确认。'), { signal: init.signal }));
+  await sendChat(message);
+  await until(`!!document.querySelector('.ai-send') && !document.querySelector('.ai-stop')`);
+}
+
+async function createViaChat(title) {
+  const beforeCount = (await storeTodos()).length;
+  await stageBatch([{ summary: `新建${title}`, action: 'create', draft: { title } }], `新建：${title}`);
+  await until(`document.querySelector('.ai-card[aria-label="新建确认卡"] input:not(:disabled)')?.value === ${JSON.stringify(title)}`);
+  await click('.ai-card[aria-label="新建确认卡"] .button-primary:not(:disabled)');
+  await until(`window.electronAPI.store.get('todos').then(todos => todos.length === ${beforeCount + 1})`);
+}
+
+const deleteEntries = (todos) => todos.map((todo) => ({ summary: `删除${todo.title}`, action: 'delete', draft: { todoId: todo.id } }));
 
 async function run() {
   const deadline = Date.now() + 20000;
@@ -281,6 +314,109 @@ async function run() {
   check('重载后终态卡折叠行恢复', await evaluate(`document.querySelectorAll('.ai-card.ai-card-mini').length >= 2`));
   check('重载后 pending 卡经队列恢复不重复', await evaluate(`document.querySelectorAll('.ai-card:not(.muted):not(.ok):not(.bad)').length === 1`));
 
+  // ===== B-2 合并删除：部分勾选、写盘失败重试、混合批次接续 =====
+  // 先确认恢复的纸巾卡，清空 D-2 未决闸门；所有数据均通过隔离应用的真实入口创建。
+  await click('.ai-card[aria-label="新建确认卡"] .button-primary:not(:disabled)');
+  await until(`window.electronAPI.ai.queueList().then(list => list.length === 0)`);
+  await createViaChat('买咖啡');
+  todos = await storeTodos();
+  const retained = todos.find((todo) => todo.title === '买纸巾' && !todo.deleted);
+  assert.ok(retained);
+  const targets = [retained, ...todos.filter((todo) => !todo.deleted && todo.id !== retained.id)];
+  assert.equal(targets.length, 3);
+  await stageBatch([
+    ...deleteEntries(targets),
+    { summary: '删除后继续新建', action: 'create', draft: { title: '删除后的接续任务' } }
+  ], '删除这三条，然后新建一条接续任务');
+  const deleteCard = '.ai-card-delete:not(.ok):not(.muted)';
+  const deleteList = `${deleteCard} .ai-group-list`;
+  await until(`document.querySelectorAll('${deleteList} input').length === 3`);
+  check('三条删除合并为一张清单卡且默认全选', await evaluate(`document.querySelectorAll('${deleteCard}').length === 1 && document.querySelectorAll('${deleteList} input:checked').length === 3`));
+  await click(`${deleteList} input`);
+  await until(`document.querySelectorAll('${deleteList} input:checked').length === 2`);
+  fs.writeFileSync(path.join(directory, 'batch-delete-preview.png'), (await win.webContents.capturePage()).toPNG());
+  const beforeDelete = JSON.stringify(await storeTodos());
+  await click(`${deleteCard} .button-primary`);
+  check('首次点击删除仅进入确认，未写入待办', JSON.stringify(await storeTodos()) === beforeDelete);
+
+  failConfigCommit = true;
+  try {
+    await click(`${deleteCard} .ai-card-danger`);
+    await until(`document.querySelector('${deleteCard} .ai-card-error')?.textContent.includes('模拟批量写入失败')`);
+    check('写盘失败整组和勾选保留，待办与队列均未部分提交',
+      JSON.stringify(await storeTodos()) === beforeDelete
+      && (await evaluate(`window.electronAPI.ai.queueList()`)).length === 4
+      && await evaluate(`document.querySelectorAll('${deleteList} input').length === 3 && document.querySelectorAll('${deleteList} input:checked').length === 2 && !document.querySelector('${deleteList} input').checked`));
+  } finally {
+    failConfigCommit = false;
+  }
+  await evaluate(`(() => { const button = document.querySelector('${deleteCard} .ai-card-danger'); button.click(); button.click(); })()`);
+  await until(`document.querySelector('.ai-card[aria-label="新建确认卡"] input:not(:disabled)')?.value === '删除后的接续任务'`);
+  todos = await storeTodos();
+  check('重试连点只删除勾选项，未勾首条完整保留',
+    JSON.stringify(todos.find((todo) => todo.id === retained.id)) === JSON.stringify(retained)
+    && targets.slice(1).every((target) => {
+      const saved = todos.find((todo) => todo.id === target.id);
+      return saved?.deleted === true && saved.updatedAt > target.updatedAt && saved.deviceId === 'acceptance-dev';
+    })
+    && todos.length === targets.length);
+  check('删除整组后下一张非删除卡接续出现', (await evaluate(`window.electronAPI.ai.queueList()`)).length === 1);
+  check('折叠摘要只列实际删除项并显示数量', await evaluate(`(() => {
+    const card = [...document.querySelectorAll('.ai-card-mini.ok')].find(c => c.textContent.includes('已删除'));
+    return card?.textContent.includes('×2') && !card.querySelector('.ai-card-mini-title').textContent.includes('买纸巾');
+  })()`));
+  await evaluate(`[...document.querySelectorAll('.ai-card-mini.ok')].find(c => c.textContent.includes('已删除')).querySelector('button').click()`);
+  await until(`!!document.querySelector('[aria-label="批量删除回看"]')`);
+  check('展开回看逐条区分已删除与保留且不可编辑', await evaluate(`(() => {
+    const list = document.querySelector('[aria-label="批量删除回看"]');
+    return JSON.stringify([...list.querySelectorAll('.ai-group-meta')].map(el => el.textContent)) === JSON.stringify(['保留', '已删除', '已删除']) && !list.querySelector('input');
+  })()`));
+  await evaluate(`document.querySelector('[aria-label="批量删除回看"]').scrollIntoView({ block: 'center', behavior: 'instant' })`);
+  await wait(350);
+  fs.writeFileSync(path.join(directory, 'batch-delete-result.png'), (await win.webContents.capturePage()).toPNG());
+  await click('.ai-card-delete.ok .ai-card-fold');
+  await click('.ai-card[aria-label="新建确认卡"] .button-primary:not(:disabled)');
+  await until(`window.electronAPI.ai.queueList().then(list => list.length === 0)`);
+  check('混合批次接续完成后收尾计数正确', await evaluate(`[...document.querySelectorAll('.ai-sys')].at(-1)?.textContent === '完成 6 · 跳过 1'`));
+
+  // ===== B-2 全选三条：一次落定并清空队列 =====
+  await createViaChat('买茶叶');
+  const allTargets = (await storeTodos()).filter((todo) => !todo.deleted);
+  assert.equal(allTargets.length, 3);
+  await stageBatch(deleteEntries(allTargets), '把这三条都删掉');
+  await until(`document.querySelectorAll('${deleteList} input:checked').length === 3`);
+  await click(`${deleteCard} .button-primary`);
+  await click(`${deleteCard} .ai-card-danger`);
+  await until(`window.electronAPI.ai.queueList().then(list => list.length === 0)`);
+  check('三条全选一次落墓碑，队列清空并输出收尾行',
+    (await storeTodos()).every((todo) => todo.deleted)
+    && await evaluate(`[...document.querySelectorAll('.ai-sys')].at(-1)?.textContent === '完成 10 · 跳过 1'`));
+
+  // ===== B-2 全不选/过期：跳过全部零写入，仍释放下一张卡 =====
+  for (const title of ['保留任务', '同名待办', '同名待办']) await createViaChat(title);
+  const skipTargets = (await storeTodos()).filter((todo) => !todo.deleted);
+  const beforeSkip = JSON.stringify(await storeTodos());
+  await stageBatch([
+    ...deleteEntries(skipTargets),
+    { summary: '跳过后继续新建', action: 'create', draft: { title: '跳过后的接续任务' } }
+  ], '删除这三条，然后新建下一条');
+  await until(`document.querySelectorAll('${deleteList} input').length === 3`);
+  await evaluate(`document.querySelectorAll('${deleteList} input').forEach(input => input.click())`);
+  await until(`document.querySelectorAll('${deleteList} input:checked').length === 0`);
+  check('全不选时删除禁用，跳过全部仍可用', await evaluate(`document.querySelector('${deleteCard} .button-primary').disabled && !document.querySelector('${deleteCard} .button-secondary').disabled`));
+  await click(`${deleteList} input`);
+  await evaluate(`(async () => { const list = await window.electronAPI.ai.queueList(); await window.electronAPI.ai.reject(list[0].id); })()`);
+  await click(`${deleteCard} .button-primary`);
+  await click(`${deleteCard} .ai-card-danger`);
+  await until(`document.querySelector('${deleteCard} .ai-card-error')?.textContent.includes('过期')`);
+  check('过期失败保留整张清单并允许跳过', await evaluate(`document.querySelectorAll('${deleteList} input').length === 3 && document.querySelector('${deleteCard} .ai-card-danger').disabled && !document.querySelector('${deleteCard} .button-secondary').disabled`));
+  await click(`${deleteCard} .button-secondary`);
+  await until(`document.querySelector('.ai-card[aria-label="新建确认卡"] input:not(:disabled)')?.value === '跳过后的接续任务'`);
+  check('跳过全部保留待办原样，清掉删除组并接续下一张',
+    JSON.stringify(await storeTodos()) === beforeSkip
+    && (await evaluate(`window.electronAPI.ai.queueList()`)).length === 1
+    && await evaluate(`!document.querySelector('.ai-ask') && [...document.querySelectorAll('.ai-card-mini.muted')].some(c => c.textContent.includes('已跳过'))`));
+
   // ===== §8.2-2 错误条可关/可重试 =====
   script.push(() => ({ ok: false, status: 401, text: async () => 'invalid api key' }));
   await sendChat('随便回点什么');
@@ -376,14 +512,24 @@ app.whenReady().then(() => {
     .then(() => app.exit(0))
     .catch(async (error) => {
       let active = 'unavailable';
+      let uiState = null;
       try {
         if (win) {
           active = await win.webContents.executeJavaScript(`document.activeElement ? document.activeElement.tagName + '[' + (document.activeElement.getAttribute('aria-label') || document.activeElement.className || '') + ']' : 'none'`, true);
+          uiState = await evaluate(`({
+            notice: document.querySelector('.ai-err,.ai-notice')?.textContent,
+            busy: !!document.querySelector('.ai-stop'),
+            stream: document.querySelector('.ai-stream')?.textContent,
+            latestReply: [...document.querySelectorAll('.ai-msg-ai .ai-msg-body')].at(-1)?.textContent,
+            cards: [...document.querySelectorAll('.ai-card-status')].map(el => el.textContent)
+          })`);
+          fs.writeFileSync(path.join(directory, 'failure.png'), (await win.webContents.capturePage()).toPNG());
         }
       } catch { /* window may be gone */ }
       console.error(`ai-acceptance FAILED: ${error.message} | activeElement=${active}`);
+      console.error(`uiState: ${JSON.stringify(uiState)} | report: ${path.join(directory, 'acceptance-report.json')}`);
       try {
-        fs.writeFileSync(path.join(directory, 'acceptance-report.json'), JSON.stringify({ failure: String(error), checks, rendererErrors }, null, 2));
+        fs.writeFileSync(path.join(directory, 'acceptance-report.json'), JSON.stringify({ failure: String(error), checks, rendererErrors, uiState }, null, 2));
       } catch { /* ignore */ }
       app.exit(1);
     });

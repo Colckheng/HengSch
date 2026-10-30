@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     chat: (messages: unknown) => ipcRenderer.invoke('ai:chat', messages),
     stop: () => ipcRenderer.invoke('ai:stop'),
     commit: (id: string, patch?: unknown) => ipcRenderer.invoke('ai:commit', id, patch),
+    commitBatch: (commit: string[], reject: string[]) => ipcRenderer.invoke('ai:commit-batch', { commit, reject }),
     reject: (id: string) => ipcRenderer.invoke('ai:reject', id),
     queueList: () => ipcRenderer.invoke('ai:queue:list'),
     queueTouch: (id: string) => ipcRenderer.invoke('ai:queue:touch', id),

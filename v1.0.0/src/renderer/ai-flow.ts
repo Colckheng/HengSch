@@ -2,11 +2,20 @@
 
 export type CardStatus = 'pending' | 'committed' | 'rejected' | 'stale' | 'error';
 
+export type DeleteProposal = Extract<AiProposal, { kind: 'delete' }>;
+
+/** 删除清单的落定快照：队列消费后仍能区分已删除与保留的条目。 */
+export interface DeleteGroupResult {
+  id: string;
+  title: string;
+  deleted: boolean;
+}
+
 export type FlowEntry =
   | { id: string; kind: 'text'; role: 'user' | 'assistant'; content: string; /** 气泡展示文案（如 [流程] 脚手架只显原话）；入库/发模型仍用 content */ display?: string; /** 发送时刻（毫秒）；恢复的老数据可空 */ at?: number }
   /** AI 的逐条描述（stage_batch 的 summary）：展示但不回传给模型 */
   | { id: string; kind: 'summary'; content: string }
-  | { id: string; kind: 'card'; proposal: AiProposal; status: CardStatus; errorText?: string }
+  | { id: string; kind: 'card'; proposal: AiProposal; status: CardStatus; errorText?: string; groupResults?: DeleteGroupResult[] }
   | { id: string; kind: 'ask'; forEntryId: string }
   | { id: string; kind: 'system'; content: string };
 
@@ -181,6 +190,74 @@ export function mergeRestoredQueue(state: FlowState, proposals: AiProposal[]): F
     awaitingEndLine: state.awaitingEndLine || missing.length > 0
   };
   return hasPending ? next : showNext(next);
+}
+
+/**
+ * B-2 删除合并卡：未决删除卡 + 队列里连续的删除提案（前缀规则，遇到非删除即停）。
+ * 失败/过期后保留整组，供重试或跳过，不能退回单卡而丢失余下条目。
+ * 总数 <2 返回 []——单条走原卡片路径（保留取消/改要求）。
+ */
+export function groupedDeletes(state: FlowState, cardEntryId: string): DeleteProposal[] {
+  const entry = state.entries.find((item) => item.id === cardEntryId);
+  if (!entry || entry.kind !== 'card' || entry.proposal.kind !== 'delete') return [];
+  if (entry.status === 'committed' || entry.status === 'rejected') return [];
+  const out: DeleteProposal[] = [entry.proposal];
+  for (const proposal of state.queue) {
+    if (proposal.kind !== 'delete') break;
+    out.push(proposal);
+  }
+  return out.length >= 2 ? out : [];
+}
+
+/**
+ * B-2 合并卡落定：批量提交成功后调用——消费全部分组 id、按结果计数、
+ * 追加系统行并释放队列下一张（收尾行走 finalizeIfDone）。
+ */
+export function resolveDeleteGroup(
+  state: FlowState,
+  cardEntryId: string,
+  options: { confirmedIds: string[]; rejectedIds: string[]; group: DeleteProposal[] }
+): FlowState {
+  const { confirmedIds, rejectedIds, group } = options;
+  const currentGroup = groupedDeletes(state, cardEntryId);
+  if (group.length < 2 || group.some((proposal, index) => currentGroup[index]?.id !== proposal.id)) return state;
+  const consumed = new Set(group.map((proposal) => proposal.id));
+  const confirmed = new Set(confirmedIds);
+  const rejected = new Set(rejectedIds);
+  // IPC 成功结果必须完整划分本组；重复/迟到的回调不能重复计数或放出下一张。
+  if (consumed.size !== group.length || confirmed.size !== confirmedIds.length || rejected.size !== rejectedIds.length
+    || confirmed.size + rejected.size !== group.length
+    || group.some((proposal) => confirmed.has(proposal.id) === rejected.has(proposal.id))) return state;
+  const status: CardStatus = confirmed.size ? 'committed' : 'rejected';
+  const groupResults = group.map((proposal) => ({
+    id: proposal.id,
+    title: proposal.before.title,
+    deleted: confirmed.has(proposal.id)
+  }));
+  const entries = state.entries.map((entry) => {
+    if (entry.kind !== 'card' || entry.id !== cardEntryId) return entry;
+    return {
+      ...entry,
+      status,
+      errorText: undefined,
+      groupResults
+    };
+  });
+  const lines: string[] = [];
+  if (confirmed.size) {
+    lines.push(`已删除 ${confirmed.size} 条：${groupResults.filter((result) => result.deleted).map((result) => result.title).join('、')}`);
+    if (rejected.size) lines.push(`保留 ${rejected.size} 条`);
+  } else {
+    lines.push(`跳过 ${rejected.size} 条删除`);
+  }
+  const base: FlowState = {
+    ...state,
+    entries: [...entries, { id: nextEntryId(), kind: 'system', content: lines.join(' · ') }],
+    queue: state.queue.filter((proposal) => !consumed.has(proposal.id)),
+    committed: state.committed + confirmed.size,
+    skipped: state.skipped + rejected.size
+  };
+  return finalizeIfDone(showNext(base));
 }
 
 /** 回传给模型的历史：只含真实对话文本（summary/system/ask 不回传） */
