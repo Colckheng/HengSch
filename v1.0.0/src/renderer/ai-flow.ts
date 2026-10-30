@@ -189,3 +189,62 @@ export function toChatMessages(entries: FlowEntry[]): AiChatMessage[] {
     .filter((entry): entry is Extract<FlowEntry, { kind: 'text' }> => entry.kind === 'text')
     .map((entry) => ({ role: entry.role, content: entry.content }));
 }
+
+/** B-1a 持久化快照：文字/描述/系统行 + 终态卡；pending/stale/error 卡不存（主进程队列是真相源），问句行随卡消亡 */
+export interface PersistedFlow {
+  entries: FlowEntry[];
+  committed: number;
+  skipped: number;
+  awaitingEndLine: boolean;
+}
+
+export function persistableFlow(state: FlowState): PersistedFlow {
+  return {
+    entries: state.entries.filter((entry) =>
+      entry.kind === 'text' ||
+      entry.kind === 'summary' ||
+      entry.kind === 'system' ||
+      (entry.kind === 'card' && (entry.status === 'committed' || entry.status === 'rejected'))
+    ),
+    committed: state.committed,
+    skipped: state.skipped,
+    awaitingEndLine: state.awaitingEndLine
+  };
+}
+
+/** 挂载恢复：坏数据回空流；条目 id 全部重编（模块 seq 已复位，避免与新条目撞 id） */
+export function restoreFlow(raw: string | null): FlowState {
+  if (!raw) return emptyFlow();
+  try {
+    const data = JSON.parse(raw) as Partial<PersistedFlow>;
+    if (!data || !Array.isArray(data.entries)) return emptyFlow();
+    const entries: FlowEntry[] = [];
+    for (const entry of data.entries) {
+      if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string') continue;
+      if (entry.kind === 'text' && (entry.role === 'user' || entry.role === 'assistant') && typeof entry.content === 'string') {
+        entries.push({ ...entry, id: nextEntryId() });
+      } else if (entry.kind === 'summary' && typeof entry.content === 'string') {
+        entries.push({ ...entry, id: nextEntryId() });
+      } else if (entry.kind === 'system' && typeof entry.content === 'string') {
+        entries.push({ ...entry, id: nextEntryId() });
+      } else if (
+        entry.kind === 'card' &&
+        (entry.status === 'committed' || entry.status === 'rejected') &&
+        typeof entry.proposal === 'object' &&
+        entry.proposal !== null &&
+        typeof entry.proposal.kind === 'string'
+      ) {
+        entries.push({ ...entry, id: nextEntryId() });
+      }
+    }
+    return {
+      entries,
+      queue: [],
+      committed: typeof data.committed === 'number' && data.committed >= 0 ? data.committed : 0,
+      skipped: typeof data.skipped === 'number' && data.skipped >= 0 ? data.skipped : 0,
+      awaitingEndLine: data.awaitingEndLine === true
+    };
+  } catch {
+    return emptyFlow();
+  }
+}

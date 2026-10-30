@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   emptyFlow,
   appendText,
+  appendSystem,
   insertStaged,
   commitCard,
   cancelCard,
@@ -12,6 +13,8 @@ import {
   rebuildQueue,
   mergeIntoLastAssistant,
   toChatMessages,
+  persistableFlow,
+  restoreFlow,
   type FlowState,
   type FlowEntry
 } from './ai-flow';
@@ -207,4 +210,45 @@ it('mergeIntoLastAssistant skips over staged summary/card entries after the text
 it('mergeIntoLastAssistant drops the tail when latest text is the user message', () => {
   const state = appendText(emptyFlow(), 'user', 'hi');
   assert.equal(mergeIntoLastAssistant(state, '。'), state);
+});
+
+it('persistableFlow keeps text/system/settled cards and drops pending cards and asks', () => {
+  let state = appendText(emptyFlow(), 'user', '你好');
+  state = insertStaged(state, [proposal('描述', 'a')]);
+  state = cancelCard(state, cards(state)[0].id);
+  state = appendSystem(state, '完成 0 · 跳过 0');
+  const snap = persistableFlow(state);
+  assert.deepEqual(
+    snap.entries.map((entry) => entry.kind),
+    ['text', 'summary', 'card', 'system']
+  );
+  const card = snap.entries[2] as CardEntry;
+  assert.equal(card.status, 'rejected');
+  assert.equal(snap.entries.some((entry) => entry.kind === 'ask'), false);
+});
+
+it('restoreFlow round-trips a snapshot with renumbered ids and falls back to empty on garbage', () => {
+  let state = appendText(emptyFlow(), 'user', 'hi');
+  state = insertStaged(state, [proposal('描述', 'a')]);
+  state = commitCard(state, cards(state)[0].id);
+  const snap = persistableFlow(state);
+  const restored = restoreFlow(JSON.stringify(snap));
+  assert.equal(restored.entries.length, 3);
+  assert.equal(restored.committed, 1);
+  assert.equal(restored.queue.length, 0);
+  const text = restored.entries[0];
+  assert.equal(text.kind === 'text' ? text.content : null, 'hi');
+  const card = restored.entries[2] as CardEntry;
+  assert.equal(card.status, 'committed');
+  const restoredIds = restored.entries.map((entry) => entry.id);
+  assert.equal(new Set(restoredIds).size, restoredIds.length);
+  // 重编：恢复出的 id 与快照原 id 无交集（模块 seq 已复位/推进，不撞旧 id）
+  const snapIds = snap.entries.map((entry) => entry.id);
+  assert.equal(restoredIds.some((id) => snapIds.includes(id)), false);
+  const next = appendText(restored, 'assistant', 'yo');
+  const nextIds = next.entries.map((entry) => entry.id);
+  assert.equal(new Set(nextIds).size, nextIds.length);
+  assert.deepEqual(restoreFlow(null).entries, []);
+  assert.deepEqual(restoreFlow('not-json').entries, []);
+  assert.equal(restoreFlow('{"entries":[]}').committed, 0);
 });

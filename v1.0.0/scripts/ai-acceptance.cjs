@@ -192,7 +192,7 @@ async function run() {
   check('提案卡出现且待确认未锁', await evaluate(`(() => { const c = document.querySelector('.ai-card'); return c.textContent.includes('待确认') && !c.querySelector('input').disabled; })()`));
   await evaluate(`[...document.querySelectorAll('.ai-card-footer .button-secondary')].find(b => b.textContent.includes('取消')).click()`);
   await until(`!!document.querySelector('.ai-ask')`);
-  check('取消后就地终态+问句行', await evaluate(`(() => { const c = [...document.querySelectorAll('.ai-card')].at(-1); return c.classList.contains('muted') && c.querySelector('input').disabled && document.querySelector('.ai-ask')?.textContent.includes('这条怎么办'); })()`));
+  check('取消后折叠成一行+问句行', await evaluate(`(() => { const c = [...document.querySelectorAll('.ai-card')].at(-1); return c.classList.contains('muted') && c.classList.contains('ai-card-mini') && !c.querySelector('input') && document.querySelector('.ai-ask')?.textContent.includes('这条怎么办'); })()`));
   await evaluate(`[...document.querySelectorAll('.ai-ask .button')].find(b => b.textContent.includes('改要求')).click()`);
   await until(`!!document.querySelector('.ai-amend-bar')`);
   check('改要求模式条可见并标注原卡', await evaluate(`document.querySelector('.ai-amend-bar').textContent.includes('买牛奶')`));
@@ -219,11 +219,21 @@ async function run() {
   await until(`!!document.querySelector('.ai-card.ok')`, 4000);
   let todos = await storeTodos();
   check('连点创建只产生一条待办', todos.length === 1 && todos[0].title === '买酸奶');
-  check('终态卡：✓ 已创建 + 控件锁死 + 无错误条', await evaluate(`(() => {
+  check('终态卡折叠为一行（✓ 已创建、无输入无错误条）', await evaluate(`(() => {
     const c = document.querySelector('.ai-card.ok');
-    return c.textContent.includes('已创建') && c.querySelector('input').disabled
+    return c && c.classList.contains('ai-card-mini') && c.textContent.includes('已创建')
+      && !c.querySelector('input') && !c.querySelector('.ai-card-error');
+  })()`));
+  await evaluate(`document.querySelector('.ai-card.ok .ai-card-mini-line').click()`);
+  await until(`!!document.querySelector('.ai-card.ok input')`);
+  check('点开终态卡：输入/按钮全禁用且无错误条', await evaluate(`(() => {
+    const c = document.querySelector('.ai-card.ok');
+    return c.querySelector('input').disabled
       && [...c.querySelectorAll('.ai-card-footer button')].every(b => b.disabled) && !c.querySelector('.ai-card-error');
   })()`));
+  await evaluate(`document.querySelector('.ai-card.ok .ai-card-fold').click()`);
+  await until(`!!document.querySelector('.ai-card.ok.ai-card-mini')`);
+  check('收起回到一行摘要', true);
 
   // ===== 第四态：数据已变化（stale）=====
   script.push((init) => sseResponse(toolRoundParts('第三件'), { signal: init.signal }));
@@ -259,6 +269,17 @@ async function run() {
   check('重开自动聚焦', await evaluate(`document.activeElement?.getAttribute('aria-label') === 'AI 对话输入'`));
   check('重开定位到最新（底部）', await evaluate(`(() => { const m = document.querySelector('.ai-msgs'); return m.scrollHeight - m.scrollTop - m.clientHeight < 48; })()`));
   check('D-4 队列恢复合并不产生重复卡', await evaluate(`document.querySelectorAll('.ai-card:not(.muted):not(.ok):not(.bad)').length === 1`));
+
+  // ===== B-1a 重载恢复：对话文字/终态卡本地持久化、pending 卡走主进程队列 =====
+  await win.webContents.reload();
+  await wait(1500);
+  await until(`!!document.querySelector('.app-container')`, 8000);
+  await click('.foot-ai');
+  await until(`document.querySelector('.ai-drawer')?.classList.contains('open')`);
+  await wait(300);
+  check('重载后对话文字恢复', await evaluate(`document.querySelectorAll('.ai-msg-me').length > 0 && [...document.querySelectorAll('.ai-msg-me .ai-msg-body')].some(el => el.textContent.includes('改成买酸奶'))`));
+  check('重载后终态卡折叠行恢复', await evaluate(`document.querySelectorAll('.ai-card.ai-card-mini').length >= 2`));
+  check('重载后 pending 卡经队列恢复不重复', await evaluate(`document.querySelectorAll('.ai-card:not(.muted):not(.ok):not(.bad)').length === 1`));
 
   // ===== §8.2-2 错误条可关/可重试 =====
   script.push(() => ({ ok: false, status: 401, text: async () => 'invalid api key' }));

@@ -9,7 +9,6 @@ import type { VoiceModelStatus, VoiceTranscribeProgress } from '../types/electro
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import {
-  emptyFlow,
   appendText,
   appendSystem,
   insertStaged,
@@ -21,9 +20,14 @@ import {
   mergeRestoredQueue,
   mergeIntoLastAssistant,
   toChatMessages,
+  persistableFlow,
+  restoreFlow,
   type FlowState,
   type FlowEntry
 } from '../ai-flow';
+
+/** B-1a 对话持久化（renderer 本地）：重载/重启后文字与终态卡不丢；pending 卡走主进程队列 */
+const FLOW_STORE_KEY = 'hengsch:ai-flow:v1';
 
 interface DrawerNotice {
   kind: 'error' | 'info';
@@ -48,7 +52,9 @@ export function AiDrawer({
   onClose: () => void;
   onActivityChange?: (info: { busy: boolean; pendingCount: number }) => void;
 }): JSX.Element {
-  const [flow, setFlow] = useState<FlowState>(emptyFlow);
+  const [flow, setFlow] = useState<FlowState>(() =>
+    restoreFlow(typeof localStorage === 'undefined' ? null : localStorage.getItem(FLOW_STORE_KEY))
+  );
   const [stream, setStream] = useState('');
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
@@ -88,6 +94,15 @@ export function AiDrawer({
   useEffect(() => {
     onActivityChange?.({ busy, pendingCount });
   }, [busy, pendingCount, onActivityChange]);
+
+  // B-1a 每次流变更落盘快照（重载前最近状态可恢复；存储不可用时静默降级）
+  useEffect(() => {
+    try {
+      localStorage.setItem(FLOW_STORE_KEY, JSON.stringify(persistableFlow(flow)));
+    } catch {
+      /* 隐私模式/配额满：不阻塞会话 */
+    }
+  }, [flow]);
 
   useEffect(() => {
     const off = window.electronAPI.ai.onChunk(({ delta }) => {

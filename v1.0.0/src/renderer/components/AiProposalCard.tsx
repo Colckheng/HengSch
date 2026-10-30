@@ -109,6 +109,11 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
   const [processes, setProcesses] = useState<string[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
+  // B-1.2 终态卡折叠成一行：确认/取消即收起，点开可回看（再次点状态行之外无入口，收起按钮复原）
+  const [expanded, setExpanded] = useState(() => status !== 'committed' && status !== 'rejected');
+  useEffect(() => {
+    if (status === 'committed' || status === 'rejected') setExpanded(false);
+  }, [status]);
 
   useEffect(() => {
     if (!monitorVisible) return;
@@ -209,12 +214,32 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
     return monitor.exeName && !lower.has(monitor.exeName.toLowerCase()) ? [monitor.exeName, ...processes] : processes;
   })();
 
+  // B-1.2 终态折叠行：整行可点重新展开
+  if (settled && !expanded) {
+    const miniKind = proposal.kind === 'delete' ? '删除' : isCreate ? '新建' : '修改';
+    const miniTitle = proposal.kind === 'delete' ? proposal.before.title : title;
+    return (
+      <section className={`ai-card ai-card-mini ${statusClass}`} aria-label="已定稿卡片">
+        <button type="button" className="ai-card-mini-line" onClick={() => setExpanded(true)} aria-expanded={false}>
+          <span className={`ai-card-kind${proposal.kind === 'delete' ? ' danger' : ''}`}>{miniKind}</span>
+          <span className="ai-card-mini-title">{miniTitle || '（无标题）'}</span>
+          <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
+        </button>
+      </section>
+    );
+  }
+
   if (proposal.kind === 'delete') {
     return (
       <section className={`ai-card ai-card-delete ${statusClass}${busy ? ' is-busy' : ''}`} aria-label="删除确认卡">
         <div className="ai-card-line">
           <span className="ai-card-kind danger">删除</span>
           <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
+          {settled && (
+            <button type="button" className="ai-card-fold" onClick={() => setExpanded(false)}>
+              收起
+            </button>
+          )}
         </div>
         <div className="ai-delete-target">
           <div className="ai-delete-title">{proposal.before.title}</div>
@@ -263,6 +288,11 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, todo
         <span className="ai-card-kind">{isCreate ? '新建' : '修改'}</span>
         <span className="ai-card-chip">{chip}</span>
         <span className={`ai-card-status ${statusClass}`}>{statusLabel}</span>
+        {settled && (
+          <button type="button" className="ai-card-fold" onClick={() => setExpanded(false)}>
+            收起
+          </button>
+        )}
       </div>
       {beforeChip && (
         <div className="ai-diff">
