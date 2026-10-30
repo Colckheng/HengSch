@@ -2,7 +2,7 @@
 
 > 来源：2026-10-19 全量复检（3 个并行子代理审查 + 人工逐行核实关键项）。
 > 范围：v1.0.0 桌面端（AI 抽屉/提案卡/AI 设置、Add/Edit 弹窗、ReminderSection、paper-lab）。
-> 状态：**计划待评审**；本文件不改代码。用户已批准"全都修"，按本文档分批执行。
+> 状态：**已审计（2026-10-25）**；本文件不改代码。37 项逐项只读核对，台账见 §12：已做 32 / 部分完成 3（U-4、U-7.4、F-5）/ 未做 0 / 撤销降级 2。缺口三项只列清单，逐项经用户点头才开工。
 > 已完成的前置修复见 §0.2（无需重做）。
 
 ---
@@ -339,4 +339,69 @@ npx electron C:\Users\hengxing\AppData\Local\Temp\opencode\paper-pos-check.cjs  
 |---|---|---|---|
 | D-A | compact（窄窗）模式要不要保留 AI 入口？ | **不保留**（维持现状，只修常规模式角标） | F-7 |
 | D-B | "新会话"按钮是否清空卡片队列？ | **只清对话文本，队列保留** | F-8 |
-| D-C | 终态（已创建/已取消）提案卡要不要折叠成一行摘要？ | **不折叠**（只做 U-3 的禁用样式与锁定） | U-3 |
+| D-C | 终态（已创建/已取消）提案卡要不要折叠成一行摘要？ | ~~**不折叠**~~ → **2026-10-25 翻案：做折叠**（用户报障 B-1.2「卡片确认后缩小」，见 `2026-10-25-acceptance-audit-closure-plan.md` §4） | U-3 |
+
+---
+
+## 12. 执行审计台账（2026-10-25，只读核对，未改任何代码）
+
+证据均为 `file:line`（v1.0.0 工作区，基线 `ba7c2a3`）。结论：**已做 32 / 部分完成 3 / 未做 0 / 撤销降级 2**。
+
+### 12.1 逻辑与文档测试类（L/D，14 项）
+
+| 项 | 结论 | 证据 | 说明 |
+|---|---|---|---|
+| L-1 | 已做 | reminder.ts:48-55；ai-tools.ts:2,201-202,240-245；AddTodoModal.tsx:3,83；EditTodoModal.tsx:3,117-120 | 模型端到端已实现；缺组件级 round-trip 单测（Add 路径由 ai-acceptance E2E 覆盖），默认不补 |
+| L-2 | 已做 | ai-flow.ts:148-158；ai-flow.test.ts:131-152；AiDrawer.tsx:79-80,300-318,501；AiProposalCard.tsx:145,214,236,418 | catch 分支比方案更激进：任何确认失败都不弹 notice，错误只落卡 `errorText` |
+| L-3 | 已做 | paper-lab/App.tsx:215-229 | `setLeaving(null)` 复位未补（可选增强），靠父级删样本兜底 |
+| L-4 | 已做 | ai-service.ts:602,610,622,626-628；ai-service.test.ts:95-127 | 与修正后方案完全一致 |
+| L-5 | 已做 | ai-service.ts:61-64,70；index.ts:915-920；AISettingsModal.tsx:137-138；ai-service.test.ts:78-93 | — |
+| L-6 | 已撤销 | ai-service.ts:32,633-636,649-654,656-659 | 撤销理由成立（设计预期，不改） |
+| L-7 | 已降级 | AiDrawer.tsx:220-230 | 可选微改未做，符合降级处置 |
+| L-8 | 已做 | AiDrawer.tsx:282,331 | 文案与方案示例措辞不同（语义一致）；reject 幂等化未做 |
+| D-1 | 已做 | AISettingsModal.tsx:21,68-81,98,114,129,208-242,233,75-138 | 五处全部带 busy 禁用与提示 |
+| D-2 | 已做 | ai-service.ts:563-568 | 闸门落点在 ai-service 工具循环而非 stageProposalBatch（方案允许） |
+| D-3 | 已做 | todo-utils.ts:31-38,47-53；todo-utils.test.ts:70-77,80-126 | TZ 在测试文件顶层设置（潜在串扰，未实测暴露） |
+| D-4 | 已做 | ai-flow.ts:165-184；AiDrawer.tsx:167-177；ai-smoke.cjs:140-154；ai-acceptance.cjs:261 | 选「合并」路线；覆盖在 smoke/acceptance 而非独立单测 |
+| D-5 | 已做 | drawer-design.md:49,51-70,72,86-89 | 仅核对 §4 与通道处，其余章节未逐行比对（存疑） |
+| D-6 | 已做 | ai-tools.test.ts:144；reminder.test.ts:142；ai-flow.test.ts:140；ai-service.test.ts:78,95；test-paper-lab.cjs:10 | 四测均存在且被 test-paper-lab.cjs 收录；审计未执行验证（门禁另跑） |
+
+### 12.2 界面类（U，13 项）
+
+| 项 | 结论 | 证据 | 说明 |
+|---|---|---|---|
+| U-1 | 已做 | index.css:949-965；AiDrawer.tsx:550 | — |
+| U-2 | 已做 | AiProposalCard.tsx:132-143,214,261,265；index.css:992-1008,1061-1078 | — |
+| U-3 | 已做 | index.css:1011-1026；time-picker.css:29-33；各组件 disabled prop | 终态底色用 `--paper` 非方案的 `--paper-2`（小偏差） |
+| **U-4** | **部分完成** | AiDrawer.tsx:527-541,290-294,379-399 | **重试按钮条件过宽：任意 error 级 notice 都带「重试」，语音失败/麦克风拒绝也显示，点击会误发上一轮聊天。修法：仅聊天类错误显示** |
+| U-5 | 已做 | index.css:2386-2409 | — |
+| U-6 | 已做 | ai-flow.ts:6,63-65,187-191；AiDrawer.tsx:278,284,453；ai-flow.test.ts:172-184 | — |
+| **U-7** | **部分完成** | 1-3 已做：index.css:1358-1359,984-985,1363-1365；**第 4 条**：index.css:803 vs :1754 | **窄屏 300px 媒体规则在 360px 基础规则之前、特异度相同 → 源顺序后者胜 → ≤860px 窄屏弹窗多偏 60px（2026-10-25 读码裁决）；「先量化再二选一」无决策记录。修法：媒体规则移到基础规则后 + 补决策注记** |
+| U-8 | 已做 | SwissTimePicker.tsx:87-95；time-picker.css:62-65；GroupSelect.tsx:31-38；SwissSelect.tsx:36-43；index.css:1949-1953 | — |
+| U-9 | 已做 | SwissTimePicker.tsx:60-85；ReminderSection.tsx:22,159；AddTodoModal.tsx:30-35,108-117,212；EditTodoModal.tsx:31-36,132-141,236 | 实现路径与方案不同（等效）；范围外残留：分组菜单开着时 Esc 直关整窗 |
+| U-10 | 已做 | ReminderSection.tsx:43,136-196；SwissTimePicker.tsx:41,148；MonitorSection.tsx:11,92-160 | 实际冲突已消除；GroupSelect/SwissSelect 未改 useId |
+| U-11 | 已做 | ReminderSection.tsx:67-78,108-121,182-198 | 初值经 effect 同步而非 useState 派生（等效） |
+| U-12 | 已做 | ReminderSection.tsx:130-131,161-163；index.css:1173-1184 | — |
+| U-13 | 已做 | ai-flow.ts:6,63-65；AiDrawer.tsx:446-451；index.css:967-974 | — |
+
+### 12.3 手感类（F，10 项）
+
+| 项 | 结论 | 证据 | 说明 |
+|---|---|---|---|
+| F-1 | 已做 | AiDrawer.tsx:73-74,183-218,286,561-565；index.css:1262-1283 | 滚底非 `behavior:'smooth'`；浮标触发提前 400→600px 残影（小偏差） |
+| F-2 | 已做 | index.css:1186-1196；AiProposalCard.tsx:145,236,418 | — |
+| F-3 | 已做 | index.css:771-806；AiDrawer.tsx:183-192,511 | 窄屏隐藏用 `.compact` 类而非媒体查询（等效，D-A 默认符合） |
+| F-4 | 已做 | AiDrawer.tsx:268-274,553-560,643；index.css:1198-1222,1485-1497 | — |
+| **F-5** | **部分完成** | 模式条/ask 禁用/reject notice 已做：AiDrawer.tsx:335-345,485,488,567-574；**卡片 busy**：AiDrawer.tsx:501 | **提案卡 busy 只绑自身 `committingIds`，生成中点另一张卡仍可确认。修法：busy 传 `committingIds.has(id) || chatBusy`** |
+| F-6 | 已做 | index.css:1472-1483 | — |
+| F-7 | 已做 | AiDrawer.tsx:45-49,83-90；App.tsx:40-43,256-270,280；index.css:713-755,771-773 | D-A 已按默认执行 |
+| F-8 | 已做 | AiDrawer.tsx:347-355,365-374,515-517,609 | D-B 已按默认执行；新会话不中断在途流式（偏差记档） |
+| F-9 | 已做 | index.css:1285-1317,1319-1334 | `.ai-card` 现为 `.ai-pop`（10-25 三改后续变更） |
+| F-10 | 已做 | index.css:803-805,1753-1756 | 窄屏 60px 过度偏移源顺序问题归入 **U-7 第 4 条**，不重复计 |
+
+### 12.4 缺口与偏差汇总
+
+- **部分完成 3 项（即收尾计划 B-4，只列不动，点头才修）**：U-4、U-7.4、F-5。
+- 次要偏差（默认不修）：L-1、L-2、L-3、L-8 部分、D-2、D-3、U-9 残留、U-10 半项、F-1、F-8。
+- 撤销/降级：L-6 撤销、L-7 降级。
+
