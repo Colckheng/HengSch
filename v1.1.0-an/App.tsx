@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { TodoProvider, useTodos } from './src/context/TodoContext';
 import { GroupProvider } from './src/context/GroupContext';
 import { SyncProvider } from './src/context/SyncContext';
+import { ReminderProvider, readNotificationTodoId } from './src/context/ReminderContext';
 import { TodoList } from './src/components/TodoList';
 import { AddTodoModal } from './src/components/AddTodoModal';
 import { EditTodoModal } from './src/components/EditTodoModal';
@@ -12,10 +13,12 @@ import { TodoDetailModal } from './src/components/TodoDetailModal';
 import { GroupManagerModal } from './src/components/GroupManagerModal';
 import { SyncStatusFooter } from './src/components/SyncStatusFooter';
 import { SyncSettingsModal } from './src/components/SyncSettingsModal';
+import { ReminderSettingsModal } from './src/components/ReminderSettingsModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { syncWidgetSummary } from './src/utils/widgetSummary';
 import type { Todo } from '@hengsch/shared-types';
 
-// P0 spike：前台也展示通知，验证渠道与权限链路
+// 前台也展示通知，避免用户以为提醒没到
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false })
 });
@@ -30,9 +33,45 @@ function AppContent(): React.ReactElement {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isGroupOpen, setIsGroupOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
-  const { state, deleteTodo } = useTodos();
+  const [isReminderOpen, setIsReminderOpen] = useState(false);
+  const { state, allTodos, isInitialized, deleteTodo } = useTodos();
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
+  const handledColdResponseRef = useRef(false);
+
+  const openTodoById = (id: string) => {
+    const todo = allTodos.find((item) => item.id === id && !item.deleted);
+    if (!todo) return;
+    setDetailTodo(todo);
+    setIsDetailOpen(true);
+  };
+
+  // 小组件摘要：初始化完成与任务变化后同步（只读，不影响数据）
+  useEffect(() => {
+    if (!isInitialized) return;
+    syncWidgetSummary(allTodos);
+  }, [isInitialized, allTodos]);
+
+  // 通知点击：冷启动只读一次 last response；运行中监听新 response
+  useEffect(() => {
+    if (!isInitialized) return;
+    let alive = true;
+    if (!handledColdResponseRef.current) {
+      handledColdResponseRef.current = true;
+      Notifications.getLastNotificationResponseAsync()
+        .then((response) => {
+          if (!alive) return;
+          const id = readNotificationTodoId(response);
+          if (id) openTodoById(id);
+        })
+        .catch(() => undefined);
+    }
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const id = readNotificationTodoId(response);
+      if (id) openTodoById(id);
+    });
+    return () => { alive = false; sub.remove(); };
+  }, [isInitialized, allTodos]);
 
   const handleDetail = (todo: Todo) => {
     setDetailTodo(todo);
@@ -69,9 +108,14 @@ function AppContent(): React.ReactElement {
           <Text style={styles.toolbarBtnText}>＋</Text>
         </TouchableOpacity>
         <Text style={styles.toolbarTitle}>HENGSCH TODO</Text>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => setIsGroupOpen(true)}>
-          <Text style={styles.toolbarBtnTextSm}>GRP</Text>
-        </TouchableOpacity>
+        <View style={styles.toolbarActions}>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => setIsReminderOpen(true)} aria-label="提醒设置">
+            <Text style={styles.toolbarBtnTextSm}>ALR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => setIsGroupOpen(true)}>
+            <Text style={styles.toolbarBtnTextSm}>GRP</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.statsStrip}>
         <View style={styles.statsLeft}>
@@ -82,33 +126,6 @@ function AppContent(): React.ReactElement {
           {pad(state.todos.filter((t) => t.status === 'completed').length)} DONE · {pad(state.todos.length)} TOTAL
         </Text>
       </View>
-      {/* P0 spike：临时入口，A3 前替换为提醒设置里的「发送测试提醒」 */}
-      <TouchableOpacity
-        style={styles.spikeBtn}
-        onPress={async () => {
-          try {
-            const granted = await Notifications.requestPermissionsAsync();
-            if (!granted.granted) {
-              Alert.alert('通知权限被拒绝', '请在系统设置里允许 HengSch 通知');
-              return;
-            }
-            await Notifications.setNotificationChannelAsync('reminders', {
-              name: '待办提醒',
-              importance: Notifications.AndroidImportance.MAX,
-              vibrationPattern: [0, 250, 250, 250]
-            });
-            await Notifications.scheduleNotificationAsync({
-              content: { title: '待办提醒', body: '原生通知 spike（10 秒）' },
-              trigger: { seconds: 10, channelId: 'reminders' }
-            });
-            Alert.alert('已排程', '10 秒后应收到通知；请分别在前台/后台/杀进程后验证');
-          } catch (error) {
-            Alert.alert('排程失败', error instanceof Error ? error.message : '未知错误');
-          }
-        }}
-      >
-        <Text style={styles.spikeBtnText}>10s 测试通知</Text>
-      </TouchableOpacity>
       <TodoList onDetail={handleDetail} />
       <SyncStatusFooter onPress={() => setIsSyncOpen(true)} />
       <AddTodoModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
@@ -132,6 +149,7 @@ function AppContent(): React.ReactElement {
       />
       <GroupManagerModal isOpen={isGroupOpen} onClose={() => setIsGroupOpen(false)} />
       <SyncSettingsModal isOpen={isSyncOpen} onClose={() => setIsSyncOpen(false)} />
+      <ReminderSettingsModal isOpen={isReminderOpen} onClose={() => setIsReminderOpen(false)} />
     </View>
   );
 }
@@ -142,7 +160,9 @@ export default function App(): React.ReactElement {
       <GroupProvider>
         <TodoProvider>
           <SyncProvider>
-            <AppContent />
+            <ReminderProvider>
+              <AppContent />
+            </ReminderProvider>
           </SyncProvider>
         </TodoProvider>
       </GroupProvider>
@@ -171,6 +191,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  toolbarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   toolbarBtnText: {
     fontSize: 20,
@@ -225,21 +249,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: '#8A8A85',
     marginBottom: 5,
-  },
-  spikeBtn: {
-    marginHorizontal: 24,
-    marginTop: 8,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#111111',
-    backgroundColor: '#FAFAF7',
-  },
-  spikeBtnText: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-    letterSpacing: 1,
-    color: '#111111',
   },
 });

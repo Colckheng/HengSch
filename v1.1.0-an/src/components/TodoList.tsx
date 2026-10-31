@@ -3,16 +3,17 @@ import { View, Text, FlatList, TouchableOpacity, ScrollView, StyleSheet } from '
 import type { Todo } from '@hengsch/shared-types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
-import { TodoCard } from './TodoCard';
+import { SwipeableTodoRow } from './SwipeableTodoRow';
 
 interface TodoListProps {
   onDetail: (todo: Todo) => void;
 }
 
 export function TodoList({ onDetail }: TodoListProps): React.ReactElement {
-  const { state, toggleTodoStatus } = useTodos();
+  const { state, toggleTodoStatus, updateTodo, deleteTodo } = useTodos();
   const { state: groupState } = useGroups();
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const filteredTodos =
     selectedGroupId === 'all'
@@ -20,11 +21,15 @@ export function TodoList({ onDetail }: TodoListProps): React.ReactElement {
       : state.todos.filter((todo) => todo.groupId === selectedGroupId);
 
   const renderItem = ({ item, index }: { item: Todo; index: number }) => (
-    <TodoCard
+    <SwipeableTodoRow
       todo={item}
       index={index}
+      open={openId === item.id}
+      onOpenChange={(next) => setOpenId(next ? item.id : (openId === item.id ? null : openId))}
       onToggle={toggleTodoStatus}
       onPress={onDetail}
+      onSnooze={(id, remindAt) => updateTodo(id, { remindAt, remindedAt: undefined })}
+      onDelete={deleteTodo}
     />
   );
 
