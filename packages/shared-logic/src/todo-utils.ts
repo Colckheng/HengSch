@@ -28,6 +28,11 @@ function stepCycle(cycleType: CycleType, customCycleDays: number | undefined, fr
   }
 }
 
+/** 单步推进一个周期（不做「必须晚于 now」的收敛），供排程等需要逐轮展开的调用方使用 */
+export function stepCycleDate(cycleType: CycleType, customCycleDays: number | undefined, from: number): number | undefined {
+  return stepCycle(cycleType, customCycleDays, from);
+}
+
 /**
  * 计算循环任务的下次到期时间（保时刻推进）
  * @param anchor 上一轮 nextDueDate（保 HH:MM 不漂移）；缺省视为"当前时刻"

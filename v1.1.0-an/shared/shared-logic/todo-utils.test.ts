@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { calculateNextDueDate, toggleTodoStatus } from './todo-utils';
 import type { Todo, RecurringTodo } from '@hengsch/shared-types';
 
@@ -78,10 +78,13 @@ describe('calculateNextDueDate · 保时刻推进', () => {
 });
 
 // D-3 DST：daily/weekly 为绝对毫秒步进（跨切换日本地 HH:MM 漂移 ±1h），
-// monthly 走日历步进保时刻。TZ 在文件顶层设置，覆盖后续 Date 行为。
-process.env.TZ = 'America/New_York';
+// monthly 走日历步进保时刻。TZ 仅在本 describe 内设置并在结束时还原，
+// 避免污染后续用例（2026-10-31 曾因此让 toggleTodoStatus 的 09:00 断言漂成 08:00）。
+const ORIGINAL_TZ = process.env.TZ;
 
 describe('calculateNextDueDate · DST（America/New_York）', () => {
+  beforeAll(() => { process.env.TZ = 'America/New_York'; });
+  afterAll(() => { process.env.TZ = ORIGINAL_TZ; });
   const ny = (iso: string): number => Date.parse(iso);
 
   it('daily 跨春令时（2026-03-08 2:00→3:00）：绝对 +24h，本地时刻 +1h', () => {
