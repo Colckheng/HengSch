@@ -8,6 +8,8 @@ import {
   commitCard,
   cancelCard,
   skipCard,
+  resetSession,
+  cardStateNote,
   replaceAfterCancel,
   markCard,
   rebuildQueue,
@@ -108,6 +110,39 @@ it('skip on the last queued card closes the batch with counts', () => {
   state = skipCard(state, cardB.id);
   assert.equal(last(state).kind, 'system');
   assert.equal((last(state) as Extract<FlowEntry, { kind: 'system' }>).content, '完成 1 · 跳过 1');
+});
+
+it('resetSession clears text and settled cards but keeps pending cards and queue', () => {
+  let state = insertStaged(emptyFlow(), [proposal('A', 'a'), proposal('B', 'b')]);
+  state = appendText(state, 'user', '你好');
+  state = commitCard(state, cards(state)[0].id);
+  state = appendText(state, 'assistant', '完成');
+  state = resetSession(state);
+  assert.equal(cards(state).length, 1);
+  assert.equal(cards(state)[0].status, 'pending');
+  assert.equal(state.entries.some((entry) => entry.kind === 'text' || entry.kind === 'summary' || entry.kind === 'system'), false);
+  assert.equal(state.committed, 1);
+});
+
+it('resetSession with no live work clears all cards and resets counters', () => {
+  let state = insertStaged(emptyFlow(), [proposal(undefined, 'x')]);
+  state = commitCard(state, cards(state)[0].id);
+  state = appendText(state, 'user', 'hi');
+  state = resetSession(state);
+  assert.equal(state.entries.length, 0);
+  assert.equal(state.queue.length, 0);
+  assert.equal(state.committed, 0);
+  assert.equal(state.skipped, 0);
+  assert.equal(state.awaitingEndLine, false);
+});
+
+it('cardStateNote lists pending cards or states none', () => {
+  let state = insertStaged(emptyFlow(), [proposal(undefined, '待办')]);
+  assert.match(cardStateNote(state), /当前有 1 张待确认预览卡（待办）/);
+  state = cancelCard(state, cards(state)[0].id);
+  state = skipCard(state, cards(state)[0].id);
+  assert.match(cardStateNote(state), /当前没有待确认预览卡/);
+  assert.match(cardStateNote(state), /不要再让用户确认旧卡/);
 });
 
 it('replaceAfterCancel splices the new proposal right after the canceled card', () => {

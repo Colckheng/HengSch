@@ -15,6 +15,8 @@ import {
   commitCard,
   cancelCard,
   skipCard,
+  resetSession,
+  cardStateNote,
   replaceAfterCancel,
   markCard,
   mergeRestoredQueue,
@@ -305,7 +307,12 @@ export function AiDrawer({
     const next = appendText(flow, 'user', content, target ? text : undefined);
     setFlow(next);
     justSentRef.current = true;
-    void sendMessages(toChatMessages(next.entries));
+    const messages = toChatMessages(next.entries);
+    if (messages.length) {
+      const last = messages[messages.length - 1];
+      messages[messages.length - 1] = { ...last, content: `${cardStateNote(next)}\n\n${last.content}` };
+    }
+    void sendMessages(messages);
   };
 
   const retryLast = () => {
@@ -340,10 +347,11 @@ export function AiDrawer({
   };
 
   /** 取消：不出队不落盘，就地变已取消并问「这条怎么办？」 */
-  const handleCancel = (id: string) => {
+  const handleCancel = (cardEntryId: string, proposalId: string) => {
     replaceRef.current = null;
     setAmending(false);
-    setFlow((previous) => cancelCard(previous, id));
+    window.electronAPI.ai.reject(proposalId).catch(() => setNotice({ kind: 'error', text: '原提案移出队列失败，请重试' }));
+    setFlow((previous) => cancelCard(previous, cardEntryId));
   };
 
   /** B-2 删除合并卡：一次批量提交（勾选=确认删除，未勾选=出队保留）；失败整体放弃可重试 */
@@ -397,10 +405,8 @@ export function AiDrawer({
     replaceRef.current = null;
     setAmending(false);
     setNotice(null);
-    setFlow((previous) => ({
-      ...previous,
-      entries: previous.entries.filter((entry) => entry.kind !== 'text' && entry.kind !== 'summary')
-    }));
+    setShowJump(false);
+    setFlow((previous) => resetSession(previous));
   };
 
   const answerMonitorAsk = (answer: 'complete' | 'keep') => {
@@ -555,7 +561,7 @@ export function AiDrawer({
         groups={groupState.groups}
         onConfirm={(_proposalId, patch) => void handleConfirm(entry.id, entry.proposal.id, patch)}
         onConfirmGroup={(checkedIds) => void handleConfirmGroup(entry.id, checkedIds)}
-        onReject={() => handleCancel(entry.id)}
+        onReject={(proposalId) => handleCancel(entry.id, proposalId)}
       />
     );
   };

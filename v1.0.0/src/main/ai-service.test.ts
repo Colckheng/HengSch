@@ -36,6 +36,8 @@ it('todo context caps to 100 pending-first lines with group and monitor annotati
   const annotated = compactTodoLines([{ ...many[0], groupId: 'g1', monitor: { exeName: 'chrome.exe', thresholdMinutes: 10 } }], groups);
   assert.ok(annotated.includes('分组:工作'));
   assert.ok(annotated.includes('监测:chrome.exe'));
+  const reminded = compactTodoLines([{ ...many[0], remindAt: Date.parse('2026-11-01T09:00:00+08:00') }], groups);
+  assert.match(reminded, /提醒:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/);
   assert.equal(compactTodoLines([], groups), '（暂无待办）');
 });
 
@@ -46,7 +48,8 @@ it('system prompt carries clock, groups, processes and rules', () => {
     ['chrome.exe', 'Code.exe'],
     1_700_000_000_000
   );
-  assert.ok(prompt.includes('当前时间：') && prompt.includes('（ISO 2023-11-14T22:13:20.000Z）'));
+  assert.ok(prompt.includes('当前时间：'));
+  assert.match(prompt, /当前时间：.*（\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}）/);
   assert.ok(prompt.includes('分组列表：g1=工作'));
   assert.ok(prompt.includes('当前运行进程：chrome.exe, Code.exe'));
   assert.ok(prompt.includes('#t1 [待办] 写周报'));
@@ -61,6 +64,14 @@ it('system prompt carries serial flow rules for stage_batch overview', () => {
   assert.ok(prompt.includes('[流程]'));
   assert.ok(prompt.includes('一次至多 10 条'));
   assert.ok(prompt.includes('循环待办只关心“时刻”'));
+});
+
+it('system prompt states pending preview cards from the live queue', () => {
+  const none = buildSystemPrompt([], [], [], Date.now(), 1, []);
+  assert.ok(none.includes('待确认预览卡：无'));
+  assert.ok(none.includes('不要仅凭历史文字说'));
+  const some = buildSystemPrompt([], [], [], Date.now(), 1, ['报销', '买牛奶']);
+  assert.ok(some.includes('待确认预览卡：2 张（报销、买牛奶）'));
 });
 
 it('promptLevel picks exactly one detail rule', () => {

@@ -43,6 +43,16 @@ it('create accepts recurring with cycle and stamps nextDueDate', () => {
   assert.equal(created.nextDueDate, NOW + 86_400_000);
 });
 
+it('create accepts ISO 8601 reminder with offset and keeps numeric compatibility', () => {
+  const iso = '2026-11-01T09:00:00+08:00';
+  const proposal = stageProposal('create', { title: '报销', remindAt: iso }, ctx());
+  assert.equal(proposal.kind === 'create' ? proposal.draft.remindAt : null, Date.parse(iso));
+  const numeric = stageProposal('create', { title: '报销', remindAt: String(NOW + 60_000) }, ctx());
+  assert.equal(numeric.kind === 'create' ? numeric.draft.remindAt : null, NOW + 60_000);
+  assert.throws(() => stageProposal('create', { title: 'x', remindAt: iso }, ctx({ now: Date.parse(iso) + 1 })), /必须晚于当前时间/);
+  assert.throws(() => stageProposal('create', { title: 'x', remindAt: '明天九点' }, ctx()), /ISO 8601/);
+});
+
 it('create rejects invalid payloads with Chinese errors', () => {
   const bad: unknown[] = [
     42, {}, { title: ' ' }, { title: 'x', remindAt: NOW - 1 }, { title: 'x', remindAt: '明天' },

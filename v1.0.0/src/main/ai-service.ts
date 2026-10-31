@@ -217,9 +217,31 @@ export function accumulateToolCalls(
   }
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function localIso(date: Date): string {
+  const offset = -date.getTimezoneOffset();
+  const abs = Math.abs(offset);
+  const sign = offset >= 0 ? '+' : '-';
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}${sign}${pad2(Math.floor(abs / 60))}:${pad2(abs % 60)}`;
+}
+
 function formatClock(now: number): string {
   const date = new Date(now);
-  return `${date.toLocaleString('zh-CN', { hour12: false })}（ISO ${date.toISOString()}）`;
+  return `${date.toLocaleString('zh-CN', { hour12: false })}（${localIso(date)}）`;
+}
+
+function activeProposalTitles(): string[] {
+  const now = Date.now();
+  const titles: string[] = [];
+  for (const entry of proposals.values()) {
+    if (now >= entry.expires) continue;
+    const proposal = entry.proposal;
+    titles.push(proposal.kind === 'create' ? proposal.draft.title : proposal.before.title);
+  }
+  return titles;
 }
 
 export function compactTodoLines(todos: Todo[], groups: Group[]): string {
@@ -232,7 +254,7 @@ export function compactTodoLines(todos: Todo[], groups: Group[]): string {
     .map((todo) => {
       const lead = [`#${todo.id}`, todo.status === 'pending' ? '[待办]' : '[已完成]', todo.title].join(' ');
       const parts = [`分组:${groupName(todo.groupId)}`];
-      if (todo.remindAt) parts.push(`提醒:${new Date(todo.remindAt).toISOString()}${todo.remindLeadMs ? ` 提前${Math.round(todo.remindLeadMs / 60000)}分钟` : ''}`);
+      if (todo.remindAt) parts.push(`提醒:${localIso(new Date(todo.remindAt))}${todo.remindLeadMs ? ` 提前${Math.round(todo.remindLeadMs / 60000)}分钟` : ''}`);
       if ('cycleType' in todo) parts.push(`循环:${todo.cycleType}${todo.customCycleDays ? `(${todo.customCycleDays}天)` : ''}`);
       if (todo.monitor) parts.push(`监测:${todo.monitor.exeName}`);
       return [lead, ...parts].join(' | ');
@@ -240,7 +262,7 @@ export function compactTodoLines(todos: Todo[], groups: Group[]): string {
     .join('\n');
 }
 
-export function buildSystemPrompt(todos: Todo[], groups: Group[], processNames: string[], now: number, promptLevel: 1 | 2 = 1): string {
+export function buildSystemPrompt(todos: Todo[], groups: Group[], processNames: string[], now: number, promptLevel: 1 | 2 = 1, pendingTitles: string[] = []): string {
   const groupLines = groups.filter((group) => !group.deleted).map((group) => `${group.id}=${group.name}`).join(', ') || '（无）';
   const processes = processNames.slice(0, PROCESS_CONTEXT_LIMIT).join(', ') || '（未取到进程列表）';
   const detailRule = promptLevel === 2
@@ -256,12 +278,13 @@ export function buildSystemPrompt(todos: Todo[], groups: Group[], processNames: 
     detailRule,
     '字段规则：',
     '- type：once（一次性）或 recurring（循环）；循环必须给 cycleType（daily/weekly/monthly/custom），custom 还要 customCycleDays≥1 天；一次性任务不要传 cycleType。',
-    '- remindAt 是毫秒时间戳且必须晚于现在；remindLeadMs 是提前量毫秒（0=到点，可省略）。循环待办只关心“时刻”：remindAt 给下一次发生的“时刻减提前量”，不要纠结日期。',
+    '- remindAt 用 ISO 8601 字符串并带时区偏移（例如 2026-11-01T09:00:00+08:00），必须晚于现在；remindLeadMs 是提前量毫秒（0=到点，可省略）。循环待办只关心“时刻”：remindAt 给下一次发生的“时刻减提前量”，不要纠结日期。不要自行把时间换算成时间戳。',
     '- groupId 只能从下面的分组里选（给 id 或名称），匹配不到就不传（会落到未分类）。',
     '- monitor 传 { exeName, thresholdMinutes(≥1), auto, askOnExit }，exeName 必须在“当前运行进程”列表里；用户没要求进程监测就不要传。',
     '- 标记完成/撤销完成用 update_todo 的 toggleStatus:true（与主界面勾选完全同一套规则，循环待办会续期）。',
     '- 纯查询先用 list_todos 拿最新数据。禁止编造不存在的待办 id。',
     `当前时间：${formatClock(now)}`,
+    `待确认预览卡：${pendingTitles.length ? `${pendingTitles.length} 张（${pendingTitles.join('、')}）` : '无。历史对话里说过的“已生成预览卡”都已处理（创建/取消/跳过），不要仅凭历史文字说“还在等你确认”。'}`,
     `分组列表：${groupLines}`,
     `当前运行进程：${processes}`,
     '当前待办：',
@@ -292,7 +315,7 @@ const TOOLS = [
           cycleType: { type: 'string', enum: ['daily', 'weekly', 'monthly', 'custom'], description: '循环任务必填' },
           customCycleDays: { type: 'integer', description: 'cycleType=custom 时必填，天数≥1' },
           groupId: { type: 'string', description: '已有分组的 id 或名称，可省略' },
-          remindAt: { type: 'number', description: '提醒时间戳（毫秒，必须晚于现在），可省略' },
+          remindAt: { type: 'string', description: '提醒时间，ISO 8601 字符串且必须带时区偏移（如 2026-11-01T09:00:00+08:00），必须晚于现在；可省略' },
           remindLeadMs: { type: 'number', description: '提前量毫秒，可省略' },
           monitor: {
             type: 'object',
@@ -323,7 +346,7 @@ const TOOLS = [
           title: { type: 'string' },
           description: { type: 'string' },
           groupId: { type: 'string' },
-          remindAt: { description: '毫秒时间戳，或字符串 "clear" 取消提醒' },
+          remindAt: { description: 'ISO 8601 带时区偏移的时间字符串（如 2026-11-01T09:00:00+08:00），或字符串 "clear" 取消提醒' },
           remindLeadMs: { description: '提前量毫秒，或字符串 "clear"' },
           monitor: { description: '进程监测对象，或 null 移除' },
           toggleStatus: { type: 'boolean', description: 'true=切换完成状态' }
@@ -497,7 +520,7 @@ async function runToolLoop(
     | { role: 'assistant'; content: string | null; tool_calls?: unknown }
     | { role: 'tool'; tool_call_id: string; content: string };
   const apiMessages: ApiMessage[] = [
-    { role: 'system', content: buildSystemPrompt(ctx.todos, ctx.groups, ctx.processNames, ctx.now, promptLevel) },
+    { role: 'system', content: buildSystemPrompt(ctx.todos, ctx.groups, ctx.processNames, ctx.now, promptLevel, activeProposalTitles()) },
     ...history
   ];
   for (let round = 0; round < TOOL_ROUNDS; round += 1) {

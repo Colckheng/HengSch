@@ -21,7 +21,7 @@
 
 ## 1. 批次一：AI 任务书阶段 F 手测（6 项，陪同）
 
-逐项过、逐项勾 `2026-10-18-ai-assistant-taskbook.md:79-84`，记录入 `docs/evidence/ai-assistant/manual-check-2026-10-25.md`。
+逐项过、逐项勾 `2026-10-18-ai-assistant-taskbook.md:79-84`，记录入 `docs/evidence/ai-assistant/manual-check-2026-10-31.md`。
 
 | # | 剧本 | 验收点 |
 |---|---|---|
@@ -33,6 +33,8 @@
 | F-6 | UI Swiss 对照：直角 / 发丝线 / 令牌色 / 无说明性段落 | 对照设计 §6/§12 逐条过 |
 
 合并 `2026-10-19-qa-fixes-plan.md` §8 手工剧本的重叠项（流式光标、卡四态、改要求模式条、入口角标、nextDueDate）一次测完。
+
+- **2026-10-31 执行**：F-1 通过；期间修复 4 项——remindAt 时区换算、取消未移出主进程队列、新会话残留终态卡、「在吗」模型臆测旧卡。证据 [`manual-check-2026-10-31.md`](../evidence/ai-assistant/manual-check-2026-10-31.md)。F-2~F-6 待测。
 
 ## 2. 批次二：QA 复检计划审计（2026-10-25 已执行）
 

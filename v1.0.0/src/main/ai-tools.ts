@@ -62,8 +62,16 @@ function readMonitor(raw: unknown, processNames: string[]): MonitorConfig | unde
 
 function readRemindAt(value: unknown, now: number): number | undefined {
   if (value === undefined || value === null) return undefined;
-  const remindAt = Number(value);
-  if (!Number.isFinite(remindAt)) throw new Error('提醒时间必须是时间戳');
+  let remindAt: number;
+  if (typeof value === 'number') {
+    remindAt = value;
+  } else if (typeof value === 'string') {
+    const text = value.trim();
+    remindAt = /^\d+$/.test(text) ? Number(text) : Date.parse(text);
+  } else {
+    throw new Error('提醒时间必须是 ISO 8601 时间或时间戳');
+  }
+  if (!Number.isFinite(remindAt)) throw new Error('提醒时间必须是 ISO 8601 时间（带时区偏移）');
   if (remindAt <= now) throw new Error('提醒时间必须晚于当前时间');
   return remindAt;
 }

@@ -142,6 +142,31 @@ export function skipCard(state: FlowState, cardEntryId: string): FlowState {
   return finalizeIfDone(showNext(base));
 }
 
+/** 新会话：清空文字/系统行/终态卡，只保留待确认卡与队列（D-B） */
+export function resetSession(state: FlowState): FlowState {
+  const live = state.entries.filter((entry) => entry.kind === 'card' && entry.status === 'pending');
+  const keepBatch = live.length > 0 || state.queue.length > 0;
+  return {
+    ...state,
+    entries: live,
+    committed: keepBatch ? state.committed : 0,
+    skipped: keepBatch ? state.skipped : 0,
+    awaitingEndLine: keepBatch ? state.awaitingEndLine : false
+  };
+}
+
+/** 回传给模型的卡片状态前缀：防止模型仅凭历史文字臆测待确认卡 */
+export function cardStateNote(state: FlowState): string {
+  const pending = state.entries.filter(
+    (entry): entry is Extract<FlowEntry, { kind: 'card' }> => entry.kind === 'card' && entry.status === 'pending'
+  );
+  if (!pending.length) {
+    return '[卡片状态] 当前没有待确认预览卡；历史里“已生成预览卡”的卡片都已取消、跳过或创建完成，不要再让用户确认旧卡。';
+  }
+  const titles = pending.map((entry) => (entry.proposal.kind === 'create' ? entry.proposal.draft.title : entry.proposal.before.title));
+  return `[卡片状态] 当前有 ${pending.length} 张待确认预览卡（${titles.join('、')}），需要用户在卡片上确认，不要重复生成。`;
+}
+
 /** 改要求的结果：撤问句行，新提案（连描述）插在被取消卡之后 */
 export function replaceAfterCancel(state: FlowState, anchorCardId: string, proposals: AiProposal[]): FlowState {
   if (!proposals.length) return state;

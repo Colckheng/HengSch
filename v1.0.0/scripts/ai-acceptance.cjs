@@ -225,9 +225,12 @@ async function run() {
   await sendChat('加个待办：买牛奶');
   await until(`!!document.querySelector('.ai-card')`, 6000);
   check('提案卡出现且待确认未锁', await evaluate(`(() => { const c = document.querySelector('.ai-card'); return c.textContent.includes('待确认') && !c.querySelector('input').disabled; })()`));
+  const cancelledId = await evaluate(`window.electronAPI.ai.queueList().then(list => list.at(-1)?.id)`);
   await evaluate(`[...document.querySelectorAll('.ai-card-footer .button-secondary')].find(b => b.textContent.includes('取消')).click()`);
   await until(`!!document.querySelector('.ai-ask')`);
   check('取消后折叠成一行+问句行', await evaluate(`(() => { const c = [...document.querySelectorAll('.ai-card')].at(-1); return c.classList.contains('muted') && c.classList.contains('ai-card-mini') && !c.querySelector('input') && document.querySelector('.ai-ask')?.textContent.includes('这条怎么办'); })()`));
+  await until(`window.electronAPI.ai.queueList().then(list => !list.some(p => p.id === ${JSON.stringify(cancelledId)}))`);
+  check('取消同步移出主进程队列', true);
   await evaluate(`[...document.querySelectorAll('.ai-ask .button')].find(b => b.textContent.includes('改要求')).click()`);
   await until(`!!document.querySelector('.ai-amend-bar')`);
   check('改要求模式条可见并标注原卡', await evaluate(`document.querySelector('.ai-amend-bar').textContent.includes('买牛奶')`));
@@ -439,11 +442,11 @@ async function run() {
   await until(`!document.querySelector('.ai-err')`);
   check('错误条 ✕ 可直接关闭', true);
 
-  // ===== §8.2-4 新会话：只清文本、卡片保留 =====
-  const cardsBefore = await evaluate(`document.querySelectorAll('.ai-card').length`);
+  // ===== §8.2-4 新会话：清空对话与终态卡，只保留待确认卡 =====
+  const pendingBefore = await evaluate(`document.querySelectorAll('.ai-card:not(.muted):not(.ok):not(.bad)').length`);
   await click('[aria-label="新会话"]');
   await until(`document.querySelectorAll('.ai-msg-me,.ai-msg-ai').length === 0`);
-  check('新会话清空对话但保留卡片队列', (await evaluate(`document.querySelectorAll('.ai-card').length`)) === cardsBefore);
+  check('新会话清空对话与终态卡，只保留待确认卡', (await evaluate(`document.querySelectorAll('.ai-card').length`)) === pendingBefore);
   await click('[aria-label="关闭 AI 抽屉"]');
 
   // ===== §8.2-5 循环待办：下次提醒提示 + nextDueDate =====
