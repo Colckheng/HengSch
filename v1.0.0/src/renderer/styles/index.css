@@ -799,10 +799,6 @@ button {
   .ai-drawer.open {
     flex-basis: 300px;
   }
-
-  .app-container:has(.ai-drawer.open) .modal-overlay {
-    padding-right: 300px;
-  }
 }
 
 .ai-drawer-head {
@@ -1859,6 +1855,13 @@ label.ai-group-row {
 /* U-7.4 AI 抽屉展开时弹窗居中偏移（不被抽屉压住） */
 .app-container:has(.ai-drawer.open) .modal-overlay {
   padding-right: 360px;
+}
+
+/* U-7.4 窄屏 300px 必须写在 360px 基础规则之后：同特异度靠源顺序生效 */
+@media (max-width: 860px) {
+  .app-container:has(.ai-drawer.open) .modal-overlay {
+    padding-right: 300px;
+  }
 }
 
 @keyframes fade-in {

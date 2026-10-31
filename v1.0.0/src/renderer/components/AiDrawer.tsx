@@ -36,6 +36,8 @@ const FLOW_STORE_KEY = 'hengsch:ai-flow:v1';
 interface DrawerNotice {
   kind: 'error' | 'info';
   text: string;
+  /** 仅聊天类错误可重试；语音/麦克风/移队失败等不显示「重试」 */
+  retryable?: boolean;
 }
 
 interface ReplaceTarget {
@@ -275,14 +277,14 @@ export function AiDrawer({
           setFlow((previous) => insertStaged(previous, result.proposals));
         }
       }
-      if (result.error) setNotice({ kind: result.error === '已停止生成' ? 'info' : 'error', text: result.error });
+      if (result.error) setNotice({ kind: result.error === '已停止生成' ? 'info' : 'error', text: result.error, retryable: result.error !== '已停止生成' });
     } catch (error) {
       settledRef.current = true;
       streamRef.current = '';
       setStream('');
       replaceRef.current = null;
       setAmending(false);
-      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'AI 服务异常' });
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'AI 服务异常', retryable: true });
     } finally {
       setBusy(false);
     }
@@ -555,6 +557,7 @@ export function AiDrawer({
         status={entry.status as AiCardStatus}
         errorText={entry.errorText}
         busy={committingIds.has(entry.id)}
+        chatBusy={busy}
         group={group.length ? group : undefined}
         groupResults={entry.groupResults}
         todos={todoState.todos}
@@ -587,7 +590,7 @@ export function AiDrawer({
         <div className={notice.kind === 'error' ? 'ai-err' : 'ai-notice'} role={notice.kind === 'error' ? 'alert' : 'status'}>
           <span className="ai-notice-text">{notice.text}</span>
           <span className="ai-notice-actions">
-            {notice.kind === 'error' && lastSentRef.current && (
+            {notice.kind === 'error' && notice.retryable && lastSentRef.current && (
               <button type="button" className="ai-notice-btn" onClick={retryLast} disabled={busy}>
                 重试
               </button>

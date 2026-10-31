@@ -442,6 +442,35 @@ async function run() {
   await until(`!document.querySelector('.ai-err')`);
   check('错误条 ✕ 可直接关闭', true);
 
+  // ===== B-4 U-4：语音失败不显示聊天重试 =====
+  const micReady = await evaluate(`(() => { const b = document.querySelector('[aria-label="语音输入"]'); return !!b && !b.disabled; })()`);
+  if (micReady) {
+    const overridden = await evaluate(`(() => { try { window.__origGUM = navigator.mediaDevices.getUserMedia; navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError')); return navigator.mediaDevices.getUserMedia !== window.__origGUM; } catch { return false; } })()`);
+    if (overridden) {
+      await evaluate(`document.querySelector('[aria-label="语音输入"]').click()`);
+      await until(`document.querySelector('.ai-err')?.textContent.includes('麦克风权限被拒绝')`, 5000);
+      check('语音失败错误条不显示重试', await evaluate(`![...document.querySelectorAll('.ai-notice-btn')].some(b => b.textContent.includes('重试'))`));
+      await click('[aria-label="关闭提示"]');
+      await evaluate(`(() => { if (window.__origGUM) navigator.mediaDevices.getUserMedia = window.__origGUM; })()`);
+    }
+  }
+
+  // ===== B-4 F-5：聊天生成中锁住其他提案卡 =====
+  script.push((init) => sseResponse(toolRoundParts('并发卡'), { signal: init.signal }));
+  script.push((init) => sseResponse(textParts('已生成预览卡，确认后生效。'), { signal: init.signal }));
+  await sendChat('加个待办：并发卡');
+  await until(`!!document.querySelector('.ai-card-footer .button-primary')`, 6000);
+  script.push((init) => sseResponse(textParts('生成中', 20), { delayMs: 300, signal: init.signal }));
+  await sendChat('随便聊聊');
+  await wait(400);
+  check('生成中提案卡确认禁用', await evaluate(`(() => { const b = document.querySelector('.ai-card-footer .button-primary'); return !!b && b.disabled; })()`));
+  await until(`!!document.querySelector('.ai-send') && !document.querySelector('.ai-stop')`, 15000);
+  check('生成结束提案卡恢复可点', await evaluate(`(() => { const b = document.querySelector('.ai-card-footer .button-primary'); return !!b && !b.disabled; })()`));
+  await evaluate(`[...document.querySelectorAll('.ai-card-footer .button-secondary')].find(b => b.textContent.includes('取消')).click()`);
+  await until(`!!document.querySelector('.ai-ask')`);
+  await evaluate(`[...document.querySelectorAll('.ai-ask .button')].find(b => b.textContent.includes('跳过')).click()`);
+  await until(`!document.querySelector('.ai-ask')`);
+
   // ===== §8.2-4 新会话：清空对话与终态卡，只保留待确认卡 =====
   const pendingBefore = await evaluate(`document.querySelectorAll('.ai-card:not(.muted):not(.ok):not(.bad)').length`);
   await click('[aria-label="新会话"]');

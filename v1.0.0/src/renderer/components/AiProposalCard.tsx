@@ -21,6 +21,8 @@ interface AiProposalCardProps {
   errorText?: string;
   /** 提交进行中：确认按钮禁用并显示「确认中…」，防双击重复落盘 */
   busy?: boolean;
+  /** 聊天生成中：锁住卡片交互，但不改变提交中的文案/样式 */
+  chatBusy?: boolean;
   /** B-2 删除合并卡：分组全量（含本卡），≥2 条时渲染清单勾选视图 */
   group?: DeleteProposal[];
   /** B-2 落定快照：折叠摘要与逐条回看均区分已删除/保留 */
@@ -71,7 +73,7 @@ function isTargetStale(proposal: Exclude<AiProposal, { kind: 'create' }>, todos:
   return !current || current.deleted === true || current.updatedAt !== proposal.before.updatedAt;
 }
 
-export function AiProposalCard({ proposal, status, errorText, busy = false, group, groupResults, todos, groups, onConfirm, onConfirmGroup, onReject }: AiProposalCardProps): JSX.Element {
+export function AiProposalCard({ proposal, status, errorText, busy = false, chatBusy = false, group, groupResults, todos, groups, onConfirm, onConfirmGroup, onReject }: AiProposalCardProps): JSX.Element {
   const uid = useId();
   const isCreate = proposal.kind === 'create';
 
@@ -169,7 +171,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, grou
             : '待确认';
   const statusClass = status === 'committed' ? 'ok' : status === 'rejected' ? 'muted' : status === 'error' || isStale ? 'bad' : '';
   /** 终态/过期/提交中：所有可点控件一并锁死 */
-  const locked = settled || isStale || busy;
+  const locked = settled || isStale || busy || chatBusy;
   const isRecurring =
     proposal.kind === 'create'
       ? proposal.draft.type === 'recurring'
@@ -286,7 +288,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, grou
                     type="checkbox"
                     checked={!uncheckedIds.has(id)}
                     onChange={() => toggleRow(id)}
-                    disabled={settled || busy}
+                    disabled={settled || busy || chatBusy}
                     aria-label={`删除 ${memberTitle}`}
                   />
                   <span className="ai-group-title">{memberTitle}</span>
@@ -325,7 +327,7 @@ export function AiProposalCard({ proposal, status, errorText, busy = false, grou
               type="button"
               className="button button-secondary"
               onClick={() => onConfirmGroup([])}
-              disabled={settled || busy}
+              disabled={settled || busy || chatBusy}
             >
               跳过全部
             </button>
