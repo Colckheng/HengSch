@@ -1,0 +1,860 @@
+{
+  "at": "2026-10-30T14:41:53.857Z",
+  "methodology": "One discarded warmup then alternating engine order; fresh process per run. Wall clock includes model load, decode and exit. OS file cache is not flushed. Hashes and log I/O excluded.",
+  "rounds": 5,
+  "threads": 8,
+  "node": "v22.23.4",
+  "cpu": "AMD Ryzen 9 5900HX with Radeon Graphics        ",
+  "logicalCores": 16,
+  "memoryBytes": 16540905472,
+  "sherpaVersion": "sherpa-onnx version : 2.0.1\r\nsherpa-onnx Git SHA1: af2d8d81\r\nsherpa-onnx Git date: Mon Oct 26 14:57:12 2026\r\nonnxruntime version : 1.28.2",
+  "integrity": [
+    {
+      "name": "runtime-archive",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts.tar.bz2",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sherpa-v2.0.1.tar.bz2",
+      "bytes": 25567228,
+      "sha256": "a644dfe2f7944afec9a356d2557c0452380f20ffcf2f8c704653cfce37558596"
+    },
+    {
+      "name": "sensevoice-model",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-model.int8.onnx",
+      "bytes": 239233841,
+      "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+    },
+    {
+      "name": "sensevoice-tokens",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-tokens.txt",
+      "bytes": 315894,
+      "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+    },
+    {
+      "name": "zh",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/test_wavs/zh.wav",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-zh.wav",
+      "bytes": 178988,
+      "sha256": "b77f1794fe374a0ba1ee1dc458bfaf9349496cbbfc32780c50ba3c5a7ad8e373"
+    },
+    {
+      "name": "en",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/test_wavs/en.wav",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-en.wav",
+      "bytes": 228908,
+      "sha256": "eb1eb008904465b74c304aad8342e8c7d3c6e61ffe9f66adcaca9cf0f76a93f4"
+    },
+    {
+      "name": "whisper-model",
+      "url": "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
+      "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-small-q5_1.bin",
+      "bytes": 190085487,
+      "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"
+    }
+  ],
+  "payloads": {
+    "whisper": {
+      "bytes": 13080064,
+      "files": [
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-base.dll",
+          "bytes": 666624,
+          "sha256": "1482359d921b4c1b183d49db1d770f9b5e90d86a618b8b648d4845c2471ad6b0"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-alderlake.dll",
+          "bytes": 809984,
+          "sha256": "d1c5411561361f7ce71ff8455ecf01f666f581b0608fa91a1dfe7d3fd6a25bd1"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-cannonlake.dll",
+          "bytes": 853504,
+          "sha256": "2ef36f05fa252ff4fdcb8d42ebce1ceba4f3d3de12b93bed15bdee6237dccd63"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-cascadelake.dll",
+          "bytes": 850944,
+          "sha256": "505899aaf3f99c5d714361640f561458ea97f8a09eb0614568a66bead2115cb0"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-haswell.dll",
+          "bytes": 811008,
+          "sha256": "f8cf2f35a06498d783d77fde42004dd54d2f8236b0d42ac323b94bba65a603c4"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-icelake.dll",
+          "bytes": 850944,
+          "sha256": "78ad143ee2e674d037b4840ef33b5748a0659762a26e0ae2b621c4f9451cbde8"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-sandybridge.dll",
+          "bytes": 803328,
+          "sha256": "ee47db7dc40fb30eca73e62a05306059c2c3c42aecddf2e8d6ad7e530069b815"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-skylakex.dll",
+          "bytes": 852992,
+          "sha256": "164e2793897944a43ee071ce6c0b09018088bdf4dd8b14ac0755c58849cf8c50"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-sse42.dll",
+          "bytes": 790016,
+          "sha256": "7318a9a3b95a85b2453c437b274412bbbae89e5ecdf5babb19b99edc06ded063"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-cpu-x64.dll",
+          "bytes": 794112,
+          "sha256": "af0f1c2f28ff9e3f472481dd969907bda85fa39d4fde17617d4bb0b389301b60"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml.dll",
+          "bytes": 67584,
+          "sha256": "894c6237ee7849843213906a2b6a0b371aaa6234048d465f206d910ae846fafb"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\parakeet.dll",
+          "bytes": 581632,
+          "sha256": "567c56a3c9b7383982e5777964f37f9f3cb930ef4a7ca907477e4e955f1cd0a4"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\SDL2.dll",
+          "bytes": 2500096,
+          "sha256": "de23db1694a3c7a4a735e7ecd3d214b2023cc2267922c6c35d30c7fc7370d677"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\whisper-cli.exe",
+          "bytes": 479232,
+          "sha256": "95e3c0b0e778ad9499eb0125f97c1dcf437dd9eb4ea77050b043574f93c2631d"
+        },
+        {
+          "file": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\whisper.dll",
+          "bytes": 1368064,
+          "sha256": "792fc523c7ad16e6b9c348e30ad5e5f591165cbcf6a80ca8d0db02a38ce3eea2"
+        }
+      ]
+    },
+    "sensevoice": {
+      "bytes": 20667904,
+      "files": [
+        {
+          "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts\\bin\\onnxruntime.dll",
+          "bytes": 17799168,
+          "sha256": "7f66f939a881baf4f46a2216496798edf4a1429878b646d12674aa62f27d8a25"
+        },
+        {
+          "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts\\bin\\onnxruntime_providers_shared.dll",
+          "bytes": 104960,
+          "sha256": "551d0e1fe4c227d8542314ba718d52f4379e0c7bfe729a37c59833a884e27b4d"
+        },
+        {
+          "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts\\bin\\sherpa-onnx-offline.exe",
+          "bytes": 2763776,
+          "sha256": "047bff7c67bedbf99d1a0e55773ed6770f67d161466f6e4977af3e217de99e27"
+        }
+      ]
+    }
+  },
+  "samples": [
+    {
+      "id": "jfk",
+      "file": "D:\\todo\\HengSch\\v1.0.0\\scripts\\fixtures\\jfk.wav",
+      "bytes": 352078,
+      "sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+      "encoding": 1,
+      "channels": 1,
+      "sampleRate": 16000,
+      "byteRate": 32000,
+      "bits": 16,
+      "audioBytes": 352000,
+      "seconds": 11
+    },
+    {
+      "id": "zh",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-zh.wav",
+      "bytes": 178988,
+      "sha256": "b77f1794fe374a0ba1ee1dc458bfaf9349496cbbfc32780c50ba3c5a7ad8e373",
+      "encoding": 1,
+      "channels": 1,
+      "sampleRate": 16000,
+      "byteRate": 32000,
+      "bits": 16,
+      "audioBytes": 178944,
+      "seconds": 5.592
+    },
+    {
+      "id": "en",
+      "file": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-en.wav",
+      "bytes": 228908,
+      "sha256": "eb1eb008904465b74c304aad8342e8c7d3c6e61ffe9f66adcaca9cf0f76a93f4",
+      "encoding": 1,
+      "channels": 1,
+      "sampleRate": 16000,
+      "byteRate": 32000,
+      "bits": 16,
+      "audioBytes": 228864,
+      "seconds": 7.152
+    }
+  ],
+  "commands": [
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "exe": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\whisper-cli.exe",
+      "args": [
+        "-m",
+        "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-small-q5_1.bin",
+        "-f",
+        "D:\\todo\\HengSch\\v1.0.0\\scripts\\fixtures\\jfk.wav",
+        "-l",
+        "auto",
+        "-np",
+        "-nt",
+        "-pp",
+        "-t",
+        "8"
+      ]
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "exe": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts\\bin\\sherpa-onnx-offline.exe",
+      "args": [
+        "--sense-voice-model=C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-model.int8.onnx",
+        "--tokens=C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-tokens.txt",
+        "--sense-voice-language=auto",
+        "--sense-voice-use-itn=1",
+        "--num-threads=8",
+        "--provider=cpu",
+        "--debug=0",
+        "D:\\todo\\HengSch\\v1.0.0\\scripts\\fixtures\\jfk.wav"
+      ]
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "exe": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\whisper-cli.exe",
+      "args": [
+        "-m",
+        "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-small-q5_1.bin",
+        "-f",
+        "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-zh.wav",
+        "-l",
+        "auto",
+        "-np",
+        "-nt",
+        "-pp",
+        "-t",
+        "8"
+      ]
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "exe": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts\\bin\\sherpa-onnx-offline.exe",
+      "args": [
+        "--sense-voice-model=C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-model.int8.onnx",
+        "--tokens=C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-tokens.txt",
+        "--sense-voice-language=auto",
+        "--sense-voice-use-itn=1",
+        "--num-threads=8",
+        "--provider=cpu",
+        "--debug=0",
+        "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-zh.wav"
+      ]
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "exe": "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\whisper-cli.exe",
+      "args": [
+        "-m",
+        "D:\\todo\\HengSch\\v1.0.0\\resources\\whisper\\ggml-small-q5_1.bin",
+        "-f",
+        "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-en.wav",
+        "-l",
+        "auto",
+        "-np",
+        "-nt",
+        "-pp",
+        "-t",
+        "8"
+      ]
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "exe": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts\\bin\\sherpa-onnx-offline.exe",
+      "args": [
+        "--sense-voice-model=C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-model.int8.onnx",
+        "--tokens=C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-sensevoice-tokens.txt",
+        "--sense-voice-language=auto",
+        "--sense-voice-use-itn=1",
+        "--num-threads=8",
+        "--provider=cpu",
+        "--debug=0",
+        "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-en.wav"
+      ]
+    }
+  ],
+  "logDir": "C:\\Users\\hengxing\\AppData\\Local\\Temp\\opencode\\hengsch-b3-bench-S9KxG1",
+  "runs": [
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "phase": "warmup",
+      "round": 0,
+      "wallMs": 7833.595,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 24.587,
+      "log": "jfk-whisper-warmup-0",
+      "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "phase": "warmup",
+      "round": 0,
+      "wallMs": 2649.302,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 36.964,
+      "log": "jfk-sensevoice-warmup-0",
+      "text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1935,
+      "decodeMs": 309
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 1,
+      "wallMs": 2219.141,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 34.371,
+      "log": "jfk-sensevoice-measured-1",
+      "text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1780,
+      "decodeMs": 301
+    },
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 1,
+      "wallMs": 7885.937,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 44.35,
+      "log": "jfk-whisper-measured-1",
+      "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 2,
+      "wallMs": 7580.147,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 21.905,
+      "log": "jfk-whisper-measured-2",
+      "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 2,
+      "wallMs": 2274.65,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 21.301,
+      "log": "jfk-sensevoice-measured-2",
+      "text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1834,
+      "decodeMs": 320
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 3,
+      "wallMs": 2418.159,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 30.385,
+      "log": "jfk-sensevoice-measured-3",
+      "text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1921,
+      "decodeMs": 360
+    },
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 3,
+      "wallMs": 7726.746,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 36.707,
+      "log": "jfk-whisper-measured-3",
+      "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 4,
+      "wallMs": 7739.529,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 27.45,
+      "log": "jfk-whisper-measured-4",
+      "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 4,
+      "wallMs": 2303.898,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 21.779,
+      "log": "jfk-sensevoice-measured-4",
+      "text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1873,
+      "decodeMs": 305
+    },
+    {
+      "sample": "jfk",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 5,
+      "wallMs": 2283.417,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 30.773,
+      "log": "jfk-sensevoice-measured-5",
+      "text": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1838,
+      "decodeMs": 322
+    },
+    {
+      "sample": "jfk",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 5,
+      "wallMs": 7644.059,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 25.382,
+      "log": "jfk-whisper-measured-5",
+      "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "phase": "warmup",
+      "round": 0,
+      "wallMs": 7281.566,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 47.149,
+      "log": "zh-whisper-warmup-0",
+      "text": "开放时间早上九点至下午五点。"
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "phase": "warmup",
+      "round": 0,
+      "wallMs": 2113.883,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 30.858,
+      "log": "zh-sensevoice-warmup-0",
+      "text": "开饭时间早上9点至下午5点。",
+      "language": "<|zh|>",
+      "recognizerLoadMs": 1809,
+      "decodeMs": 171
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 1,
+      "wallMs": 2089.469,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 31.116,
+      "log": "zh-sensevoice-measured-1",
+      "text": "开饭时间早上9点至下午5点。",
+      "language": "<|zh|>",
+      "recognizerLoadMs": 1807,
+      "decodeMs": 162
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 1,
+      "wallMs": 7127.712,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 35.647,
+      "log": "zh-whisper-measured-1",
+      "text": "开放时间早上九点至下午五点。"
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 2,
+      "wallMs": 7092.93,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 35.259,
+      "log": "zh-whisper-measured-2",
+      "text": "开放时间早上九点至下午五点。"
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 2,
+      "wallMs": 2142.248,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 20.863,
+      "log": "zh-sensevoice-measured-2",
+      "text": "开饭时间早上9点至下午5点。",
+      "language": "<|zh|>",
+      "recognizerLoadMs": 1846,
+      "decodeMs": 169
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 3,
+      "wallMs": 2342.677,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 24.659,
+      "log": "zh-sensevoice-measured-3",
+      "text": "开饭时间早上9点至下午5点。",
+      "language": "<|zh|>",
+      "recognizerLoadMs": 2047.0000000000002,
+      "decodeMs": 173
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 3,
+      "wallMs": 7130.296,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 31.58,
+      "log": "zh-whisper-measured-3",
+      "text": "开放时间早上九点至下午五点。"
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 4,
+      "wallMs": 7268.581,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 29.429,
+      "log": "zh-whisper-measured-4",
+      "text": "开放时间早上九点至下午五点。"
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 4,
+      "wallMs": 2549.147,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 41.419,
+      "log": "zh-sensevoice-measured-4",
+      "text": "开饭时间早上9点至下午5点。",
+      "language": "<|zh|>",
+      "recognizerLoadMs": 2239,
+      "decodeMs": 180
+    },
+    {
+      "sample": "zh",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 5,
+      "wallMs": 2134.488,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 24.36,
+      "log": "zh-sensevoice-measured-5",
+      "text": "开饭时间早上9点至下午5点。",
+      "language": "<|zh|>",
+      "recognizerLoadMs": 1844,
+      "decodeMs": 170
+    },
+    {
+      "sample": "zh",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 5,
+      "wallMs": 7345.438,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 31.528,
+      "log": "zh-whisper-measured-5",
+      "text": "开放时间早上九点至下午五点。"
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "phase": "warmup",
+      "round": 0,
+      "wallMs": 7802.634,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 30.851,
+      "log": "en-whisper-warmup-0",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "phase": "warmup",
+      "round": 0,
+      "wallMs": 2237.775,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 23.895,
+      "log": "en-sensevoice-warmup-0",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of code.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1878,
+      "decodeMs": 234
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 1,
+      "wallMs": 2165.231,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 31.632,
+      "log": "en-sensevoice-measured-1",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of code.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1825,
+      "decodeMs": 218
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 1,
+      "wallMs": 7449.068,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 27.332,
+      "log": "en-whisper-measured-1",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 2,
+      "wallMs": 7632.707,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 35.957,
+      "log": "en-whisper-measured-2",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 2,
+      "wallMs": 2336.334,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 24.122,
+      "log": "en-sensevoice-measured-2",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of code.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1950,
+      "decodeMs": 248
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 3,
+      "wallMs": 2329.504,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 42.964,
+      "log": "en-sensevoice-measured-3",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of code.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1955,
+      "decodeMs": 246
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 3,
+      "wallMs": 7403.158,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 46.357,
+      "log": "en-whisper-measured-3",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 4,
+      "wallMs": 7509.353,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 25.61,
+      "log": "en-whisper-measured-4",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 4,
+      "wallMs": 2194.84,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 33.087,
+      "log": "en-sensevoice-measured-4",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of code.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1854,
+      "decodeMs": 214
+    },
+    {
+      "sample": "en",
+      "engine": "sensevoice",
+      "phase": "measured",
+      "round": 5,
+      "wallMs": 2169.453,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 26.279,
+      "log": "en-sensevoice-measured-5",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of code.",
+      "language": "<|en|>",
+      "recognizerLoadMs": 1832,
+      "decodeMs": 213
+    },
+    {
+      "sample": "en",
+      "engine": "whisper",
+      "phase": "measured",
+      "round": 5,
+      "wallMs": 7569.763,
+      "code": 0,
+      "timedOut": false,
+      "backgroundCpuPercent": 27.957,
+      "log": "en-whisper-measured-5",
+      "text": "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+    }
+  ],
+  "summary": [
+    {
+      "sample": "jfk",
+      "seconds": 11,
+      "whisper": {
+        "medianMs": 7726.746,
+        "minMs": 7580.147,
+        "maxMs": 7885.937,
+        "wallRtf": 0.702,
+        "texts": [
+          "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+        ]
+      },
+      "sensevoice": {
+        "medianMs": 2283.417,
+        "minMs": 2219.141,
+        "maxMs": 2418.159,
+        "wallRtf": 0.208,
+        "texts": [
+          "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+        ]
+      },
+      "speedup": 3.384
+    },
+    {
+      "sample": "zh",
+      "seconds": 5.592,
+      "whisper": {
+        "medianMs": 7130.296,
+        "minMs": 7092.93,
+        "maxMs": 7345.438,
+        "wallRtf": 1.275,
+        "texts": [
+          "开放时间早上九点至下午五点。"
+        ]
+      },
+      "sensevoice": {
+        "medianMs": 2142.248,
+        "minMs": 2089.469,
+        "maxMs": 2549.147,
+        "wallRtf": 0.383,
+        "texts": [
+          "开饭时间早上9点至下午5点。"
+        ]
+      },
+      "speedup": 3.328
+    },
+    {
+      "sample": "en",
+      "seconds": 7.152,
+      "whisper": {
+        "medianMs": 7509.353,
+        "minMs": 7403.158,
+        "maxMs": 7632.707,
+        "wallRtf": 1.05,
+        "texts": [
+          "The tribal chieftain called for the boy and presented him with 50 pieces of gold."
+        ]
+      },
+      "sensevoice": {
+        "medianMs": 2194.84,
+        "minMs": 2165.231,
+        "maxMs": 2336.334,
+        "wallRtf": 0.307,
+        "texts": [
+          "The tribal chieftain called for the boy and presented him with 50 pieces of code."
+        ]
+      },
+      "speedup": 3.421
+    }
+  ],
+  "finishedAt": "2026-10-30T14:44:59.259Z"
+}

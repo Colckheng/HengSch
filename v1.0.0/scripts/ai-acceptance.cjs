@@ -1,12 +1,14 @@
 /* §8.2/§8.3 手工剧本（CDP/真机项的可重复执行版）：
    隔离 userData + 已构建桌面产物 + 主进程全局 fetch 拦截为脚本化假 DeepSeek。
    只放行 api.deepseek.com，其余网络调用直接抛错。
-   用法：先在桌面 workspace 执行 npm run build，再执行 npm run ai:acceptance。 */
+   用法：先在桌面 workspace 执行 npm run build，再执行 npm run ai:acceptance。
+   无显示环境可追加 -- --no-screenshots，报告会显式标注截图跳过。 */
 const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
+const screenshotsSkipped = process.argv.includes('--no-screenshots');
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hengsch-ai-acceptance-'));
 const configPath = path.join(directory, 'config.json');
@@ -334,7 +336,7 @@ async function run() {
   check('三条删除合并为一张清单卡且默认全选', await evaluate(`document.querySelectorAll('${deleteCard}').length === 1 && document.querySelectorAll('${deleteList} input:checked').length === 3`));
   await click(`${deleteList} input`);
   await until(`document.querySelectorAll('${deleteList} input:checked').length === 2`);
-  fs.writeFileSync(path.join(directory, 'batch-delete-preview.png'), (await win.webContents.capturePage()).toPNG());
+  if (!screenshotsSkipped) fs.writeFileSync(path.join(directory, 'batch-delete-preview.png'), (await win.webContents.capturePage()).toPNG());
   const beforeDelete = JSON.stringify(await storeTodos());
   await click(`${deleteCard} .button-primary`);
   check('首次点击删除仅进入确认，未写入待办', JSON.stringify(await storeTodos()) === beforeDelete);
@@ -373,7 +375,7 @@ async function run() {
   })()`));
   await evaluate(`document.querySelector('[aria-label="批量删除回看"]').scrollIntoView({ block: 'center', behavior: 'instant' })`);
   await wait(350);
-  fs.writeFileSync(path.join(directory, 'batch-delete-result.png'), (await win.webContents.capturePage()).toPNG());
+  if (!screenshotsSkipped) fs.writeFileSync(path.join(directory, 'batch-delete-result.png'), (await win.webContents.capturePage()).toPNG());
   await click('.ai-card-delete.ok .ai-card-fold');
   await click('.ai-card[aria-label="新建确认卡"] .button-primary:not(:disabled)');
   await until(`window.electronAPI.ai.queueList().then(list => list.length === 0)`);
@@ -501,8 +503,8 @@ async function run() {
 
   check('渲染层无 console 错误', rendererErrors.length === 0);
 
-  const report = { at: new Date().toISOString(), electron: process.versions.electron, checks, rendererErrors, store: directory };
-  console.log(JSON.stringify({ passed: checks.filter((c) => c.pass).length, total: checks.length, rendererErrors }, null, 2));
+  const report = { at: new Date().toISOString(), electron: process.versions.electron, checks, rendererErrors, screenshotsSkipped, store: directory };
+  console.log(JSON.stringify({ passed: checks.filter((c) => c.pass).length, total: checks.length, rendererErrors, screenshotsSkipped }, null, 2));
   fs.writeFileSync(path.join(directory, 'acceptance-report.json'), JSON.stringify(report, null, 2));
   console.log(`report: ${path.join(directory, 'acceptance-report.json')}`);
 }
@@ -523,13 +525,13 @@ app.whenReady().then(() => {
             latestReply: [...document.querySelectorAll('.ai-msg-ai .ai-msg-body')].at(-1)?.textContent,
             cards: [...document.querySelectorAll('.ai-card-status')].map(el => el.textContent)
           })`);
-          fs.writeFileSync(path.join(directory, 'failure.png'), (await win.webContents.capturePage()).toPNG());
+          if (!screenshotsSkipped) fs.writeFileSync(path.join(directory, 'failure.png'), (await win.webContents.capturePage()).toPNG());
         }
       } catch { /* window may be gone */ }
       console.error(`ai-acceptance FAILED: ${error.message} | activeElement=${active}`);
       console.error(`uiState: ${JSON.stringify(uiState)} | report: ${path.join(directory, 'acceptance-report.json')}`);
       try {
-        fs.writeFileSync(path.join(directory, 'acceptance-report.json'), JSON.stringify({ failure: String(error), checks, rendererErrors, uiState }, null, 2));
+        fs.writeFileSync(path.join(directory, 'acceptance-report.json'), JSON.stringify({ failure: String(error), checks, rendererErrors, uiState, screenshotsSkipped }, null, 2));
       } catch { /* ignore */ }
       app.exit(1);
     });

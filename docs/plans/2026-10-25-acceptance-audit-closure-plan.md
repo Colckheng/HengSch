@@ -69,10 +69,11 @@
 - 验收：3 条删除 → 一张清单卡 → 勾选确认 → 全部落盘 + `完成 N · 跳过 M` 系统行；未勾选可跳过。
 
 ### B-3 语音提速：SenseVoiceSmall spike
+- **2026-10-30 spike 已完成**：3 夹具 × 5 轮，SenseVoice 中位 2.1–2.3s vs whisper 7.1–7.9s，**提速 3.3–3.4×**（SV 加载占 1.8s、解码 RTF 0.03–0.06，常驻化可再降）；小样本质量 whisper 3/3 对、SV 中英各 1 错词；体积模型 +47.2MiB、运行时 +7.2MiB；许可 sherpa Apache-2.0 + onnxruntime MIT，但 **SV 模型权重=FunASR Model License v1.1 须署名**。报告与证据：[`b3-sensevoice-spike-2026-10-30.md`](../evidence/ai-assistant/b3-sensevoice-spike-2026-10-30.md)。
+- **决策（2026-10-31 拍板）**：选 **A 双后端共存**——默认 whisper，AI 设置提供 SenseVoice 快速模式。落地前补真实中文待办语音对比；应用「关于/致谢」须署名 FunASR Model License v1.1。集成实现另立批次，不在本收尾计划内插入。
 - 现状：whisper small-q5_1 已 `-t 8`（11s 夹具 8s→5s），仍是 CPU 自回归推理。
 - **方案**：SenseVoiceSmall（非自回归、中英日韩粤+标点）**whisper-cli 跑不了**，需引入 **sherpa-onnx** 运行时。
 - **步骤**：① Spike：sherpa-onnx Windows x64 CLI + 模型下载（URL+sha256、hf-mirror），用 `scripts/fixtures/jfk.wav` 实测耗时/出字对比 whisper；② 集成设计：`voice-service` 抽后端选择、AI 设置加模型下拉（whisper-small / sensevoice-small 双后端、默认 whisper）；③ 核实打包体积与许可；④ 门禁 + A/B 计时入证据。
-- **决策点**：spike 数据出来后拍板——双后端共存 or 替换。
 
 ### B-4 QA 审计 3 缺口
 = §2 清单（U-4 / U-7.4 / F-5），按拍板 #2 只列不动，逐项点头才修。

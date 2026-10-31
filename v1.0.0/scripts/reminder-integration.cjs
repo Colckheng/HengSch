@@ -10,6 +10,7 @@ buildSync({entryPoints:[path.resolve(__dirname,'../src/main/reminder-service.ts'
 const service=require(bundle);const Store=require('electron-store');
 const evidence=path.resolve(__dirname,'../../docs/evidence/paper-reminder-rebuild');
 const checks=[]; const errors=[];let store;
+const screenshotsSkipped=process.argv.includes('--no-screenshots');
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn){const deadline=Date.now()+10000;while(Date.now()<deadline){if(await fn())return;await wait(50);}throw Error('Timed out');}
 function check(name,value){assert.ok(value,name);checks.push(name);}
@@ -27,7 +28,7 @@ app.whenReady().then(async()=>{
   const firstCount=await overlay().webContents.executeJavaScript('document.querySelectorAll(".paper-object").length');check('adaptive queue capacity',firstCount>=1&&firstCount<=3);
   check('opening does not acknowledge reminder',!store.get('todos')[0].remindedAt);
   check('open reminders persisted before display',store.get('openPaperReminders').length===4);
-  await wait(200);fs.mkdirSync(evidence,{recursive:true});fs.writeFileSync(path.join(evidence,'11-production-overlay.png'),(await overlay().webContents.capturePage()).toPNG());
+  await wait(200);fs.mkdirSync(evidence,{recursive:true});if(!screenshotsSkipped)fs.writeFileSync(path.join(evidence,'11-production-overlay.png'),(await overlay().webContents.capturePage()).toPNG());
   const at=store.get('todos')[0].remindAt;await command('1','dismiss');
   check('dismiss saved before IPC resolves',new Store({cwd:directory,name:'integration'}).get('todos')[0].remindedAt>=at);
   check('dismiss keeps task pending',store.get('todos')[0].status==='pending');
@@ -48,7 +49,7 @@ app.whenReady().then(async()=>{
   check('real detail button saves then closes overlay',true);
   check('completion persisted',new Store({cwd:directory,name:'integration'}).get('todos')[0].status==='completed');
   service.stopReminderService();check('all overlay windows released',!overlay());check('no renderer errors',errors.length===0);
-  fs.writeFileSync(path.join(evidence,'production-integration.json'),JSON.stringify({checks,errors,store:directory,scope:'Production service, built renderer and preload; isolated data. Physical click-through and mixed DPI require manual checks.'},null,2));
-  console.log(JSON.stringify({passed:checks.length,directory}));fs.unlinkSync(bundle);app.exit(0);
+  fs.writeFileSync(path.join(evidence,'production-integration.json'),JSON.stringify({checks,errors,store:directory,screenshotsSkipped,scope:'Production service, built renderer and preload; isolated data. Physical click-through and mixed DPI require manual checks.'},null,2));
+  console.log(JSON.stringify({passed:checks.length,directory,screenshotsSkipped}));fs.unlinkSync(bundle);app.exit(0);
  }catch(error){console.error(error);service.stopReminderService();fs.unlinkSync(bundle);app.exit(1);}
 });
