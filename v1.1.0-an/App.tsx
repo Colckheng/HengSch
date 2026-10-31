@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { TodoProvider, useTodos } from './src/context/TodoContext';
 import { GroupProvider } from './src/context/GroupContext';
 import { SyncProvider } from './src/context/SyncContext';
@@ -13,6 +14,11 @@ import { SyncStatusFooter } from './src/components/SyncStatusFooter';
 import { SyncSettingsModal } from './src/components/SyncSettingsModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import type { Todo } from '@hengsch/shared-types';
+
+// P0 spike：前台也展示通知，验证渠道与权限链路
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false })
+});
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -76,6 +82,33 @@ function AppContent(): React.ReactElement {
           {pad(state.todos.filter((t) => t.status === 'completed').length)} DONE · {pad(state.todos.length)} TOTAL
         </Text>
       </View>
+      {/* P0 spike：临时入口，A3 前替换为提醒设置里的「发送测试提醒」 */}
+      <TouchableOpacity
+        style={styles.spikeBtn}
+        onPress={async () => {
+          try {
+            const granted = await Notifications.requestPermissionsAsync();
+            if (!granted.granted) {
+              Alert.alert('通知权限被拒绝', '请在系统设置里允许 HengSch 通知');
+              return;
+            }
+            await Notifications.setNotificationChannelAsync('reminders', {
+              name: '待办提醒',
+              importance: Notifications.AndroidImportance.MAX,
+              vibrationPattern: [0, 250, 250, 250]
+            });
+            await Notifications.scheduleNotificationAsync({
+              content: { title: '待办提醒', body: '原生通知 spike（10 秒）' },
+              trigger: { seconds: 10, channelId: 'reminders' }
+            });
+            Alert.alert('已排程', '10 秒后应收到通知；请分别在前台/后台/杀进程后验证');
+          } catch (error) {
+            Alert.alert('排程失败', error instanceof Error ? error.message : '未知错误');
+          }
+        }}
+      >
+        <Text style={styles.spikeBtnText}>10s 测试通知</Text>
+      </TouchableOpacity>
       <TodoList onDetail={handleDetail} />
       <SyncStatusFooter onPress={() => setIsSyncOpen(true)} />
       <AddTodoModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
@@ -192,5 +225,21 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: '#8A8A85',
     marginBottom: 5,
+  },
+  spikeBtn: {
+    marginHorizontal: 24,
+    marginTop: 8,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#111111',
+    backgroundColor: '#FAFAF7',
+  },
+  spikeBtnText: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    letterSpacing: 1,
+    color: '#111111',
   },
 });
