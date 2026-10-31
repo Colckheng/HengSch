@@ -66,6 +66,13 @@ it('system prompt carries serial flow rules for stage_batch overview', () => {
   assert.ok(prompt.includes('循环待办只关心“时刻”'));
 });
 
+it('system prompt keeps process names beyond the old 60-name cap', () => {
+  const names = Array.from({ length: 120 }, (_, index) => `app${String(index).padStart(3, '0')}.exe`);
+  const prompt = buildSystemPrompt([], [], names, Date.now());
+  assert.ok(prompt.includes('app100.exe'));
+  assert.ok(prompt.includes('app119.exe'));
+});
+
 it('system prompt states pending preview cards from the live queue', () => {
   const none = buildSystemPrompt([], [], [], Date.now(), 1, []);
   assert.ok(none.includes('待确认预览卡：无'));

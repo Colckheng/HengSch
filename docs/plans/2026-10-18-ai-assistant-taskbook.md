@@ -12,7 +12,7 @@
 
 **文件**
 - 新增 `src/main/ai-tools.ts`：`validateCreate / validateUpdate / validateDelete / stageProposal / commitProposal / rejectProposal`；纯函数校验 + 同步写 electron-store（LWW meta、墓碑、`order` 规则）+ `push('sync:merged', …)`
-- 新增 `src/main/ai-service.ts`：系统提示与上下文装配（待办≤100 条、分组、进程展示名前 60、本地时间与时区、历史≤20 条/30k 字符）、SSE 解析、工具循环（读立即执行 / 写暂存提案）、校验错误回填重试 ≤2、60s 超时、AbortController
+- 新增 `src/main/ai-service.ts`：系统提示与上下文装配（待办≤100 条、分组、进程展示名前 200、本地时间与时区、历史≤20 条/30k 字符）、SSE 解析、工具循环（读立即执行 / 写暂存提案）、校验错误回填重试 ≤2、60s 超时、AbortController
 - 新增 `src/main/ai-settings.ts`（或并入 index.ts）：`aiSettings` 读写（key 掩码回读）
 - 修改 `src/main/index.ts`：注册 `ai:chat` `ai:stop` `ai:commit` `ai:reject` `ai:settings:*`，均校验 sender
 - 新增 `src/main/ai-tools.test.ts`（并入根测试脚本）
@@ -77,11 +77,11 @@
 
 **验收清单（逐项勾）**
 - [x] 打字建/改/删待办全链路，删除二次确认，取消零写入 —— 2026-10-31 手测通过，证据 `docs/evidence/ai-assistant/manual-check-2026-10-31.md`（期间修复：时间戳时区、取消未移出主队列、新会话残留终态卡、模型臆测旧卡）
-- [ ] 语音往返（说话 → 文字可改 → 发送 → 卡片 → 落盘）
-- [ ] 进程预填：提到“打原神”类描述能在卡片区给出 exe 且可改
-- [ ] 监测三态 + 降级矩阵全绿
-- [ ] 无 key / 断网 / 模型未下载三种降级可用（打字路径完好）
-- [ ] UI 对照 Swiss 规范：直角、发丝线、令牌色、无说明性段落
+- [x] 语音往返（说话 → 文字可改 → 发送 → 卡片 → 落盘） —— 2026-10-31 手测通过；转写文字可改，卡片落盘「报销」11月1日 09:00，可见待办 8→9。三阶段进度备注见 `docs/evidence/ai-assistant/manual-check-2026-10-31.md`
+- [x] 进程预填：提到“打原神”类描述能在卡片区给出 exe 且可改 —— 2026-10-31 用户手测通过；期间修复进程列表前 60 截断（Edge 被截），上限提至 200
+- [ ] 监测三态 + 降级矩阵全绿 —— 2026-10-31 部分：ask/keep/用户裁决 complete 已见；四种降级（开关关/断网/无key/8s）用户跳过，未测
+- [ ] 无 key / 断网 / 模型未下载三种降级可用（打字路径完好）—— 2026-10-31 用户跳过，未测
+- [ ] UI 对照 Swiss 规范：直角、发丝线、令牌色、无说明性段落 —— 2026-10-31 静态核对通过（令牌/直角/发丝线/无说明段落）；主观视觉用户跳过
 - [x] 门禁五件套：`npx tsc --noEmit` / `npm run lint`（0 警告）/ `npm run build` / 根 `npm test` / `npm run reminder:integration` —— 2026-10-24 全绿（另 `ai:smoke` 通过、`ai:acceptance` 39/39），证据 `docs/evidence/ai-assistant/gates-2026-10-24.md`
 - [x] 打包 `npx electron-builder --win nsis` 产物内含 whisper exe、不含模型与 key —— `release/win-unpacked/resources/whisper` 含 exe + 14 DLL、0 个 `.bin`、无 key
 
@@ -123,7 +123,7 @@
 | promptLevel | 1（默认）/ 2 | `ai-settings` |
 | 提醒推进锚 | 上一轮 `nextDueDate`（保时刻） | `shared-logic/todo-utils.ts` |
 | 待办上下文 | 100 条（超丢最旧已完成） | `ai-service.ts` |
-| 进程上下文 | 展示名前 60 | `ai-service.ts` |
+| 进程上下文 | 展示名前 200（2026-10-31 由 60 提高，修复 Edge 被截断） | `ai-service.ts` |
 | 语音模型 | `ggml-small-q5_1` ≈190MB（HF 无 q5_0，已改 q5_1；URL+sha256 固化） | `voice-service.ts` |
 | whisper 超时 | 音频时长×3，下限 10 s（模型加载）、封顶 30 s | `voice-service.ts` |
 | whisper 线程 | `max(4, 逻辑核/2)`（本机 8，实测 11s 夹具 8s→5s） | `voice-service.ts` |
