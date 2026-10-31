@@ -13,6 +13,8 @@ import {
 import type { TodoType, CycleType } from '@hengsch/shared-types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
+import { ReminderPresetPicker } from './ReminderPresetPicker';
+import { resolveReminderPreset, type ReminderPreset } from '../utils/reminderPresets';
 
 interface AddTodoModalProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): React.Reac
   const [cycleType, setCycleType] = useState<CycleType>('daily');
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
+  const [remindPreset, setRemindPreset] = useState<ReminderPreset>('none');
 
   const reset = () => {
     setTitle('');
@@ -43,6 +46,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): React.Reac
     setCycleType('daily');
     setCustomCycleDays('');
     setSelectedGroupId('default');
+    setRemindPreset('none');
   };
 
   const handleClose = () => {
@@ -52,6 +56,10 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): React.Reac
 
   const handleSubmit = () => {
     if (!title.trim()) return;
+    const remindAt = resolveReminderPreset(remindPreset);
+    const reminderFields = typeof remindAt === 'number'
+      ? { remindAt, remindLeadMs: 0 }
+      : {};
 
     if (type === 'recurring') {
       const parsedDays = parseInt(customCycleDays, 10);
@@ -63,8 +71,9 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): React.Reac
         cycleType,
         customCycleDays:
           cycleType === 'custom' && !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined,
-        nextDueDate: Date.now(),
+        nextDueDate: remindAt ?? Date.now(),
         groupId: selectedGroupId,
+        ...reminderFields,
       });
     } else {
       addTodo({
@@ -73,6 +82,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): React.Reac
         type: 'once',
         status: 'pending',
         groupId: selectedGroupId,
+        ...reminderFields,
       });
     }
     handleClose();
@@ -155,6 +165,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): React.Reac
               ))}
             </View>
           </View>
+          <ReminderPresetPicker value={remindPreset} onChange={setRemindPreset} />
           {type === 'recurring' && (
             <>
               <View style={styles.field}>

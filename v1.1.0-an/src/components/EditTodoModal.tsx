@@ -13,6 +13,8 @@ import {
 import type { Todo, TodoType, CycleType, RecurringTodo } from '@hengsch/shared-types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
+import { ReminderPresetPicker } from './ReminderPresetPicker';
+import { matchReminderPreset, resolveReminderPreset, type ReminderPreset } from '../utils/reminderPresets';
 
 interface EditTodoModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
   const [cycleType, setCycleType] = useState<CycleType>('daily');
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
+  const [remindPreset, setRemindPreset] = useState<ReminderPreset>('none');
 
   useEffect(() => {
     if (todo) {
@@ -43,6 +46,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
       setDescription(todo.description || '');
       setType(todo.type);
       setSelectedGroupId(todo.groupId || 'default');
+      setRemindPreset(matchReminderPreset(todo.remindAt));
       if (todo.type === 'recurring') {
         const recurringTodo = todo as RecurringTodo;
         setCycleType(recurringTodo.cycleType);
@@ -64,6 +68,21 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
       type,
       groupId: selectedGroupId,
     };
+
+    if (remindPreset === 'none') {
+      updateData.remindAt = undefined;
+      updateData.remindedAt = undefined;
+    } else if (remindPreset !== 'keep') {
+      const remindAt = resolveReminderPreset(remindPreset);
+      if (typeof remindAt === 'number') {
+        updateData.remindAt = remindAt;
+        updateData.remindLeadMs = 0;
+        updateData.remindedAt = undefined;
+        if (type === 'recurring') {
+          (updateData as Partial<RecurringTodo>).nextDueDate = remindAt;
+        }
+      }
+    }
 
     if (type === 'recurring') {
       const recurringUpdateData = updateData as Partial<RecurringTodo>;
@@ -154,6 +173,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
               ))}
             </View>
           </View>
+          <ReminderPresetPicker value={remindPreset} onChange={setRemindPreset} currentAt={todo.remindAt} />
           {type === 'recurring' && (
             <>
               <View style={styles.field}>
