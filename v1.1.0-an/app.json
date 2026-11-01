@@ -29,7 +29,7 @@
       "versionCode": 1,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "backgroundColor": "#FAFAF7",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "userInterfaceStyle": "light"
