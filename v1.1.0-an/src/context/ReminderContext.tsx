@@ -2,25 +2,42 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState, type AppStateStatus } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useTodos } from './TodoContext';
-import { getReminderSettings } from '../utils/reminderSettings';
-import { rescheduleAll } from '../notifications/reminderScheduler';
+import { getReminderSettings, setReminderEnabled } from '../utils/reminderSettings';
+import {
+  rescheduleAll,
+  cancelAll,
+  scheduleTestNotification,
+  scheduledCount,
+  getPermissionState,
+  requestPermission,
+  type PermissionState
+} from '../notifications/reminderScheduler';
 import type { Todo } from '@hengsch/shared-types';
+
+interface ReminderActionResult {
+  ok: boolean;
+  message: string;
+}
 
 interface ReminderContextValue {
   enabled: boolean;
+  permission: PermissionState;
+  scheduled: number;
   error: string | null;
+  setEnabled: (next: boolean) => Promise<ReminderActionResult>;
   refresh: () => Promise<void>;
+  refreshCount: () => Promise<void>;
+  testNotification: () => Promise<ReminderActionResult>;
 }
 
 const ReminderContext = createContext<ReminderContextValue | undefined>(undefined);
 
-/**
- * 提醒生命周期：任务变化 / 回前台 / 初始化完成后重排；
- * 只有开关开启且拿到有效排程时才写通知，失败只记录错误、不清空待办。
- */
+/** 提醒生命周期：开关状态、权限、排程与点击定位都由 Provider 持有 */
 export function ReminderProvider({ children }: { children: ReactNode }): React.ReactElement {
   const { allTodos, isInitialized } = useTodos();
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabledState] = useState(false);
+  const [permission, setPermission] = useState<PermissionState>('undetermined');
+  const [scheduled, setScheduled] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enabledRef = useRef(false);
@@ -37,19 +54,35 @@ export function ReminderProvider({ children }: { children: ReactNode }): React.R
     })
     .join('|');
 
+  const syncCount = useCallback(async (): Promise<void> => {
+    setScheduled(await scheduledCount().catch(() => 0));
+  }, []);
+
   const refresh = useCallback(async (): Promise<void> => {
     if (!enabledRef.current) return;
     const result = await rescheduleAll(todosRef.current);
     setError(result.ok ? null : result.error ?? '提醒排程失败');
+    if (result.ok) setScheduled(result.scheduled);
   }, []);
+
+  const refreshCount = useCallback(async (): Promise<void> => {
+    await syncCount();
+  }, [syncCount]);
 
   useEffect(() => {
-    getReminderSettings()
-      .then((settings) => setEnabled(settings.enabled))
+    let alive = true;
+    Promise.all([getReminderSettings(), getPermissionState(), scheduledCount()])
+      .then(([settings, perm, count]) => {
+        if (!alive) return;
+        setEnabledState(settings.enabled);
+        setPermission(perm);
+        setScheduled(count);
+      })
       .catch(() => undefined);
+    return () => { alive = false; };
   }, []);
 
-  // 待办变化 → 300ms 防抖重排；重排期间签名不变则不重复写
+  // 待办变化 → 300ms 防抖重排；相同签名不重复写
   useEffect(() => {
     if (!enabled || !isInitialized) return;
     if (signature === lastSignatureRef.current) return;
@@ -73,8 +106,63 @@ export function ReminderProvider({ children }: { children: ReactNode }): React.R
     return () => sub.remove();
   }, [enabled, refresh]);
 
+  const setEnabled = useCallback(async (next: boolean): Promise<ReminderActionResult> => {
+    try {
+      if (!next) {
+        await cancelAll();
+        await setReminderEnabled(false);
+        lastSignatureRef.current = '';
+        setEnabledState(false);
+        setScheduled(0);
+        setError(null);
+        return { ok: true, message: '已关闭，已排提醒已清空' };
+      }
+
+      const perm = await requestPermission();
+      setPermission(perm);
+      if (perm !== 'granted') {
+        return { ok: false, message: '未获得通知权限，请到系统设置中允许 HengSch 通知' };
+      }
+
+      const result = await rescheduleAll(todosRef.current);
+      if (!result.ok) {
+        setError(result.error ?? '排程失败');
+        return { ok: false, message: result.error ?? '排程失败' };
+      }
+
+      await setReminderEnabled(true);
+      // 强制下一次签名 effect 重新排一次，避免“关闭再开启”复用旧签名
+      lastSignatureRef.current = '';
+      setEnabledState(true);
+      setScheduled(result.scheduled);
+      setError(null);
+      return { ok: true, message: `已开启，排入 ${result.scheduled} 条提醒` };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '提醒设置失败';
+      setError(message);
+      return { ok: false, message };
+    }
+  }, []);
+
+  const testNotification = useCallback(async (): Promise<ReminderActionResult> => {
+    try {
+      const perm = await requestPermission();
+      setPermission(perm);
+      if (perm !== 'granted') {
+        return { ok: false, message: '未获得通知权限，无法发送测试提醒' };
+      }
+      await scheduleTestNotification();
+      await syncCount();
+      return { ok: true, message: '已排程：5 秒后应收到测试通知' };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '测试提醒失败' };
+    }
+  }, [syncCount]);
+
   return (
-    <ReminderContext.Provider value={{ enabled, error, refresh }}>
+    <ReminderContext.Provider
+      value={{ enabled, permission, scheduled, error, setEnabled, refresh, refreshCount, testNotification }}
+    >
       {children}
     </ReminderContext.Provider>
   );

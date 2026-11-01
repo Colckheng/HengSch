@@ -63,12 +63,14 @@ function AppContent(): React.ReactElement {
           if (!alive) return;
           const id = readNotificationTodoId(response);
           if (id) openTodoById(id);
+          return Notifications.clearLastNotificationResponseAsync();
         })
         .catch(() => undefined);
     }
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const id = readNotificationTodoId(response);
       if (id) openTodoById(id);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     });
     return () => { alive = false; sub.remove(); };
   }, [isInitialized, allTodos]);

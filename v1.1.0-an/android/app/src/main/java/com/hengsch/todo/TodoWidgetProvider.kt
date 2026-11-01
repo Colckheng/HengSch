@@ -6,6 +6,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.widget.RemoteViews
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -22,11 +24,14 @@ class TodoWidgetProvider : AppWidgetProvider() {
 
     companion object {
         fun refreshAll(context: Context) {
-            val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(ComponentName(context, TodoWidgetProvider::class.java))
-            if (ids.isEmpty()) return
-            val summary = WidgetSummaryStore.read(context)
-            for (id in ids) manager.updateAppWidget(id, buildViews(context, summary))
+            val appContext = context.applicationContext
+            Handler(Looper.getMainLooper()).post {
+                val manager = AppWidgetManager.getInstance(appContext)
+                val ids = manager.getAppWidgetIds(ComponentName(appContext, TodoWidgetProvider::class.java))
+                if (ids.isEmpty()) return@post
+                val summary = WidgetSummaryStore.read(appContext)
+                for (id in ids) manager.updateAppWidget(id, buildViews(appContext, summary))
+            }
         }
 
         private fun buildViews(context: Context, summary: WidgetSummaryStore.Summary): RemoteViews {

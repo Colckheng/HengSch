@@ -31,7 +31,10 @@ export function SwipeableTodoRow({
 }: SwipeableTodoRowProps): React.ReactElement {
   const translateX = useRef(new Animated.Value(0)).current;
   const openRef = useRef(open);
+  const onOpenChangeRef = useRef(onOpenChange);
   openRef.current = open;
+  onOpenChangeRef.current = onOpenChange;
+  const isCompleted = todo.status === 'completed';
 
   const animateTo = (to: number) => {
     Animated.timing(translateX, { toValue: to, duration: 160, useNativeDriver: true }).start();
@@ -55,7 +58,7 @@ export function SwipeableTodoRow({
         const base = openRef.current ? OPEN_X : 0;
         const next = base + g.dx;
         const shouldOpen = next < OPEN_X / 2;
-        onOpenChange(shouldOpen);
+        onOpenChangeRef.current(shouldOpen);
         animateTo(shouldOpen ? OPEN_X : 0);
       },
       onPanResponderTerminate: () => {
@@ -66,6 +69,7 @@ export function SwipeableTodoRow({
   );
 
   const handleSnooze = () => {
+    if (isCompleted) return;
     onOpenChange(false);
     onSnooze(todo.id, Date.now() + HOUR);
   };
@@ -83,13 +87,31 @@ export function SwipeableTodoRow({
     onToggle(todo.id);
   };
 
+  const handleCardPress = (item: Todo) => {
+    if (openRef.current) {
+      onOpenChange(false);
+      animateTo(0);
+      return;
+    }
+    onPress(item);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.actions} pointerEvents={open ? 'auto' : 'none'}>
-        <TouchableOpacity style={styles.action} onPress={handleToggle} accessibilityLabel="完成待办">
-          <Text style={styles.actionText}>完成</Text>
+        <TouchableOpacity
+          style={styles.action}
+          onPress={handleToggle}
+          accessibilityLabel={isCompleted ? '恢复待办' : '完成待办'}
+        >
+          <Text style={styles.actionText}>{isCompleted ? '恢复' : '完成'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.action} onPress={handleSnooze} accessibilityLabel="稍后一小时">
+        <TouchableOpacity
+          style={[styles.action, isCompleted && styles.actionDisabled]}
+          onPress={handleSnooze}
+          disabled={isCompleted}
+          accessibilityLabel="稍后一小时"
+        >
           <Text style={styles.actionText}>稍后1h</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.action, styles.actionDanger]} onPress={handleDelete} accessibilityLabel="删除待办">
@@ -97,7 +119,7 @@ export function SwipeableTodoRow({
         </TouchableOpacity>
       </View>
       <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-        <TodoCard todo={todo} index={index} onToggle={onToggle} onPress={onPress} />
+        <TodoCard todo={todo} index={index} onToggle={onToggle} onPress={handleCardPress} />
       </Animated.View>
     </View>
   );
@@ -121,6 +143,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#E5E5E3'
   },
   actionDanger: { backgroundColor: '#E1352B' },
+  actionDisabled: { opacity: 0.35 },
   actionText: {
     fontFamily: 'monospace',
     fontSize: 11,

@@ -9,17 +9,8 @@ import {
   Switch,
   Platform
 } from 'react-native';
-import {
-  getPermissionState,
-  requestPermission,
-  rescheduleAll,
-  scheduleTestNotification,
-  scheduledCount,
-  cancelAll,
-  type PermissionState
-} from '../notifications/reminderScheduler';
-import { getReminderSettings, setReminderEnabled } from '../utils/reminderSettings';
-import { useTodos } from '../context/TodoContext';
+import type { PermissionState } from '../notifications/reminderScheduler';
+import { useReminder } from '../context/ReminderContext';
 
 interface ReminderSettingsModalProps {
   isOpen: boolean;
@@ -34,30 +25,15 @@ const PERMISSION_LABEL: Record<PermissionState, string> = {
 
 /** 提醒设置：与 SyncSettingsModal 同构的 Swiss 排版（纸底、发丝线、mono 标签） */
 export function ReminderSettingsModal({ isOpen, onClose }: ReminderSettingsModalProps): React.ReactElement {
-  const { allTodos, isInitialized } = useTodos();
-  const [enabled, setEnabled] = useState(false);
-  const [permission, setPermission] = useState<PermissionState>('undetermined');
-  const [scheduled, setScheduled] = useState(0);
+  const { enabled, permission, scheduled, error, setEnabled, refreshCount, testNotification } = useReminder();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    let alive = true;
     setMessage(null);
-    (async () => {
-      const [settings, perm, count] = await Promise.all([
-        getReminderSettings(),
-        getPermissionState(),
-        scheduledCount()
-      ]);
-      if (!alive) return;
-      setEnabled(settings.enabled);
-      setPermission(perm);
-      setScheduled(count);
-    })().catch(() => undefined);
-    return () => { alive = false; };
-  }, [isOpen]);
+    void refreshCount();
+  }, [isOpen, refreshCount]);
 
   if (!isOpen) return <></>;
 
@@ -65,32 +41,11 @@ export function ReminderSettingsModal({ isOpen, onClose }: ReminderSettingsModal
     setBusy(true);
     setMessage(null);
     try {
-      if (!next) {
-        await cancelAll();
-        await setReminderEnabled(false);
-        setEnabled(false);
-        setScheduled(0);
-        setMessage({ ok: true, text: '已关闭，已排提醒已清空' });
-        return;
-      }
-      const perm = await requestPermission();
-      setPermission(perm);
-      if (perm !== 'granted') {
-        setMessage({ ok: false, text: '未获得通知权限，请到系统设置中允许 HengSch 通知' });
-        return;
-      }
-      const result = await rescheduleAll(allTodos);
-      if (!result.ok) {
-        setMessage({ ok: false, text: result.error ?? '排程失败' });
-        return;
-      }
-      await setReminderEnabled(true);
-      setEnabled(true);
-      setScheduled(result.scheduled);
-      setMessage({ ok: true, text: `已开启，排入 ${result.scheduled} 条提醒` });
+      const result = await setEnabled(next);
+      setMessage({ ok: result.ok, text: result.message });
+      await refreshCount();
     } finally {
       setBusy(false);
-      if (isInitialized) setScheduled(await scheduledCount().catch(() => scheduled));
     }
   };
 
@@ -98,16 +53,8 @@ export function ReminderSettingsModal({ isOpen, onClose }: ReminderSettingsModal
     setBusy(true);
     setMessage(null);
     try {
-      const perm = await requestPermission();
-      setPermission(perm);
-      if (perm !== 'granted') {
-        setMessage({ ok: false, text: '未获得通知权限，无法发送测试提醒' });
-        return;
-      }
-      await scheduleTestNotification();
-      setMessage({ ok: true, text: '已排程：5 秒后应收到测试通知' });
-    } catch (error) {
-      setMessage({ ok: false, text: error instanceof Error ? error.message : '测试提醒失败' });
+      const result = await testNotification();
+      setMessage({ ok: result.ok, text: result.message });
     } finally {
       setBusy(false);
     }
@@ -160,8 +107,15 @@ export function ReminderSettingsModal({ isOpen, onClose }: ReminderSettingsModal
             </View>
           ) : null}
 
+          {error ? (
+            <View style={[styles.testBox, styles.testBoxFail]}>
+              <Text style={[styles.testText, styles.testTextFail]}>{error}</Text>
+            </View>
+          ) : null}
+
           <Text style={styles.footnote}>
             仅本机生效，不写云同步。单次按提醒时间，循环按下一周期提前量排未来 7 天；应用被杀时由系统投递。
+            精确时间由系统闹钟权限决定，未授权时为近似时间。
           </Text>
         </ScrollView>
       </View>
