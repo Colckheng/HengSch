@@ -204,7 +204,7 @@ npm start              # node src/server.js，默认监听 0.0.0.0:8642
 | Web | `v1.1.0-web/vite.config.ts` 的 alias 指向 `../packages/*/src/index.ts` | **不需要**（源码直引） |
 | 移动 | `v1.1.0-an/shared/` 是 `packages/*/src` 的内嵌副本 | 需要先 `npm run sync-shared` |
 
-> ⚠️ `packages/README.md` 与 `docs/architecture.md` 第二节称桌面端「解析到 `dist/`，需先 `npm run build:packages`」——**与代码不符**：桌面端与 Web 端一样通过 Vite alias 直引源码。移动端的 `shared/` 副本才是需要同步的那一份。
+> 桌面端与 Web 端一样通过 Vite alias 与 tsconfig `paths` 直引 `packages/*/src`，**无需预构建共享包**；只有移动端的 `shared/` 副本需要 `npm run sync-shared` 同步。`packages/README.md` 与 `docs/architecture.md` 已与此对齐。
 
 ---
 
