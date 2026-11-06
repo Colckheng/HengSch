@@ -18,7 +18,7 @@ HengSch 项目的共享代码包，Monorepo 架构，供桌面端、Web 端、�
 
 ### @hengsch/shared-logic
 
-共享业务逻辑（纯函数，ESM 输出，vitest 单测，根 `npm test` 共 62 项）：
+共享业务逻辑（纯函数，ESM 输出，vitest 单测，根 `npm test` 共 140 项）：
 
 - `todo-utils.ts`
   - `calculateNextDueDate`：计算循环任务下次到期
@@ -62,20 +62,29 @@ npm install
 
 ### 构建
 
+共享包各自有 `build`（`tsc` → `dist/`）脚本：
+
 ```bash
-npm run build:packages       # 根目录构建全部共享包（tsc → dist/）
-# 或单包：cd packages/shared-logic && npm run build
+cd packages/shared-logic && npm run build
 ```
 
-### 引用（注意三种方式不同）
+根目录的 `npm run build:packages` 名义上构建全部 workspace（`npm run build --workspaces --if-present`），实际会把桌面端和 Web 端一起构建；在干净检出的仓库上直接跑会失败——workspace 顺序里 `shared-logic` 的 `tsc` 早于 `shared-types`，找不到 `@hengsch/shared-types` 的 `dist` 类型。需要构建共享包时，先单独构建 `packages/shared-types`：
 
-- **桌面端**（workspace 依赖，解析到 `dist/`，需先 build:packages）：
+```bash
+npm run build --workspace=packages/shared-types
+npm run build --workspace=packages/shared-logic
+npm run build --workspace=packages/shared-storage
+```
+
+### 引用（桌面端与 Web 端相同：源码直引，无需预构建）
+
+- **桌面端**：`v1.0.0/vite.config.ts` 与 `v1.0.0/tsconfig.json` 的 `paths` 都把 `@hengsch/shared-*` 指向 `../packages/*/src/index.ts`——**源码直引，不需要先 build:packages**。
 
 ```json
 { "dependencies": { "@hengsch/shared-logic": "*" } }
 ```
 
-- **Web 端**：vite alias 直接指向**源码**（`../packages/*/src/index.ts`），无需预构建。
+- **Web 端**：`vite.config.ts` 与 `tsconfig.json` 同样 alias 指向 `../packages/*/src/index.ts`，无需预构建。
 - **移动端**：内嵌副本 `v1.1.0-an/shared/`，改完 packages 后根目录 `npm run sync-shared` 同步。
 
 ```typescript
@@ -87,6 +96,6 @@ import type { IStorage } from '@hengsch/shared-storage';
 ## 开发说明
 
 - TypeScript 编写；包间可相互依赖（`shared-logic` → `shared-types`）
-- **改业务逻辑一律改 `packages/`**，然后：桌面 / Web 直接生效（dev 走源码或重构建）；移动端跑 `npm run sync-shared`
-- 修改后必跑根目录 `npm test`（sync / monitor 单测）
+- **改业务逻辑一律改 `packages/`**，然后：桌面 / Web 直接生效（源码直引，改完刷新即可）；移动端跑 `npm run sync-shared`
+- 修改后必跑根目录 `npm test`（桌面 87 + shared-logic 140 + 同步桥 13）
 - 输出为 ESM（兼容 Vite/Rollup 命名导出；历史上曾因 CommonJS 出过解析问题）
