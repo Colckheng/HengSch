@@ -133,11 +133,11 @@ ssh cloud-server "sudo systemctl restart sync-bridge"
 ### 验收
 
 ```bash
-# 服务器或本地跑探针 (11 项全绿)
+# 服务器或本地跑探针 (9 项全绿)
 bash services/sync-bridge/scripts/probe.sh http://<SERVER_IP>:8642 <SYNC_TOKEN>
 ```
 
-覆盖：health 200、鉴权 GET 200、无 token/错 token 401、幂等 PUT 200、回读一致、stale etag 409、DELETE 405、未知路径 404。
+覆盖 9 项：health 200、鉴权 GET 200、无 token 401、错 token 401、幂等 PUT 200、回读一致、stale etag 409、DELETE 405、未知路径 404。
 
 CORS 验收：
 ```bash
@@ -145,7 +145,7 @@ curl -si -X OPTIONS http://<SERVER_IP>:8642/sync | head -5          # 204 + Acce
 curl -si -H "Origin: http://<SERVER_IP>" http://<SERVER_IP>:8642/health | grep -i access-control
 ```
 
-单元测试：`cd services/sync-bridge && npm test` (node --test，11 项，含 CORS 断言)。
+单元测试：`cd services/sync-bridge && npm test` (node --test，13 项，含 CORS 断言)。
 
 ---
 
