@@ -7,9 +7,9 @@
   --paper: #FAFAF8;
   --paper-2: #F2F2EF;
   --ink: #0A0A0A;
-  --ink-2: #8A8A86;
-  --ink-3: #B9B9B4;
-  --signal: #E63329;
+  --ink-2: #6E6E6A;
+  --ink-3: #8A8A86;
+  --signal: #D02F26;
   --hairline: #E5E5E3;
   --hairline-strong: #D8D8D5;
 
@@ -290,13 +290,13 @@ button {
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: none;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .group-filter-item .tab-count {
   font-size: 10.5px;
   font-weight: 700;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .group-filter-item .tab-dot {
@@ -534,6 +534,7 @@ button {
 }
 
 .todo-action-button {
+  position: relative;
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
@@ -625,7 +626,7 @@ button {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.16em;
-  padding: 9px 16px;
+  padding: 12px 18px;
   transition: background 0.15s ease;
 }
 
@@ -720,7 +721,7 @@ button {
   right: 0;
   font-style: normal;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
   min-width: 12px;
@@ -872,7 +873,7 @@ button {
   background: var(--paper);
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 2px 7px;
@@ -926,7 +927,7 @@ button {
 
 .ai-msg-role {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.16em;
   color: var(--ink-3);
@@ -1058,7 +1059,7 @@ button {
   flex: 0 0 auto;
   margin-left: 4px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.1em;
   color: var(--ink-3);
   background: none;
@@ -1082,7 +1083,7 @@ button {
 .ai-card-kind {
   flex: 0 0 auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1098,7 +1099,7 @@ button {
 .ai-card-chip {
   flex: 0 0 auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.1em;
   color: var(--ink-2);
   border: 1px solid var(--hairline-strong);
@@ -1108,7 +1109,7 @@ button {
 .ai-card-status {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1191,7 +1192,7 @@ button {
 .ai-diff-head {
   display: block;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.16em;
   color: var(--ink-3);
@@ -1257,7 +1258,7 @@ label.ai-group-row {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   color: var(--ink-3);
 }
@@ -1451,7 +1452,7 @@ label.ai-group-row {
 
 .ai-sys {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -1645,7 +1646,7 @@ label.ai-group-row {
 .ai-mic-progress {
   align-self: center;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--ink-3);
@@ -1841,6 +1842,23 @@ label.ai-group-row {
 
 /* ---------------- modals (swiss) ---------------- */
 
+dialog.modal-overlay,
+dialog.confirm-overlay {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+}
+
+dialog.modal-overlay::backdrop,
+dialog.confirm-overlay::backdrop {
+  background: transparent;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1853,13 +1871,13 @@ label.ai-group-row {
 }
 
 /* U-7.4 AI 抽屉展开时弹窗居中偏移（不被抽屉压住） */
-.app-container:has(.ai-drawer.open) .modal-overlay {
+body:has(.ai-drawer.open) .modal-overlay {
   padding-right: 360px;
 }
 
 /* U-7.4 窄屏 300px 必须写在 360px 基础规则之后：同特异度靠源顺序生效 */
 @media (max-width: 860px) {
-  .app-container:has(.ai-drawer.open) .modal-overlay {
+  body:has(.ai-drawer.open) .modal-overlay {
     padding-right: 300px;
   }
 }
@@ -1912,6 +1930,7 @@ label.ai-group-row {
 }
 
 .modal-close {
+  position: relative;
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
@@ -2207,6 +2226,7 @@ label.ai-group-row {
   letter-spacing: -0.02em;
   line-height: 1.25;
   margin-bottom: 14px;
+  overflow-wrap: anywhere;
 }
 
 .todo-detail-description h4 {
@@ -2222,6 +2242,8 @@ label.ai-group-row {
   font-size: 14px;
   line-height: 1.65;
   color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .todo-detail-meta {
@@ -2240,11 +2262,11 @@ label.ai-group-row {
 }
 
 .meta-label {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .meta-value {
@@ -2323,8 +2345,11 @@ label.ai-group-row {
 }
 
 .group-name {
+  min-width: 0;
+  flex: 0 1 auto;
   font-size: 13.5px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .group-edit-form {
@@ -2332,6 +2357,7 @@ label.ai-group-row {
   flex-direction: column;
   gap: 10px;
   flex: 1;
+  min-width: 0;
   padding: 2px 0;
 }
 
@@ -2358,10 +2384,12 @@ label.ai-group-row {
 
 .group-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 4px;
 }
 
 .group-action-button {
+  position: relative;
   width: 28px;
   height: 28px;
   border: 1px solid transparent;
@@ -2382,6 +2410,15 @@ label.ai-group-row {
 .group-action-button.delete:hover {
   border-color: var(--signal);
   color: var(--signal);
+}
+
+/* 视觉尺寸不变，透明伪元素把命中区扩到 ≥44px（触屏可用性） */
+.todo-action-button::after,
+.modal-close::after,
+.group-action-button::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
 
 .add-group-form {
@@ -2461,6 +2498,9 @@ label.ai-group-row {
 .confirm-box {
   width: 360px;
   max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
   background: var(--paper);
   border: 2px solid var(--ink);
   box-shadow: 8px 8px 0 var(--ink);
@@ -2482,6 +2522,7 @@ label.ai-group-row {
   line-height: 1.65;
   color: var(--ink-2);
   margin-bottom: 20px;
+  overflow-wrap: anywhere;
 }
 
 .confirm-actions {
@@ -2557,7 +2598,7 @@ label.ai-group-row {
   border: 1px solid transparent;
   background: transparent;
   font-family: var(--font-mono, monospace);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--ink-2);
@@ -2621,7 +2662,7 @@ label.ai-group-row {
 
 .app-container.compact .head-sub {
   font-family: var(--font-mono, monospace);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.08em;
   color: var(--ink-2);
 }
@@ -2647,7 +2688,7 @@ label.ai-group-row {
   visibility: visible;
   opacity: 1;
   transform: none;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .app-container.compact .todo-actions {
@@ -2897,7 +2938,7 @@ label.ai-group-row {
 
 .reminder-queue-meta {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.04em;
   color: var(--ink-2);
 }

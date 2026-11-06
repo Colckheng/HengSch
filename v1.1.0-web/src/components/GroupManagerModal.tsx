@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useGroups, DEFAULT_GROUP_COLORS } from '../context/GroupContext';
 import { useTodos } from '../context/TodoContext';
 import { ColorPicker } from './ColorPicker';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog, ModalFrame } from './ConfirmDialog';
 import { IconClose, IconEdit, IconTrash } from './Icons';
 import type { Group } from '../types';
 
@@ -19,24 +19,20 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
   const [selectedColor, setSelectedColor] = useState(DEFAULT_GROUP_COLORS[0]);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState<Group | null>(null);
+  const isFormActive = isAdding || editingGroup !== null;
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        if (deletingGroup) {
-          setDeletingGroup(null);
-        } else {
-          onClose();
-        }
-      }
-    };
+  const resetForm = () => {
+    setEditingGroup(null);
+    setIsAdding(false);
+    setNewGroupName('');
+    setSelectedColor(DEFAULT_GROUP_COLORS[0]);
+  };
 
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose, deletingGroup]);
+  const handleStartAdd = () => {
+    if (isFormActive) return;
+    resetForm();
+    setIsAdding(true);
+  };
 
   const handleAddGroup = () => {
     if (!newGroupName.trim()) return;
@@ -46,12 +42,12 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
       color: selectedColor
     });
 
-    setNewGroupName('');
-    setSelectedColor(DEFAULT_GROUP_COLORS[0]);
-    setIsAdding(false);
+    resetForm();
   };
 
   const handleEditGroup = (group: Group) => {
+    if (isFormActive) return;
+    setIsAdding(false);
     setEditingGroup(group);
     setNewGroupName(group.name);
     setSelectedColor(group.color);
@@ -65,13 +61,11 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
       color: selectedColor
     });
 
-    setEditingGroup(null);
-    setNewGroupName('');
-    setSelectedColor(DEFAULT_GROUP_COLORS[0]);
+    resetForm();
   };
 
   const handleDeleteGroup = (group: Group) => {
-    if (group.id === 'default') return;
+    if (group.id === 'default' || isFormActive) return;
     setDeletingGroup(group);
   };
 
@@ -83,27 +77,15 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
         updateTodo(todo.id, { groupId: 'default' });
       }
     });
+    if (editingGroup?.id === deletingGroup.id) resetForm();
     setDeletingGroup(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingGroup(null);
-    setNewGroupName('');
-    setSelectedColor(DEFAULT_GROUP_COLORS[0]);
-  };
-
-  const handleCancelAdd = () => {
-    setNewGroupName('');
-    setSelectedColor(DEFAULT_GROUP_COLORS[0]);
-    setIsAdding(false);
   };
 
   if (!isOpen) return <></>;
 
   return (
     <>
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <ModalFrame label="分组管理" onClose={onClose}>
         <div className="modal-header">
           <h2>分组管理</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
@@ -127,7 +109,7 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
                     <div className="form-actions">
                       <button
                         className="button button-secondary"
-                        onClick={handleCancelEdit}
+                        onClick={resetForm}
                       >
                         取消
                       </button>
@@ -152,6 +134,7 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
                               className="group-action-button edit"
                               onClick={() => handleEditGroup(group)}
                               aria-label="编辑分组"
+                              disabled={isFormActive}
                             >
                               <IconEdit />
                             </button>
@@ -159,6 +142,7 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
                               className="group-action-button delete"
                               onClick={() => handleDeleteGroup(group)}
                               aria-label="删除分组"
+                              disabled={isFormActive}
                             >
                               <IconTrash />
                             </button>
@@ -190,7 +174,7 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
               <div className="form-actions">
                 <button
                   className="button button-secondary"
-                  onClick={handleCancelAdd}
+                  onClick={resetForm}
                 >
                   取消
                 </button>
@@ -208,14 +192,14 @@ export function GroupManagerModal({ isOpen, onClose }: GroupManagerModalProps): 
           {!isAdding && (
             <button
               className="button button-primary add-group-button"
-              onClick={() => setIsAdding(true)}
+              onClick={handleStartAdd}
+              disabled={isFormActive}
             >
               + 新建分组
             </button>
           )}
         </div>
-      </div>
-      </div>
+      </ModalFrame>
       <ConfirmDialog
         isOpen={deletingGroup !== null}
         title="删除分组"

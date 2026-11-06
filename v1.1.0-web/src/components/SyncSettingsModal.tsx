@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { IconClose } from './Icons';
+import { ModalFrame } from './ConfirmDialog';
 import { useSync } from '../context/SyncContext';
 
 interface SyncSettingsModalProps {
@@ -26,14 +27,6 @@ export function SyncSettingsModal({ isOpen, onClose }: SyncSettingsModalProps): 
       setBusy(false);
     }
   }, [isOpen, config]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return <></>;
 
@@ -82,8 +75,7 @@ export function SyncSettingsModal({ isOpen, onClose }: SyncSettingsModalProps): 
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content sync-modal" onClick={(e) => e.stopPropagation()}>
+    <ModalFrame label="同步设置" onClose={onClose} className="modal-content sync-modal">
         <div className="modal-header">
           <h2>同步设置</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
@@ -152,7 +144,6 @@ export function SyncSettingsModal({ isOpen, onClose }: SyncSettingsModalProps): 
             与手机端共用同一个 HTTP 同步桥与 TOKEN，三端数据互通。浏览器标签页回到前台时会自动同步。
           </p>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 }

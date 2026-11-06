@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { ConfirmDialog, ModalFrame } from './ConfirmDialog';
 import type { Todo, TodoType, CycleType, RecurringTodo, MonitorConfig } from '../types';
 import { nextDueFromReminder } from '@hengsch/shared-logic';
 import { useTodos } from '../context/TodoContext';
@@ -28,6 +29,14 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
   const [monitor, setMonitor] = useState<MonitorConfig | undefined>(undefined);
   const [reminder, setReminder] = useState<ReminderValue | undefined>(undefined);
   const [titleError, setTitleError] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [monitorDraftChanged, setMonitorDraftChanged] = useState(false);
+  const recurring = todo?.type === 'recurring' ? todo as RecurringTodo : null;
+  const dirty = !!todo && (title !== todo.title || description !== (todo.description ?? '') || type !== todo.type ||
+    selectedGroupId !== (todo.groupId ?? 'default') || (type === 'recurring' &&
+      (cycleType !== (recurring?.cycleType ?? 'daily') || customCycleDays !== (recurring?.customCycleDays?.toString() ?? ''))) ||
+    JSON.stringify(monitor) !== JSON.stringify(todo.monitor) || monitorDraftChanged || reminder?.remindAt !== todo.remindAt ||
+    reminder?.remindLeadMs !== (todo.remindAt === undefined ? undefined : todo.remindLeadMs ?? 0));
   /** 时间面板刚被外点关闭的时刻——同一次交互的后续 click 不再关整个弹窗 */
   const panelClosedAtRef = useRef(0);
 
@@ -66,22 +75,23 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
     setMonitor(undefined);
     setReminder(undefined);
     setTitleError(false);
+    setConfirmingDiscard(false);
+    setMonitorDraftChanged(false);
     onClose();
   }, [onClose]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        handleClose();
-      }
-    };
+  const requestClose = () => {
+    if (dirty) setConfirmingDiscard(true);
+    else handleClose();
+  };
 
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, handleClose]);
+  const requestOverlayClose = () => {
+    if (Date.now() - panelClosedAtRef.current < 300) {
+      panelClosedAtRef.current = 0;
+      return;
+    }
+    requestClose();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,21 +139,11 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
   if (!isOpen || !todo) return <></>;
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={() => {
-        // 面板外点刚关掉面板（SwissTimePicker capture pointerdown 先行）→ 这次 click 不关弹窗
-        if (Date.now() - panelClosedAtRef.current < 300) {
-          panelClosedAtRef.current = 0;
-          return;
-        }
-        handleClose();
-      }}
-    >
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <>
+      <ModalFrame label="编辑待办事项" onClose={requestOverlayClose}>
         <div className="modal-header">
           <h2>编辑待办事项</h2>
-          <button className="modal-close" onClick={handleClose} aria-label="关闭">
+          <button className="modal-close" onClick={requestClose} aria-label="关闭">
             <IconClose />
           </button>
         </div>
@@ -235,10 +235,10 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
 
           <ReminderSection value={reminder} onChange={setReminder} recurring={type === 'recurring'} onOpenChange={handlePanelOpenChange} />
 
-          <MonitorSection monitor={monitor} onChange={setMonitor} />
+          <MonitorSection monitor={monitor} onChange={setMonitor} onDraftChange={() => setMonitorDraftChanged(true)} />
 
           <div className="modal-footer">
-            <button type="button" className="button button-secondary" onClick={handleClose}>
+            <button type="button" className="button button-secondary" onClick={requestClose}>
               取消
             </button>
             <button type="submit" className="button button-primary">
@@ -246,7 +246,8 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): JS
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </ModalFrame>
+      <ConfirmDialog isOpen={confirmingDiscard} title="放弃未保存的内容？" message="关闭后，本次修改的内容将丢失。" confirmText="放弃修改" cancelText="继续编辑" onConfirm={handleClose} onCancel={() => setConfirmingDiscard(false)} />
+    </>
   );
 }

@@ -22,8 +22,19 @@ export function GroupSelect({ groups, value, onChange, id, disabled = false }: G
         setOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      rootRef.current?.querySelector('button')?.focus();
+    };
     document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [open]);
 
   const selected = groups.find((group) => group.id === value) ?? groups[0];

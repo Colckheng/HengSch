@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { OpenReminderItem } from '../types/electron';
 import { SwissSelect } from './SwissSelect';
 import { IconClose } from './Icons';
+import { ModalFrame } from './ConfirmDialog';
 import { LEAD_OPTIONS } from './selectOptions';
 
 interface ReminderSettingsModalProps {
@@ -97,8 +98,7 @@ export function ReminderSettingsModal({ isOpen, onClose }: ReminderSettingsModal
   if (!isOpen) return <></>;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <ModalFrame label="提醒设置" onClose={onClose}>
         <div className="modal-header">
           <h2>提醒设置</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
@@ -192,7 +192,6 @@ export function ReminderSettingsModal({ isOpen, onClose }: ReminderSettingsModal
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 }

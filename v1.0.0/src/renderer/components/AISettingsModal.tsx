@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { IconClose } from './Icons';
+import { ModalFrame } from './ConfirmDialog';
 import { SwissSelect } from './SwissSelect';
 import type { AiMaskedSettings, VoiceModelStatus } from '../types/electron';
 
@@ -52,14 +53,6 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
       alive = false;
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return <></>;
 
@@ -170,8 +163,7 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
             : '未下载';
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content sync-modal" onClick={(event) => event.stopPropagation()}>
+    <ModalFrame label="AI 设置" onClose={onClose} className="modal-content sync-modal">
         <div className="modal-header">
           <h2>AI 设置</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
@@ -267,7 +259,6 @@ export function AISettingsModal({ isOpen, onClose, onSaved }: AISettingsModalPro
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 }

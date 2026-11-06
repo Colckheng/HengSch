@@ -7,9 +7,9 @@
   --paper: #FAFAF8;
   --paper-2: #F2F2EF;
   --ink: #0A0A0A;
-  --ink-2: #8A8A86;
-  --ink-3: #B9B9B4;
-  --signal: #E63329;
+  --ink-2: #6E6E6A;
+  --ink-3: #8A8A86;
+  --signal: #D02F26;
   --hairline: #E5E5E3;
   --hairline-strong: #D8D8D5;
 
@@ -286,13 +286,13 @@ button {
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: none;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .group-filter-item .tab-count {
   font-size: 10.5px;
   font-weight: 700;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .group-filter-item .tab-dot {
@@ -555,6 +555,7 @@ button {
 }
 
 .todo-action-button {
+  position: relative;
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
@@ -635,7 +636,7 @@ button {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.16em;
-  padding: 9px 16px;
+  padding: 12px 18px;
   transition: background 0.15s ease;
 }
 
@@ -833,6 +834,23 @@ button {
 
 /* ---------------- modals (swiss) ---------------- */
 
+dialog.modal-overlay,
+dialog.confirm-overlay {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+}
+
+dialog.modal-overlay::backdrop,
+dialog.confirm-overlay::backdrop {
+  background: transparent;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -892,6 +910,7 @@ button {
 }
 
 .modal-close {
+  position: relative;
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
@@ -1095,7 +1114,7 @@ button {
 
 .form-error::before {
   content: '■ ';
-  font-size: 9px;
+  font-size: 10.5px;
   vertical-align: 1px;
 }
 
@@ -1175,6 +1194,7 @@ button {
   letter-spacing: -0.02em;
   line-height: 1.25;
   margin-bottom: 14px;
+  overflow-wrap: anywhere;
 }
 
 .todo-detail-description h4 {
@@ -1190,6 +1210,8 @@ button {
   font-size: 14px;
   line-height: 1.65;
   color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .todo-detail-meta {
@@ -1208,11 +1230,11 @@ button {
 }
 
 .meta-label {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .meta-value {
@@ -1291,8 +1313,11 @@ button {
 }
 
 .group-name {
+  min-width: 0;
+  flex: 0 1 auto;
   font-size: 13.5px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .group-edit-form {
@@ -1300,6 +1325,7 @@ button {
   flex-direction: column;
   gap: 10px;
   flex: 1;
+  min-width: 0;
   padding: 2px 0;
 }
 
@@ -1326,10 +1352,12 @@ button {
 
 .group-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 4px;
 }
 
 .group-action-button {
+  position: relative;
   width: 28px;
   height: 28px;
   border: 1px solid transparent;
@@ -1350,6 +1378,15 @@ button {
 .group-action-button.delete:hover {
   border-color: var(--signal);
   color: var(--signal);
+}
+
+/* 视觉尺寸不变，透明伪元素把命中区扩到 ≥44px（触屏可用性） */
+.todo-action-button::after,
+.modal-close::after,
+.group-action-button::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
 
 .add-group-form {
@@ -1429,6 +1466,9 @@ button {
 .confirm-box {
   width: 360px;
   max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
   background: var(--paper);
   border: 2px solid var(--ink);
   box-shadow: 8px 8px 0 var(--ink);
@@ -1450,6 +1490,7 @@ button {
   line-height: 1.65;
   color: var(--ink-2);
   margin-bottom: 20px;
+  overflow-wrap: anywhere;
 }
 
 .confirm-actions {
@@ -1519,7 +1560,7 @@ button {
   border: 1px solid transparent;
   background: transparent;
   font-family: var(--font-mono, monospace);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--ink-2);
@@ -1583,7 +1624,7 @@ button {
 
 .app-container.compact .head-sub {
   font-family: var(--font-mono, monospace);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.08em;
   color: var(--ink-2);
 }
@@ -1609,7 +1650,7 @@ button {
   visibility: visible;
   opacity: 1;
   transform: none;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .app-container.compact .todo-actions {
@@ -1671,7 +1712,7 @@ button {
   }
 
   .title-brand {
-    font-size: 10px;
+    font-size: 10.5px;
     letter-spacing: 0.16em;
   }
 
@@ -1690,12 +1731,12 @@ button {
   }
 
   .head-label {
-    font-size: 9px;
+    font-size: 10.5px;
     letter-spacing: 0.14em;
   }
 
   .head-sub {
-    font-size: 10px;
+    font-size: 10.5px;
     margin-top: 4px;
   }
 
@@ -1755,15 +1796,15 @@ button {
     position: static;
     transform: none;
     margin-right: auto;
-    font-size: 9px;
+    font-size: 10.5px;
     letter-spacing: 0.1em;
     padding: 6px 4px;
   }
 
   .footer-add {
     white-space: nowrap;
-    padding: 8px 14px;
-    font-size: 10px;
+    padding: 12px 16px;
+    font-size: 10.5px;
     letter-spacing: 0.1em;
   }
 

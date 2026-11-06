@@ -5,9 +5,10 @@ import { SwissSelect } from './SwissSelect';
 interface MonitorSectionProps {
   monitor?: MonitorConfig;
   onChange: (monitor?: MonitorConfig) => void;
+  onDraftChange?: () => void;
 }
 
-export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.Element {
+export function MonitorSection({ monitor, onChange, onDraftChange }: MonitorSectionProps): JSX.Element {
   const uid = useId();
   const [auto, setAuto] = useState(monitor ? monitor.auto !== false : false);
   const [askOnExit, setAskOnExit] = useState(monitor?.askOnExit === true);
@@ -38,6 +39,7 @@ export function MonitorSection({ monitor, onChange }: MonitorSectionProps): JSX.
   }, [enabled]);
 
   const emit = (a: boolean, ask: boolean, exe: string, th: string): void => {
+    onDraftChange?.();
     if (!a && !ask) {
       onChange(undefined);
       return;

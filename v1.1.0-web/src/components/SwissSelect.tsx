@@ -24,8 +24,19 @@ export function SwissSelect({ options, value, onChange, id, placeholder }: Swiss
         setOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      rootRef.current?.querySelector('button')?.focus();
+    };
     document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [open]);
 
   const selected = options.find((option) => option.value === value);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { IconClose } from './Icons';
+import { ModalFrame } from './ConfirmDialog';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import type { SyncConfig, SyncStatus } from '@hengsch/shared-types';
@@ -44,14 +45,6 @@ export function SyncSettingsModal({ isOpen, onClose, status }: SyncSettingsModal
       alive = false;
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   const update = <K extends keyof SyncConfig>(key: K, value: SyncConfig[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -127,8 +120,7 @@ export function SyncSettingsModal({ isOpen, onClose, status }: SyncSettingsModal
   const statusRed = status?.state === 'AUTH ERROR' || status?.state === 'REMOTE ERROR';
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content sync-modal" onClick={(e) => e.stopPropagation()}>
+    <ModalFrame label="同步设置" onClose={onClose} className="modal-content sync-modal">
         <div className="modal-header">
           <h2>同步设置</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
@@ -235,7 +227,6 @@ export function SyncSettingsModal({ isOpen, onClose, status }: SyncSettingsModal
             </p>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 }

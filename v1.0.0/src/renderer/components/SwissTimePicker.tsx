@@ -71,8 +71,10 @@ export function SwissTimePicker({ value, onChange, id, minTs, mode = 'datetime',
     // 面板开着时 Esc 只关面板：拦在 document 冒泡前，弹窗层收不到
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         e.stopPropagation();
         setOpenNotified(false);
+        wrapRef.current?.querySelector('button')?.focus();
       }
     };
     document.addEventListener('pointerdown', onPointerDown, true);

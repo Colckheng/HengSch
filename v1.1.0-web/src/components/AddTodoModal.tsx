@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { TodoType, CycleType } from '../types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
+import { ConfirmDialog, ModalFrame } from './ConfirmDialog';
 import { IconClose } from './Icons';
 import { GroupSelect } from './GroupSelect';
 import { SwissSelect } from './SwissSelect';
@@ -22,6 +23,8 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   const [customCycleDays, setCustomCycleDays] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('default');
   const [titleError, setTitleError] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const dirty = title !== '' || description !== '' || type !== 'once' || cycleType !== 'daily' || customCycleDays !== '' || selectedGroupId !== 'default';
 
   const handleClose = useCallback(() => {
     setTitle('');
@@ -31,22 +34,14 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
     setCustomCycleDays('');
     setSelectedGroupId('default');
     setTitleError(false);
+    setConfirmingDiscard(false);
     onClose();
   }, [onClose]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        handleClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, handleClose]);
+  const requestClose = () => {
+    if (dirty) setConfirmingDiscard(true);
+    else handleClose();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,11 +81,11 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
   if (!isOpen) return <></>;
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <>
+      <ModalFrame label="添加待办事项" onClose={requestClose}>
         <div className="modal-header">
           <h2>添加待办事项</h2>
-          <button className="modal-close" onClick={handleClose} aria-label="关闭">
+          <button className="modal-close" onClick={requestClose} aria-label="关闭">
             <IconClose />
           </button>
         </div>
@@ -182,7 +177,7 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
           )}
 
           <div className="modal-footer">
-            <button type="button" className="button button-secondary" onClick={handleClose}>
+            <button type="button" className="button button-secondary" onClick={requestClose}>
               取消
             </button>
             <button type="submit" className="button button-primary">
@@ -190,7 +185,8 @@ export function AddTodoModal({ isOpen, onClose }: AddTodoModalProps): JSX.Elemen
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </ModalFrame>
+      <ConfirmDialog isOpen={confirmingDiscard} title="放弃未保存的内容？" message="关闭后，本次填写的内容将丢失。" confirmText="放弃修改" cancelText="继续编辑" onConfirm={handleClose} onCancel={() => setConfirmingDiscard(false)} />
+    </>
   );
 }

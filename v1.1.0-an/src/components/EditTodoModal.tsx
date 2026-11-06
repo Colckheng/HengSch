@@ -71,6 +71,7 @@ export function EditTodoModal({ isOpen, onClose, todo }: EditTodoModalProps): Re
 
     if (remindPreset === 'none') {
       updateData.remindAt = undefined;
+      updateData.remindLeadMs = undefined;
       updateData.remindedAt = undefined;
     } else if (remindPreset !== 'keep') {
       const remindAt = resolveReminderPreset(remindPreset);

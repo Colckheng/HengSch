@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import type { Todo, RecurringTodo } from '../types';
 import { IconClose } from './Icons';
+import { ModalFrame } from './ConfirmDialog';
 
 interface TodoDetailModalProps {
   isOpen: boolean;
@@ -9,20 +9,6 @@ interface TodoDetailModalProps {
 }
 
 export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps): JSX.Element {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen || !todo) return <></>;
 
   const isCompleted = todo.status === 'completed';
@@ -30,8 +16,7 @@ export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps)
   const recurringTodo = isRecurring ? (todo as RecurringTodo) : null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content todo-detail" onClick={(e) => e.stopPropagation()}>
+    <ModalFrame label="待办事项详情" onClose={onClose} className="modal-content todo-detail">
         <div className="modal-header">
           <h2>待办事项详情</h2>
           <button className="modal-close" onClick={onClose} aria-label="关闭">
@@ -96,7 +81,6 @@ export function TodoDetailModal({ isOpen, onClose, todo }: TodoDetailModalProps)
             关闭
           </button>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 }
