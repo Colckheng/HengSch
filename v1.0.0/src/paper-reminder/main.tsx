@@ -13,7 +13,7 @@ declare global { interface Window { reminderPaper: ReminderBridge } }
 export function ReminderOverlay(): JSX.Element {
   const [papers, setPapers] = useState<ReminderPaper[]>([]);
   const [size, setSize] = useState({ x: 0, y: 0, width: innerWidth, height: innerHeight });
-  const [states, setStates] = useState<Record<number, { ball: boolean; hot: boolean }>>({});
+  const [states, setStates] = useState<Record<number, { ball: boolean; hot: boolean; near: boolean; dropping: boolean }>>({});
   const [message, setMessage] = useState('');
   const [reduced, setReduced] = useState(matchMedia('(prefers-reduced-motion: reduce)').matches);
   const ids = useRef(new Map<string, number>());
@@ -46,8 +46,8 @@ export function ReminderOverlay(): JSX.Element {
     const timer = setInterval(report, 16);
     return () => { clearInterval(timer); window.removeEventListener('pointerdown', down); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); window.removeEventListener('blur', up); };
   }, []);
-  const onState = useCallback((id: number, ball: boolean, hot: boolean) => {
-    setStates(previous => previous[id]?.ball === ball && previous[id]?.hot === hot ? previous : { ...previous, [id]: { ball, hot } });
+  const onState = useCallback((id: number, ball: boolean, hot: boolean, near: boolean, dropping: boolean) => {
+    setStates(previous => previous[id]?.ball === ball && previous[id]?.hot === hot && previous[id]?.near === near && previous[id]?.dropping === dropping ? previous : { ...previous, [id]: { ball, hot, near, dropping } });
   }, []);
   const samples = useMemo(() => papers.map(paper => {
     const key = JSON.stringify([paper.todoId, paper.remindAt]);
@@ -67,7 +67,7 @@ export function ReminderOverlay(): JSX.Element {
             timers.current.add(timer);
           }} />;
       })}
-      <PaperBin visible={Object.values(states).some(s => s.ball)} hot={Object.values(states).some(s => s.hot)} rect={trash} />
+      <PaperBin visible={Object.values(states).some(s => s.ball)} hot={Object.values(states).some(s => s.hot)} near={Object.values(states).some(s => s.near)} dropping={Object.values(states).some(s => s.dropping)} rect={trash} />
     </div>
     <span className="overlay-status" role="status" aria-live="polite">{message}</span>
   </div>;

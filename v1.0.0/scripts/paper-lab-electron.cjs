@@ -141,11 +141,23 @@ async function runSmoke() {
   const bin = await rect('.paper-bin');
   await mouse('mouseMove', sphere.cx, sphere.cy);
   await mouse('mouseDown', sphere.cx, sphere.cy);
+  await mouse('mouseMove', bin.x - 35, bin.cy);
+  await wait(300);
+  check('approaching bin lifts it without arming discard', await evaluate(`document.querySelector('.paper-bin').classList.contains('is-near') && document.querySelector('.paper-bin').dataset.hot === 'false'`));
+  await capture('05-bin-near');
+  await mouse('mouseMove', bin.cx, bin.cy);
+  await mouse('mouseMove', bin.x - 110, bin.cy);
+  await waitFor(`!document.querySelector('.paper-bin').classList.contains('is-near')`);
+  check('dragging away clears warm feedback', await evaluate(`!document.querySelector('.paper-bin').classList.contains('is-near') && document.querySelector('.paper-bin').dataset.hot === 'false'`));
   for (let step = 1; step <= 12; step += 1) await mouse('mouseMove', sphere.cx + (bin.cx - sphere.cx) * step / 12, sphere.cy + (bin.cy - sphere.cy) * step / 12);
   check('entering bin highlights without closing', await evaluate(`document.querySelector('.paper-bin').dataset.hot === 'true' && document.querySelectorAll('.paper-object').length === 1`));
   await capture('06-bin-hot');
+  check('hot cue explains release and preserves task', await evaluate(`document.querySelector('.basket-cue').textContent.includes('松手放入') && document.querySelector('.basket-cue').textContent.includes('待办仍保留') && getComputedStyle(document.querySelector('.basket-glow')).opacity === '1'`));
   if (record) await wait(500);
   await mouse('mouseUp', bin.cx, bin.cy);
+  await waitFor(`document.querySelector('.paper-bin').classList.contains('is-dropping')`);
+  check('successful drop starts one settling animation', await evaluate(`getComputedStyle(document.querySelector('.basket-front')).animationName === (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : 'basket-settle')`));
+  await capture('06-bin-dropping');
   await waitFor(`document.querySelectorAll('.paper-object').length === 0`);
   check('drop closes reminder but keeps task pending', await evaluate(`document.querySelector('.event-list').textContent.includes('仍未完成')`));
   await capture('07-discarded');
@@ -176,7 +188,28 @@ async function runSmoke() {
   await evaluate(`if (!document.querySelectorAll('.lab-options input')[0].checked) document.querySelectorAll('.lab-options input')[0].click()`);
   await makeBall();
   check('reduced motion keeps ball interaction available', await evaluate(`document.querySelector('.lab').classList.contains('reduce-motion') && document.querySelector('.paper-object').dataset.phase === 'ball'`));
+  check('reduced motion disables basket animation', await evaluate(`getComputedStyle(document.querySelector('.basket-front')).animationName === 'none'`));
   await evaluate(`document.querySelectorAll('.lab-options input')[0].click()`);
+
+  const cancelBall = await rect('.paper-object');
+  const cancelBin = await rect('.paper-bin');
+  await mouse('mouseMove', cancelBall.cx, cancelBall.cy);
+  await mouse('mouseDown', cancelBall.cx, cancelBall.cy);
+  await mouse('mouseMove', cancelBin.cx, cancelBin.cy);
+  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+  await waitFor(`document.querySelector('.paper-bin').dataset.hot === 'false'`);
+  await mouse('mouseUp', cancelBin.cx, cancelBin.cy);
+  check('escape in bin clears cue and preserves ball', await evaluate(`!document.querySelector('.paper-bin').classList.contains('is-near') && !document.querySelector('.paper-bin').classList.contains('is-dropping') && document.querySelector('.paper-object').dataset.phase === 'ball'`));
+  await reset(); await makeBall();
+  await evaluate(`document.querySelectorAll('.lab-options input')[1].click()`);
+  const failedBall = await rect('.paper-object');
+  await mouse('mouseMove', failedBall.cx, failedBall.cy);
+  await mouse('mouseDown', failedBall.cx, failedBall.cy);
+  await mouse('mouseMove', cancelBin.cx, cancelBin.cy);
+  await mouse('mouseUp', cancelBin.cx, cancelBin.cy);
+  await waitFor(`!!document.querySelector('.paper-hint.has-error')`);
+  check('failed drop never settles and clears release cue', await evaluate(`!document.querySelector('.paper-bin').classList.contains('is-dropping') && !document.querySelector('.paper-bin').classList.contains('is-near') && document.querySelectorAll('.paper-object').length === 1`));
 
   await reset(); await clickText('＋ 加一张纸'); await clickText('＋ 加一张纸');
   check('three samples have independent accessible objects', await evaluate(`document.querySelectorAll('.paper-object').length === 3 && new Set([...document.querySelectorAll('.paper-object')].map(el=>el.getAttribute('aria-label'))).size === 3`));
@@ -204,6 +237,10 @@ app.whenReady().then(async () => {
   try {
     await win.loadFile(path.resolve(__dirname, '../dist-paper-lab/paper-lab.html'));
     if (!smoke) return;
+    if (process.argv.includes('--full-motion')) {
+      win.webContents.debugger.attach('1.3');
+      await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+    }
     await runSmoke();
     fs.writeFileSync(path.join(evidenceDirectory, 'prototype-smoke.json'), JSON.stringify({ at: new Date().toISOString(), electron: process.versions.electron, chrome: process.versions.chrome, checks, errors, scope: 'Isolated Electron prototype; no production persistence, OS click-through or mixed-DPI certification.' }, null, 2));
     console.log(JSON.stringify({ checks: checks.length, passed: checks.filter((item) => item.pass).length, evidenceDirectory }));

@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-15T10:26:08.217Z",
+  "at": "2026-11-02T05:34:20.770Z",
   "electron": "30.5.1",
   "chrome": "124.0.6367.243",
   "checks": [
@@ -48,7 +48,23 @@
       "pass": true
     },
     {
+      "name": "approaching bin lifts it without arming discard",
+      "pass": true
+    },
+    {
+      "name": "dragging away clears warm feedback",
+      "pass": true
+    },
+    {
       "name": "entering bin highlights without closing",
+      "pass": true
+    },
+    {
+      "name": "hot cue explains release and preserves task",
+      "pass": true
+    },
+    {
+      "name": "successful drop starts one settling animation",
       "pass": true
     },
     {
@@ -73,6 +89,18 @@
     },
     {
       "name": "reduced motion keeps ball interaction available",
+      "pass": true
+    },
+    {
+      "name": "reduced motion disables basket animation",
+      "pass": true
+    },
+    {
+      "name": "escape in bin clears cue and preserves ball",
+      "pass": true
+    },
+    {
+      "name": "failed drop never settles and clears release cue",
       "pass": true
     },
     {

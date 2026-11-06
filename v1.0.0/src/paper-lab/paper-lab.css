@@ -50,18 +50,37 @@ h1 { font-size: 32px; line-height: 1.65; letter-spacing: -.045em; font-weight: 5
 .paper-hint { position: absolute; left: 0; top: 0; font-size: 10px; color: var(--ink-2); white-space: nowrap; pointer-events: none; z-index: 40; }
 .paper-hint.has-error { background: var(--paper-2); padding: 7px 10px; border: 1px solid var(--signal); color: var(--signal); border-radius: 0; }
 .paper-object.is-leaving { pointer-events: none; }
-.paper-bin, .basket-front { position: absolute; opacity: 0; transform: translateY(8px); transition: opacity .2s ease, transform .24s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
-.paper-bin { color: var(--ink-2); z-index: 20; }
+.paper-bin, .basket-front { position: absolute; opacity: 0; transform: translateY(8px); transform-origin: 50% 90%; transition: opacity .2s ease, transform .28s cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.paper-bin { z-index: 20; }
 .paper-bin.is-visible, .basket-front.is-visible { opacity: 1; transform: translateY(0); }
-.paper-bin.is-hot, .basket-front.is-hot { transform: translateY(-3px); }
+.paper-bin.is-near, .basket-front.is-near { transform: translateY(-3px); }
+.paper-bin.is-hot, .basket-front.is-hot { transform: translateY(-5px) scale(1.035, .985); }
+.paper-bin.is-dropping, .basket-front.is-dropping { animation: basket-settle .48s ease-out both; }
 .basket-back { display: block; width: 100%; height: 100%; }
 .basket-front { z-index: 30; }
-.basket-landing { opacity: 0; transition: opacity .18s; }
-.paper-bin.is-hot .basket-landing { opacity: .8; }
-.paper-bin > span, .paper-bin > small { position: absolute; left: 0; width: 100%; text-align: center; }
-.paper-bin > span { bottom: 13px; font-size: 10px; }
-.paper-bin > small { bottom: -2px; font-size: 9px; opacity: .6; }
-.paper-bin.is-hot { color: var(--signal); }
+.basket-landing, .basket-glow { opacity: 0; transition: opacity .25s ease; }
+.paper-bin.is-near .basket-glow { opacity: .4; }
+.paper-bin.is-hot .basket-glow { opacity: 1; }
+.paper-bin.is-hot .basket-landing { opacity: .45; }
+.paper-bin.is-dropping .basket-glow { opacity: .2; }
+.basket-opening { transition: stroke .25s ease; }
+.basket-cue { --basket-cue-ink: #65563E; position: absolute; z-index: 35; pointer-events: none; text-align: center; color: var(--basket-cue-ink); white-space: nowrap; opacity: 0; transform: translate(-50%, 6px); transition: opacity .18s ease, transform .25s ease; }
+.basket-cue.is-visible.is-near, .basket-cue.is-visible.is-hot, .basket-cue.is-visible.is-dropping { opacity: 1; transform: translate(-50%, 0); }
+.basket-cue strong { font-size: 12px; font-weight: 500; letter-spacing: .06em; }
+.basket-cue small { display: block; margin-top: 5px; font-size: 9px; }
+.basket-cue-arrow { display: inline-block; margin-right: 7px; transition: transform .25s ease; }
+.basket-cue.is-hot .basket-cue-arrow { transform: translateY(3px); }
+@keyframes basket-settle {
+  0%, 40% { transform: translateY(-5px) scale(1.035, .985); }
+  58% { transform: translateY(2px) rotate(1.8deg) scale(1.025, .97); }
+  78% { transform: translateY(-1px) rotate(-1deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+.reduce-motion .paper-bin.is-visible, .reduce-motion .basket-front.is-visible { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .paper-bin, .basket-front, .basket-cue, .basket-glow, .basket-landing, .basket-cue-arrow { animation: none !important; transition: none !important; }
+  .paper-bin.is-visible, .basket-front.is-visible { transform: none; }
+}
 .workspace-status { display: flex; align-items: center; gap: 9px; min-height: 47px; font-size: 11px; color: var(--ink-2); }
 .workspace-status p { flex: 1; margin: 0; line-height: 1.6; }
 .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-2); flex-shrink: 0; }
@@ -110,7 +129,5 @@ h1 { font-weight:700; line-height:1.3; letter-spacing:-.04em; }
 .paper-detail { border-top:2px solid var(--ink); box-shadow:0 16px 48px #00000018; }
 .paper-detail h2 { font-weight:700; }
 .paper-grip-indicator,.status-dot { background:var(--signal); }
-.paper-bin.is-hot { color:var(--signal); }
-.paper-bin.is-hot .basket-landing { stroke:var(--signal); opacity:.65; }
-.paper-bin.is-hot .basket-opening { stroke:var(--signal); stroke-width:1.5; }
+.paper-bin.is-hot .basket-opening { stroke: #FFF5CE; }
 button:focus-visible,input:focus-visible,summary:focus-visible { outline-color:var(--ink); outline-offset:2px; }

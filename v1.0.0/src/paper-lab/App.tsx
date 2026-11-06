@@ -22,7 +22,7 @@ function PaperCanvas({ sample, gesture, reduced, object, hint, leaving, trash }:
   leaving: Action | null; trash: Rect;
 }): JSX.Element {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const visual = useRef({ ...gesture.center, progress: gesture.progress });
+  const visual = useRef({ ...gesture.center, progress: gesture.progress, scale: 1 });
   const latest = useRef({ gesture, reduced, leaving, trash });
   latest.current = { gesture, reduced, leaving, trash };
   const wake = useRef<() => void>(() => undefined);
@@ -53,7 +53,10 @@ function PaperCanvas({ sample, gesture, reduced, object, hint, leaving, trash }:
       if (Math.abs(v.y - target.center.y) < 0.08) v.y = target.center.y;
       const width = PAPER_WIDTH * (1 - v.progress) + BALL_SIZE * v.progress;
       const height = PAPER_HEIGHT * (1 - v.progress) + BALL_SIZE * v.progress;
-      let x = v.x; let y = v.y; let scale = 1; let rotate = 0; let opacity = 1;
+      const targetScale = target.phase === 'ball-moving' && contains(bin, target.last) ? 0.9 : 1;
+      v.scale += (targetScale - v.scale) * blend;
+      if (Math.abs(v.scale - targetScale) < 0.001) v.scale = targetScale;
+      let x = v.x; let y = v.y; let scale = v.scale; let rotate = 0; let opacity = 1;
       if (action) {
         if (!exit) exit = { at: time, x, y };
         const t = quiet ? 1 : Math.min(1, (time - exit.at) / 430);
@@ -85,7 +88,7 @@ function PaperCanvas({ sample, gesture, reduced, object, hint, leaving, trash }:
         hint.current.style.transform = `translate3d(${v.x}px, ${v.y + height / 2 + 22}px, 0) translateX(-50%)`;
       }
       if (painted !== v.progress) { paintPaper(canvas.current, texture, v.progress); painted = v.progress; }
-      if (!action && (v.progress !== target.progress || v.x !== target.center.x || v.y !== target.center.y)) frame = requestAnimationFrame(tick);
+      if (!action && (v.progress !== target.progress || v.x !== target.center.x || v.y !== target.center.y || v.scale !== targetScale)) frame = requestAnimationFrame(tick);
     };
     wake.current = () => { if (!frame) { lastTime = 0; frame = requestAnimationFrame(tick); } };
     wake.current();
@@ -96,7 +99,7 @@ function PaperCanvas({ sample, gesture, reduced, object, hint, leaving, trash }:
 }
 export function Paper({ sample, index, count, bounds, trash, reduced, onState, onAction, onActive }: {
   sample: Sample; index: number; count: number; bounds: Rect; trash: Rect; reduced: boolean;
-  onState: (id: number, ball: boolean, hot: boolean) => void;
+  onState: (id: number, ball: boolean, hot: boolean, near: boolean, dropping: boolean) => void;
   onAction: (sample: Sample, action: Action, at?: number) => Promise<void>;
   onActive: (text: string) => void;
 }): JSX.Element {
@@ -120,7 +123,9 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
   const cursor = useRef<Point | null>(null);
   const ball = gesture.progress === 1;
   const handling = gesture.pointer !== null;
+  const dropping = leaving === 'dismiss' && ball;
   const hot = (gesture.phase === 'ball-moving' && contains(trash, gesture.last)) || (pending && ball);
+  const near = hot || (gesture.phase === 'ball-moving' && contains({ x: trash.x - 72, y: trash.y - 72, width: trash.width + 144, height: trash.height + 144 }, gesture.last));
   const apply = useCallback((next: Gesture): void => { current.current = next; setGesture(next); }, []);
   const clearHold = (): void => { clearTimeout(holdTimer.current); holdTimer.current = undefined; };
   const resetGrip = (): void => { clearHold(); cancelAnimationFrame(automaticFrame.current); apply(cancel(current.current, bounds)); };
@@ -131,9 +136,9 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
     return () => { mounted.current = false; clearTimeout(holdTimer.current); cancelAnimationFrame(automaticFrame.current); };
   }, []);
   useEffect(() => {
-    onState(sample.id, ball || gesture.phase === 'crumpling', hot);
-    return () => onState(sample.id, false, false);
-  }, [sample.id, ball, gesture.phase, hot, onState]);
+    onState(sample.id, ball || gesture.phase === 'crumpling', hot, near, dropping);
+  }, [sample.id, ball, gesture.phase, hot, near, dropping, onState]);
+  useEffect(() => () => onState(sample.id, false, false, false, false), [sample.id, onState]);
   const prevCount = useRef(count);
   useEffect(() => {
     const grew = count > prevCount.current;
@@ -210,7 +215,7 @@ export function Paper({ sample, index, count, bounds, trash, reduced, onState, o
     if (current.current.pointer !== event.pointerId || busy.current) return;
     apply(move(current.current, pointerPoint(event), event.pointerId, bounds));
     if (current.current.phase === 'moving') { clearHold(); onActive('正在移动纸片，松手放下。'); }
-    else if (current.current.phase === 'ball-moving') onActive(contains(trash, current.current.last) ? '松手关闭本次提醒，待办仍保留。' : '纸团已揉好，拖到右下角纸篓。');
+    else if (current.current.phase === 'ball-moving') onActive(contains(trash, current.current.last) ? '松手放入 · 只关闭本次提醒，待办仍保留。' : '纸团已揉好，拖到右下角纸篓。');
   };
   const act = async (action: Action, at?: number): Promise<void> => {
     if (busy.current) return;
@@ -304,7 +309,7 @@ export function App(): JSX.Element {
   const [bounds, setBounds] = useState<Rect>({ x: 0, y: 0, width: 850, height: 640 });
   const [samples, setSamples] = useState<Sample[]>(() => [newSample(1)]);
   const [generation, setGeneration] = useState(0);
-  const [states, setStates] = useState<Record<number, { ball: boolean; hot: boolean }>>({});
+  const [states, setStates] = useState<Record<number, { ball: boolean; hot: boolean; near: boolean; dropping: boolean }>>({});
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [failNext, setFailNext] = useState(false);
   const failure = useRef(false);
@@ -324,10 +329,10 @@ export function App(): JSX.Element {
   const trash: Rect = { x: bounds.width - 200, y: bounds.height - 212, width: 176, height: 184 };
   const visible = Object.values(states).some((state) => state.ball);
   const hot = Object.values(states).some((state) => state.hot);
-  const onState = useCallback((id: number, ball: boolean, hot: boolean) => {
+  const onState = useCallback((id: number, ball: boolean, hot: boolean, near: boolean, dropping: boolean) => {
     setStates((previous) => {
-      if (previous[id]?.ball === ball && previous[id]?.hot === hot) return previous;
-      return { ...previous, [id]: { ball, hot } };
+      if (previous[id]?.ball === ball && previous[id]?.hot === hot && previous[id]?.near === near && previous[id]?.dropping === dropping) return previous;
+      return { ...previous, [id]: { ball, hot, near, dropping } };
     });
   }, []);
   const onAction = async (sample: Sample, action: Action, at?: number): Promise<void> => {
@@ -364,7 +369,7 @@ export function App(): JSX.Element {
         <div className="stage-grain" aria-hidden="true" />
         <div className="stage-caption" aria-hidden="true">留一点空白，<br />给正在发生的生活。</div>
         {samples.map((sample, index) => <Paper key={`${generation}-${sample.id}`} sample={sample} index={index} count={samples.length} bounds={bounds} trash={trash} reduced={reduced} onState={onState} onAction={onAction} onActive={setMessage} />)}
-        <PaperBin visible={visible} hot={hot} rect={trash} />
+        <PaperBin visible={visible} hot={hot} near={Object.values(states).some(state => state.near)} dropping={Object.values(states).some(state => state.dropping)} rect={trash} />
         {samples.length === 0 && <div className="stage-empty"><span>✓</span><h2>桌面轻了一点。</h2><p>这次提醒已经处理好了。</p><button onClick={reset}>再拿一张纸 ↗</button></div>}
       </div><footer className="workspace-status"><span className="status-dot" /><p role="status" aria-live="polite">{message}</p><span className="escape-hint">ESC 取消</span></footer>
       {entries.length > 0 && <ol className="event-list" aria-label="示例操作记录">{entries.map((entry) => <li key={entry.id}>{entry.text}</li>)}</ol>}
