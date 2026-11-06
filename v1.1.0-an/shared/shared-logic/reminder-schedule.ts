@@ -17,31 +17,29 @@ function isRecurring(todo: Todo): todo is RecurringTodo {
   return todo.type === 'recurring' && 'cycleType' in todo;
 }
 
-/**
- * 循环待办展开：从 nextDueDate 起按周期逐轮推进，只收「触发时间晚于 now 且在视窗内」的条目。
- * 窗口按触发时间（due - lead）判断，避免提前量把边界条目挤出去。
- */
 function recurringItems(todo: RecurringTodo, now: number, horizonMs: number, limit: number): ReminderScheduleItem[] {
+  const currentAt = todo.remindAt;
+  if (typeof currentAt !== 'number' || !Number.isFinite(currentAt)) return [];
   const lead = typeof todo.remindLeadMs === 'number' ? Math.max(0, todo.remindLeadMs) : 0;
-  let due = todo.nextDueDate
-    ?? (typeof todo.remindAt === 'number' ? todo.remindAt + lead : undefined);
-  if (typeof due !== 'number' || !Number.isFinite(due)) return [];
+  let due = todo.nextDueDate ?? currentAt + lead;
+  if (!Number.isFinite(due)) return [];
 
   const out: ReminderScheduleItem[] = [];
   const horizonEnd = now + horizonMs;
+  const remindedAt = todo.remindedAt ?? -Infinity;
+  if (currentAt > now && currentAt > remindedAt && currentAt <= horizonEnd) {
+    out.push({ todoId: todo.id, title: todo.title, at: currentAt });
+  }
+  // 稍后只替代本轮，跨过的周期合并到本次提醒，后续仍沿原锚点。
+  const resumeAfter = Math.max(now, currentAt, remindedAt);
   for (let i = 0; i < MAX_STEPS && out.length < limit; i += 1) {
-    const at = due - lead;
-    if (at <= now) {
-      const next = stepCycleDate(todo.cycleType, todo.customCycleDays, due);
-      if (typeof next !== 'number' || next <= due) break;
-      due = next;
-      continue;
-    }
-    if (at > horizonEnd) break;
-    out.push({ todoId: todo.id, title: todo.title, at });
     const next = stepCycleDate(todo.cycleType, todo.customCycleDays, due);
     if (typeof next !== 'number' || next <= due) break;
     due = next;
+    const at = due - lead;
+    if (at <= resumeAfter) continue;
+    if (at > horizonEnd) break;
+    out.push({ todoId: todo.id, title: todo.title, at });
   }
   return out;
 }
