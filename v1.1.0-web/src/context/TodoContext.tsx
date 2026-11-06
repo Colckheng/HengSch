@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useRef, ReactNode } from 'react';
 import type { Todo, RecurringTodo } from '../types';
-import { toggleTodoStatus, sortTodosByStatus, generateTodoId } from '@hengsch/shared-logic';
+import { toggleTodoStatus, sortTodosByStatus, generateTodoId, reorderTodosByIds } from '@hengsch/shared-logic';
 import { storage } from '../utils/localStorageAdapter';
 import { getDeviceId } from '../utils/device';
 
@@ -14,7 +14,7 @@ type TodoAction =
   | { type: 'ADD_TODO'; payload: Todo }
   | { type: 'UPDATE_TODO'; payload: { id: string; updates: Partial<Todo> } }
   | { type: 'DELETE_TODO'; payload: { id: string; updatedAt: number; deviceId: string } }
-  | { type: 'REORDER_TODOS'; payload: Todo[] }
+  | { type: 'REORDER_TODOS'; payload: { ids: string[]; updatedAt: number; deviceId: string } }
   | { type: 'TOGGLE_TODO_STATUS'; payload: { id: string; updatedAt: number; deviceId: string } };
 
 interface TodoContextType {
@@ -74,9 +74,19 @@ function todoReducer(state: TodoState, action: TodoAction): TodoState {
       };
     }
     case 'REORDER_TODOS': {
-      const reordered = action.payload.filter(isVisible);
-      const tombstones = state.todos.filter((todo) => !isVisible(todo));
-      return { ...state, todos: [...reordered, ...tombstones] };
+      const { ids, updatedAt, deviceId } = action.payload;
+      const reordered = reorderTodosByIds(state.todos, ids);
+      if (reordered === state.todos) return state;
+      const visible = state.todos.filter(isVisible);
+      const normalizeOrder = visible.some((todo, index) => index > 0 && todo.order <= visible[index - 1].order);
+      let rank = 0;
+      // 重复或倒序键必须重编号，否则同步会撤销拖动；正常键沿用原槽位。
+      const todos = reordered.map((todo, index) => {
+        if (todo.deleted) return todo;
+        const order = normalizeOrder ? rank++ : state.todos[index].order;
+        return todo.order !== order ? { ...todo, order, updatedAt, deviceId } : todo;
+      });
+      return { ...state, todos };
     }
     case 'TOGGLE_TODO_STATUS': {
       const { id, updatedAt, deviceId } = action.payload;
@@ -181,15 +191,10 @@ export function TodoProvider({ children }: { children: ReactNode }): JSX.Element
   };
 
   const reorderTodos = (todos: Todo[]) => {
-    const updatedAt = Date.now();
-    const deviceId = deviceIdRef.current;
-    // 只有顺序真正变化的记录才盖章，避免拖拽把无关任务的版本顶掉
-    const stamped = todos
-      .filter(isVisible)
-      .map((todo, index) =>
-        todo.order === index ? todo : { ...todo, order: index, updatedAt, deviceId }
-      );
-    dispatch({ type: 'REORDER_TODOS', payload: stamped });
+    dispatch({
+      type: 'REORDER_TODOS',
+      payload: { ids: todos.map(todo => todo.id), updatedAt: Date.now(), deviceId: deviceIdRef.current }
+    });
   };
 
   const visibleTodos = state.todos.filter(isVisible);

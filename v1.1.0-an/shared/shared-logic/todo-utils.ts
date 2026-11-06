@@ -97,6 +97,31 @@ export function sortTodosByStatus(todos: Todo[]): Todo[] {
   ];
 }
 
+/** 不可变前插；null 表示追加，失效 ID 或原位拖动不改变数组。 */
+export function moveTodoBefore(todos: Todo[], draggedId: string, beforeId: string | null): Todo[] {
+  const from = todos.findIndex(todo => todo.id === draggedId);
+  const before = beforeId === null ? todos.length : todos.findIndex(todo => todo.id === beforeId);
+  if (from === -1 || before === -1 || draggedId === beforeId) return todos;
+  const to = before > from ? before - 1 : before;
+  if (from === to) return todos;
+  const next = [...todos];
+  const [dragged] = next.splice(from, 1);
+  next.splice(to, 0, dragged);
+  return next;
+}
+
+/** 仅将有效、唯一的可见 ID 放回它们原来的槽位，始终使用当前 state 对象。 */
+export function reorderTodosByIds(todos: Todo[], ids: string[]): Todo[] {
+  const visible = new Map(todos.filter(todo => !todo.deleted).map(todo => [todo.id, todo]));
+  const selected = new Set(ids.filter(id => visible.has(id)));
+  const ordered = Array.from(selected, id => visible.get(id)!);
+  let index = 0;
+  const next = todos.map(todo =>
+    !todo.deleted && selected.has(todo.id) ? ordered[index++] : todo
+  );
+  return next.every((todo, i) => todo === todos[i]) ? todos : next;
+}
+
 /**
  * 按分组筛选待办事项
  */

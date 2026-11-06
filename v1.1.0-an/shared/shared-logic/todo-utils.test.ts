@@ -1,9 +1,69 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { calculateNextDueDate, toggleTodoStatus } from './todo-utils';
+import { calculateNextDueDate, toggleTodoStatus, moveTodoBefore, reorderTodosByIds } from './todo-utils';
 import type { Todo, RecurringTodo } from '@hengsch/shared-types';
 
 const at = (iso: string): number => Date.parse(iso);
 const HOUR = 3_600_000;
+
+const task = (id: string, order: number, overrides: Partial<Todo> = {}): Todo => ({
+  id, title: id, type: 'once', status: 'pending', createdAt: 1, order, ...overrides
+});
+
+describe('moveTodoBefore · 拖放不丢任务', () => {
+  it.each([
+    ['a', null, ['b', 'c', 'a']],
+    ['c', 'a', ['c', 'a', 'b']],
+    ['a', 'c', ['b', 'a', 'c']],
+    ['b', 'b', ['a', 'b', 'c']],
+    ['b', 'c', ['a', 'b', 'c']],
+    ['c', null, ['a', 'b', 'c']]
+  ] as const)('移动 %s 到 %s 前（null 为末尾）', (id, before, expected) => {
+    const todos = [task('a', 0), task('b', 1), task('c', 2)];
+    const result = moveTodoBefore(todos, id, before);
+    expect(result.map(t => t.id)).toEqual(expected);
+    expect(todos.map(t => t.id)).toEqual(['a', 'b', 'c']);
+    result.forEach(t => expect(t).toBe(todos.find(original => original.id === t.id)));
+  });
+
+  it.each([['missing', 'a'], ['a', 'missing'], ['a', 'a'], ['missing', null]])(
+    '无效或自身落点保持原数组：%s → %s', (id, before) => {
+      const todos = [task('a', 0), task('b', 1)];
+      expect(moveTodoBefore(todos, id!, before)).toBe(todos);
+    }
+  );
+});
+
+describe('reorderTodosByIds · 仅重排指定可见任务槽位', () => {
+  it('分组子集重排保持其他分组位置和对象', () => {
+    const todos = [task('a', 0, { groupId: 'g' }), task('x', 1), task('b', 2, { groupId: 'g' }), task('y', 3)];
+    const result = reorderTodosByIds(todos, ['b', 'a']);
+    expect(result).toEqual([todos[2], todos[1], todos[0], todos[3]]);
+    expect(result[1]).toBe(todos[1]);
+    expect(result[3]).toBe(todos[3]);
+    expect(todos.map(t => t.id)).toEqual(['a', 'x', 'b', 'y']);
+  });
+
+  it('忽略重复和失效 ID，遗漏项与墓碑保持原槽位', () => {
+    const todos = [task('a', 0), task('dead', 1, { deleted: true }), task('omitted', 2), task('b', 3)];
+    const result = reorderTodosByIds(todos, ['b', 'dead', 'b', 'missing', 'a']);
+    expect(result.map(t => t.id)).toEqual(['b', 'dead', 'omitted', 'a']);
+    expect(result[1]).toBe(todos[1]);
+    expect(result[2]).toBe(todos[2]);
+  });
+
+  it('使用最新 state 对象，保留编辑字段与同步元数据', () => {
+    const todos = [task('a', 0), task('b', 1, { title: '最新标题', status: 'completed', updatedAt: 999, deviceId: 'new-device' })];
+    const result = reorderTodosByIds(todos, ['b', 'a']);
+    expect(result[0]).toBe(todos[1]);
+    expect(result[0]).toMatchObject({ title: '最新标题', status: 'completed', updatedAt: 999, deviceId: 'new-device' });
+    expect(result[1]).toBe(todos[0]);
+  });
+
+  it.each([[], ['missing'], ['a'], ['a', 'b'], ['b', 'b']])('无有效换位保持原数组：%j', (...ids) => {
+    const todos = [task('a', 0), task('b', 1)];
+    expect(reorderTodosByIds(todos, ids)).toBe(todos);
+  });
+});
 
 describe('calculateNextDueDate · 保时刻推进', () => {
   it('daily：锚点保 HH:MM，推进到严格晚于 now 的最近一轮', () => {
