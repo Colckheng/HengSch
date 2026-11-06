@@ -659,8 +659,8 @@ export function commitProposal(id: string, patch?: unknown): void {
   }
   const ctx = contextFromStore(lastProcessNames);
   const next = applyProposal(entry.proposal, ctx, patch);
-  proposals.delete(id);
   storeRef!.set('todos', next);
+  proposals.delete(id);
   push('sync:merged', { todos: next, groups: ctx.groups });
 }
 

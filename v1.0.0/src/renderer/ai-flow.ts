@@ -111,22 +111,26 @@ export function insertStaged(state: FlowState, proposals: AiProposal[]): FlowSta
 export function commitCard(state: FlowState, cardEntryId: string): FlowState {
   let found = false;
   const entries = state.entries.map((entry) => {
-    if (entry.kind === 'card' && entry.id === cardEntryId && entry.status === 'pending') {
+    if (entry.kind === 'card' && entry.id === cardEntryId && (entry.status === 'pending' || entry.status === 'error')) {
       found = true;
       return { ...entry, status: 'committed' as const, errorText: undefined };
     }
     return entry;
   });
-  const base: FlowState = { ...state, entries, committed: found ? state.committed + 1 : state.committed };
+  if (!found) return state;
+  const base: FlowState = { ...state, entries, committed: state.committed + 1 };
   return finalizeIfDone(showNext(base));
 }
 
 /** 取消：就地转已取消 + 插入「这条怎么办？」问句行（不出队、不落盘） */
 export function cancelCard(state: FlowState, cardEntryId: string): FlowState {
-  const index = state.entries.findIndex((entry) => entry.id === cardEntryId && entry.kind === 'card');
+  const index = state.entries.findIndex((entry) =>
+    entry.id === cardEntryId && entry.kind === 'card' &&
+    (entry.status === 'pending' || entry.status === 'error' || entry.status === 'stale')
+  );
   if (index < 0) return state;
-  const entries = state.entries.map((entry) =>
-    entry.kind === 'card' && entry.id === cardEntryId && entry.status === 'pending'
+  const entries = state.entries.map((entry, entryIndex) =>
+    entry.kind === 'card' && entryIndex === index
       ? { ...entry, status: 'rejected' as const, errorText: undefined }
       : entry
   );
@@ -142,9 +146,11 @@ export function skipCard(state: FlowState, cardEntryId: string): FlowState {
   return finalizeIfDone(showNext(base));
 }
 
-/** 新会话：清空文字/系统行/终态卡，只保留待确认卡与队列（D-B） */
+/** 新会话保留待确认和可重试卡，避免未决队列失去入口。 */
 export function resetSession(state: FlowState): FlowState {
-  const live = state.entries.filter((entry) => entry.kind === 'card' && entry.status === 'pending');
+  const live = state.entries.filter((entry) =>
+    entry.kind === 'card' && (entry.status === 'pending' || entry.status === 'error')
+  );
   const keepBatch = live.length > 0 || state.queue.length > 0;
   return {
     ...state,

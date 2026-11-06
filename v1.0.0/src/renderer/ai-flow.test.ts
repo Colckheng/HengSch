@@ -77,6 +77,56 @@ it('serial commits advance the queue and end with the system line', () => {
   assert.equal((last(state) as Extract<FlowEntry, { kind: 'system' }>).content, '完成 2 · 跳过 0');
 });
 
+it('retrying an errored card commits once and advances only one queued proposal', () => {
+  const initial = insertStaged(emptyFlow(), [proposal(), proposal(), proposal()]);
+  const id = cards(initial)[0].id;
+  const failed = markCard(initial, id, 'error', '写入失败');
+  const retried = commitCard(failed, id);
+  assert.equal(cards(retried)[0].status, 'committed');
+  assert.equal(cards(retried)[0].errorText, undefined);
+  assert.equal(retried.committed, 1);
+  assert.equal(cards(retried).length, 2);
+  assert.deepEqual(retried.queue, initial.queue.slice(1));
+  assert.equal(commitCard(retried, id), retried);
+  assert.equal(cancelCard(retried, id), retried);
+});
+
+for (const status of ['pending', 'error', 'stale'] as const) {
+  it(`canceling a ${status} card inserts one ask and can finish the batch`, () => {
+    const initial = insertStaged(emptyFlow(), [proposal(), proposal()]);
+    const id = cards(initial)[0].id;
+    const marked = markCard(initial, id, status, '旧错误');
+    const canceled = cancelCard(marked, id);
+    assert.equal(cards(canceled)[0].status, 'rejected');
+    assert.equal(cards(canceled)[0].errorText, undefined);
+    assert.equal(asks(canceled).length, 1);
+    assert.deepEqual(canceled.queue, initial.queue);
+    assert.equal(canceled.committed, 0);
+    assert.equal(canceled.skipped, 0);
+    assert.equal(cancelCard(canceled, id), canceled);
+    assert.equal(commitCard(canceled, id), canceled);
+    const skipped = skipCard(canceled, id);
+    assert.equal(skipped.skipped, 1);
+    assert.equal(asks(skipped).length, 0);
+    const done = commitCard(skipped, cards(skipped)[1].id);
+    assert.equal((last(done) as Extract<FlowEntry, { kind: 'system' }>).content, '完成 1 · 跳过 1');
+  });
+}
+
+it('stale and invalid commit targets cannot consume the queue or alter counts', () => {
+  const initial = appendText(insertStaged(emptyFlow(), [proposal(), proposal(), proposal()]), 'user', 'hi');
+  const id = cards(initial)[0].id;
+  const stale = markCard(initial, id, 'stale', '已过期');
+  assert.equal(commitCard(stale, id), stale);
+  for (const invalidId of ['missing', last(initial).id, initial.queue[0].id]) {
+    assert.equal(commitCard(initial, invalidId), initial);
+    assert.equal(cancelCard(initial, invalidId), initial);
+  }
+  const committed = commitCard(initial, id);
+  assert.equal(commitCard(committed, id), committed);
+  assert.equal(cancelCard(committed, id), committed);
+});
+
 it('single staged proposal never emits a system line', () => {
   let state = insertStaged(emptyFlow(), [proposal(undefined, 'solo')]);
   const card = cards(state)[0];
@@ -122,6 +172,20 @@ it('resetSession clears text and settled cards but keeps pending cards and queue
   assert.equal(cards(state)[0].status, 'pending');
   assert.equal(state.entries.some((entry) => entry.kind === 'text' || entry.kind === 'summary' || entry.kind === 'system'), false);
   assert.equal(state.committed, 1);
+});
+
+it('resetSession preserves an errored card so retry can release the queue', () => {
+  const initial = insertStaged(emptyFlow(), [proposal(undefined, 'retry'), proposal(undefined, 'next')]);
+  const id = cards(initial)[0].id;
+  const failed = markCard(initial, id, 'error', '写盘失败');
+  const reset = resetSession(appendText(failed, 'user', '新会话'));
+  assert.equal(cards(reset).length, 1);
+  assert.equal(cards(reset)[0].status, 'error');
+  assert.deepEqual(reset.queue, failed.queue);
+  const retried = commitCard(reset, id);
+  assert.equal(retried.committed, 1);
+  assert.equal(cards(retried)[1].status, 'pending');
+  assert.equal(retried.queue.length, 0);
 });
 
 it('resetSession with no live work clears all cards and resets counters', () => {

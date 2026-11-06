@@ -1,6 +1,6 @@
 import { it, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings, initAiService, runAiChat, cancelAiChat, parseMonitorVerdict, requestMonitorVerdict, commitProposalBatch, listQueuedProposals, refreshProposalExpiry, rejectProposal } from './ai-service';
+import { createSseFeed, accumulateToolCalls, compactTodoLines, buildSystemPrompt, writeAiSettings, initAiService, runAiChat, cancelAiChat, parseMonitorVerdict, requestMonitorVerdict, commitProposal, commitProposalBatch, listQueuedProposals, refreshProposalExpiry, rejectProposal } from './ai-service';
 import type { Todo, Group } from '@hengsch/shared-types';
 import type Store from 'electron-store';
 
@@ -274,6 +274,31 @@ it('a changed, removed or deleted later target cannot partially apply a batch', 
       assert.deepEqual(listQueuedProposals(), [pending[3]]);
     });
   }
+});
+
+it('a single proposal survives disk failure and retry consumes it only after saving', async (t) => {
+  const { data, writes, pushed, fault, pending } = await stagedDeleteBatch(t);
+  const before = structuredClone(data.todos);
+  const id = pending[3].id;
+  fault.nextTodoWrite = true;
+  assert.throws(() => commitProposal(id), /disk failure/);
+  assert.deepEqual(data.todos, before);
+  assert.deepEqual(listQueuedProposals(), pending);
+  assert.deepEqual(writes, []);
+  assert.deepEqual(pushed, []);
+
+  commitProposal(id);
+  assert.equal(data.todos.length, 4);
+  assert.equal(data.todos[3].title, '接续任务');
+  assert.deepEqual(data.todos.slice(0, 3), before);
+  assert.deepEqual(listQueuedProposals(), pending.slice(0, 3));
+  assert.deepEqual(writes, ['todos']);
+  assert.deepEqual(pushed, [{ channel: 'sync:merged', payload: { todos: data.todos, groups: [] } }]);
+  const saved = structuredClone(data.todos);
+  assert.throws(() => commitProposal(id), /过期/);
+  assert.deepEqual(data.todos, saved);
+  assert.deepEqual(writes, ['todos']);
+  assert.equal(pushed.length, 1);
 });
 
 it('a batch disk failure preserves all proposals and a retry cannot write twice', async (t) => {
