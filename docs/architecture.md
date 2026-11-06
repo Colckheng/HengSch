@@ -38,7 +38,7 @@ HengSch/
 
 | 端 | 方式 | 关键点 |
 |---|---|---|
-| **桌面** | workspace 依赖 `@hengsch/shared-*` | 解析到包 `dist/`，需先 `npm run build:packages` |
+| **桌面** | Vite alias + tsconfig `paths` 指向 `../packages/*/src/index.ts` | **源码直引**，无需预构建 |
 | **Web** | Vite alias 源码直引 | `vite.config.ts` 将 `@hengsch/shared-*` 指向 `../packages/*/src/index.ts` |
 | **移动端** | 内嵌副本 `shared/` | Metro 编译副本，与 monorepo 解耦 |
 
@@ -63,7 +63,7 @@ HengSch/
 | 模块 | 核心导出 | 单测覆盖 |
 |---|---|---|
 | `todo-utils.ts` | `calculateNextDueDate`, `toggleTodoStatus`, `sortTodosByStatus`, `filterTodosByGroup`, `generateTodoId/GroupId` | ✅ |
-| `sync.ts` | `normalizeSynced`, `pickWinner` (LWW), `mergeSyncStates`, `parseSyncFile`, `TOMBSTONE_TTL_MS=30d` | ✅ 62项 |
+| `sync.ts` | `normalizeSynced`, `pickWinner` (LWW), `mergeSyncStates`, `parseSyncFile`, `TOMBSTONE_TTL_MS=30d` | ✅ 29项 |
 | `monitor.ts` | 进程监测进度、退出沿检测、询问裁决 | ✅ |
 
 > 输出：ESM (`module: dist/index.js`)，兼容 Vite/Rollup 命名导出
@@ -205,8 +205,8 @@ Swiss UI 组件 + Context + 原生 HTML5 拖拽排序 + `WindowControls` 无边�
 
 | 层 | 命令 | 覆盖 |
 |---|---|---|
-| shared-logic | `npm test` (vitest) | LWW、墓碑、孤儿改绑、排序收敛、monitor (62 项) |
-| sync-bridge | `cd services/sync-bridge && npm test` | 鉴权、etag/409、原子写、CORS、413/404/405 (11项) |
+| shared-logic | `npm test` (vitest) | LWW、墓碑、孤儿改绑、排序收敛、monitor (140 项) |
+| sync-bridge | `cd services/sync-bridge && npm test` | 鉴权、etag/409、原子写、并发 PUT、CORS、413/400/404/405 (13 项) |
 | 桌面 | `npx tsc --noEmit` + `npm run lint` | 类型 + ESLint 零警告 |
 | Web | `npx tsc --noEmit` + `npm run build` | 严格类型 + 生产构建 (含 PWA) |
 | 手机 | `npx tsc --noEmit` | 类型 (改 shared 后先 `npm run sync-shared`) |
