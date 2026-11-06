@@ -145,7 +145,7 @@ ssh2 连接 → `ext_openssh_expandPath` 展开 `~/` → 读远端 → `mergeSyn
 
 1. `npx tsc --noEmit`
 2. `npm run lint`（零警告）
-3. 仓库根 `npm test`（shared-logic 62 项，覆盖本端复用的合并 / 循环续期 / 监测询问逻辑）
+3. 仓库根 `npm test`（本端 87 项 + shared-logic 140 项 + sync-bridge 13 项；shared-logic 覆盖本端复用的合并 / 循环续期 / 监测询问逻辑）
 
 ## 已知问题
 
