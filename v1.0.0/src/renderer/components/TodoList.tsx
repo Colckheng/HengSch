@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import type { Todo } from '../types';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
@@ -18,6 +18,12 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
   const listRef = useRef<HTMLDivElement>(null);
   const positionsRef = useRef<Map<string, number>>(new Map());
   const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => {
+    if (selectedGroupId !== 'all' && !groupState.groups.some((group) => group.id === selectedGroupId)) {
+      setSelectedGroupId('all');
+    }
+  }, [groupState.groups, selectedGroupId]);
 
   useLayoutEffect(() => {
     const list = listRef.current;

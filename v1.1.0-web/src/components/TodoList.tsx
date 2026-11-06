@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import type { Todo } from '../types';
+import { moveTodoBefore } from '@hengsch/shared-logic';
 import { useTodos } from '../context/TodoContext';
 import { useGroups } from '../context/GroupContext';
 import { TodoCard } from './TodoCard';
@@ -23,6 +24,12 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
   const positionsRef = useRef<Map<string, number>>(new Map());
   const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const suppressClickRef = useRef(false);
+
+  useEffect(() => {
+    if (selectedGroupId !== 'all' && !groupState.groups.some((group) => group.id === selectedGroupId)) {
+      setSelectedGroupId('all');
+    }
+  }, [groupState.groups, selectedGroupId]);
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -68,11 +75,11 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
     const draggedId = e.dataTransfer.getData('text/plain');
 
     if (draggedId && targetId && draggedId !== targetId) {
-      const oldIndex = state.todos.findIndex((todo) => todo.id === draggedId);
-      const newIndex = state.todos.findIndex((todo) => todo.id === targetId);
+      const oldIndex = filteredTodos.findIndex((todo) => todo.id === draggedId);
+      const newIndex = filteredTodos.findIndex((todo) => todo.id === targetId);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newTodos = [...state.todos];
+        const newTodos = [...filteredTodos];
         const [removed] = newTodos.splice(oldIndex, 1);
         newTodos.splice(newIndex, 0, removed);
         reorderTodos(newTodos);
@@ -80,20 +87,12 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
     }
   };
 
-  // 触屏拖拽的落点应用需读取最新 state.todos：每轮渲染刷新 ref
+  // 每轮渲染刷新 ref，落点应用于当前筛选列表。
   const touchDropRef = useRef<(draggedId: string, insertBeforeId: string | null) => void>(() => undefined);
   useEffect(() => {
     touchDropRef.current = (draggedId, insertBeforeId) => {
-      const arr = state.todos;
-      const dragged = arr.find((t) => t.id === draggedId);
-      if (!dragged) return;
-      const next = arr.filter((t) => t.id !== draggedId);
-      if (insertBeforeId && insertBeforeId !== draggedId) {
-        const idx = next.findIndex((t) => t.id === insertBeforeId);
-        if (idx !== -1) next.splice(idx, 0, dragged);
-      }
-      if (next.every((t, i) => t.id === arr[i]?.id)) return;
-      reorderTodos(next);
+      const next = moveTodoBefore(filteredTodos, draggedId, insertBeforeId);
+      if (next !== filteredTodos) reorderTodos(next);
     };
   });
 
@@ -129,6 +128,7 @@ export function TodoList({ onEdit, onDetail }: TodoListProps): JSX.Element {
     const boundaryAt = (y: number): string | null => {
       const rows = Array.from(list.querySelectorAll<HTMLElement>('[data-flip-id]'));
       for (const r of rows) {
+        if (r.dataset.flipId === touch.id) continue;
         const rect = r.getBoundingClientRect();
         if (y < rect.top + rect.height / 2) return r.dataset.flipId ?? null;
       }
