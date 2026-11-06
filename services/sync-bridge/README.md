@@ -54,7 +54,7 @@ bash scripts/probe.sh http://<SERVER_IP>:8642 <SYNC_TOKEN>   # 9 项全绿
 ## 测试
 
 ```bash
-npm test          # node --test，11 项：鉴权、etag/409、原子写、回读、CORS（OPTIONS/ACAO）、413/404/405
+npm test          # node --test，13 项：鉴权、etag/409、原子写、并发 PUT、回读、CORS（OPTIONS/ACAO）、413/400/404/405
 ```
 
 ## 客户端配对
