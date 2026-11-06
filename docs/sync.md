@@ -57,7 +57,7 @@
 
 ## 三、合并算法 (`packages/shared-logic/src/sync.ts`)
 
-`mergeSyncStates(local, remote, now)` — 纯函数，62 项单测覆盖。
+`mergeSyncStates(local, remote, now)` — 纯函数，29 项单测覆盖。
 
 1. **补齐元数据**：两边记录先过 `normalizeSynced` (补 `updatedAt`/`deviceId`)
 2. **逐条 LWW** (`pickWinner`)：
